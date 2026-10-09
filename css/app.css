@@ -149,7 +149,7 @@ a { color: var(--c-primary); }
 }
 .palette-item:hover { border-color: var(--c-primary); background: var(--c-hover); }
 .palette-item img, .palette-item .ph { width: 24px; height: 24px; flex: none; }
-.palette-item .ph, .tree .ph { display: inline-grid; place-items: center; background: var(--c-primary); color: #fff; border-radius: 4px; font-size: 8px; font-weight: 700; }
+.ph { display: inline-grid; flex: none; overflow: hidden; line-height: 1; place-items: center; background: var(--c-primary); color: #fff; border-radius: 4px; font-size: 8px; font-weight: 700; }
 .palette-note { color: var(--c-muted); font-size: 11px; margin: 8px 2px; }
 
 /* explorer tree */
