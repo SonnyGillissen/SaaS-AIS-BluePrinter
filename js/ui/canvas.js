@@ -155,7 +155,7 @@
     function renderOverlay(g, st) {
       while (overlay.firstChild) overlay.removeChild(overlay.firstChild);
       const single = store.singleNode();
-      if (single && g.rects[single.id] && !g.rects[single.id].hidden && !(gesture && gesture.type === 'move')) {
+      if (single && g.rects[single.id] && !g.rects[single.id].hidden && !(gesture && gesture.type === 'move' && gesture.moved)) {
         const r = g.rects[single.id];
         const handle = svgEl('g', { class: 'handle', 'data-handle': 'connect', 'data-node-id': single.id });
         const t = svgEl('title', {});
@@ -332,6 +332,9 @@
         } else {
           store.rollback(gst.snapshot);
         }
+        queueRender();
+      } else if (gst.type === 'move') {
+        // A plain click (no drag): make sure the selection handles are drawn.
         queueRender();
       }
       if (gst.type === 'resize') {
