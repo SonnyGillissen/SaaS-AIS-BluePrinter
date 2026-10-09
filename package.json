@@ -1,0 +1,18 @@
+{
+  "name": "ais-blueprinter",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Visual designer for Azure Integration Services architectures. Runs entirely in the browser; no build step, no runtime dependencies.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/SonnyGillissen/SaaS-AIS-BluePrinter.git"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "node --test",
+    "mirror-icons": "node tools/mirror-icons.js"
+  }
+}
