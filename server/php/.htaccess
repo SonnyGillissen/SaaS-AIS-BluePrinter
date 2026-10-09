@@ -1,0 +1,14 @@
+# AIS BluePrinter - protect server-side files on Apache.
+# Only api.php and install.php are meant to be requested by browsers.
+Options -Indexes
+<IfModule mod_authz_core.c>
+  <FilesMatch "^(config\.php|config\.sample\.php|lib\.php|setup-cli\.php|install\.lock|.*\.sql)$">
+    Require all denied
+  </FilesMatch>
+</IfModule>
+<IfModule !mod_authz_core.c>
+  <FilesMatch "^(config\.php|config\.sample\.php|lib\.php|setup-cli\.php|install\.lock|.*\.sql)$">
+    Order allow,deny
+    Deny from all
+  </FilesMatch>
+</IfModule>

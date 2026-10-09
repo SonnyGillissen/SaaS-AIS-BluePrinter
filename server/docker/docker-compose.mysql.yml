@@ -1,0 +1,37 @@
+# AIS BluePrinter + MySQL - one-click setup.
+#   docker compose -f server/docker/docker-compose.mysql.yml up -d --build
+# (or run ./install.sh mysql / .\install.ps1 -Database mysql, which also generates passwords)
+# Open http://localhost:8080 afterwards.
+name: ais-blueprinter-mysql
+services:
+  db:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: aisbp
+      MYSQL_USER: aisbp
+      MYSQL_PASSWORD: ${AISBP_DB_PASSWORD:?Set AISBP_DB_PASSWORD (see server/docker/.env.example)}
+      MYSQL_ROOT_PASSWORD: ${AISBP_DB_ROOT_PASSWORD:?Set AISBP_DB_ROOT_PASSWORD}
+    volumes:
+      - db-data:/var/lib/mysql
+  web:
+    build:
+      context: ../..
+      dockerfile: server/docker/Dockerfile
+      args:
+        DB_DRIVER: mysql
+    restart: unless-stopped
+    depends_on:
+      - db
+    environment:
+      AISBP_DB_DRIVER: mysql
+      AISBP_DB_HOST: db
+      AISBP_DB_PORT: "3306"
+      AISBP_DB_NAME: aisbp
+      AISBP_DB_USER: aisbp
+      AISBP_DB_PASSWORD: ${AISBP_DB_PASSWORD}
+      AISBP_API_KEY: ${AISBP_API_KEY:-}
+    ports:
+      - "${AISBP_PORT:-8080}:80"
+volumes:
+  db-data:
