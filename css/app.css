@@ -222,6 +222,8 @@ a { color: var(--c-primary); }
 
 /* ---------------------------------------------------------------- canvas */
 .canvas-wrap { position: relative; overflow: hidden; min-width: 0; outline: none; }
+/* Set on <html> while a canvas gesture runs, so Safari does not select page text. */
+.no-select, .no-select * { -webkit-user-select: none !important; user-select: none !important; }
 .canvas { width: 100%; height: 100%; display: block; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 .canvas.panning { cursor: grabbing; }
 .canvas .node { cursor: move; }

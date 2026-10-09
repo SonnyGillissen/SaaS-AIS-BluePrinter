@@ -222,9 +222,21 @@
     // canvas, which selects the whole page while dragging. Pointer events still drive all gestures.
     svg.addEventListener('mousedown', (e) => e.preventDefault());
     svg.addEventListener('selectstart', (e) => e.preventDefault());
+    // While a gesture runs (e.g. drawing a connection) the pointer can leave the canvas; Safari
+    // then selects the text of the whole page. Block selection page-wide until the gesture ends.
+    doc.addEventListener('selectstart', (e) => { if (gesture) e.preventDefault(); });
+
+    function lockSelection(on) {
+      doc.documentElement.classList.toggle('no-select', on);
+      if (on) {
+        const sel = root.getSelection && root.getSelection();
+        if (sel && sel.rangeCount) sel.removeAllRanges();
+      }
+    }
 
     svg.addEventListener('pointerdown', (e) => {
       if (e.button !== 0 && e.button !== 1) return;
+      lockSelection(true);
       wrap.focus({ preventScroll: true });
       const pt = toCanvas(e.clientX, e.clientY);
       const handleEl = e.target.closest('[data-handle]');
@@ -246,7 +258,7 @@
         const id = nodeEl.getAttribute('data-node-id');
         if (additive) store.select([id], [], true);
         else if (!store.selection.nodes.has(id)) store.select([id]);
-        if (!store.selection.nodes.has(id)) { gesture = null; return; }
+        if (!store.selection.nodes.has(id)) { gesture = null; lockSelection(false); return; }
         const ids = Model.topLevelOnly(store.project, store.selectedNodes());
         const node = store.project.nodes[id];
         const exclude = new Set();
@@ -268,6 +280,7 @@
         gesture = { type: 'pan', sx: e.clientX, sy: e.clientY, vx: view.x, vy: view.y, clickClear: true };
         svg.classList.add('panning');
       }
+      if (!gesture) lockSelection(false);
     });
 
     svg.addEventListener('pointermove', (e) => {
@@ -320,6 +333,7 @@
       if (!gesture) return;
       const gst = gesture;
       gesture = null;
+      lockSelection(false);
       svg.classList.remove('panning');
       try { svg.releasePointerCapture(e.pointerId); } catch (err) { /* already released */ }
       if (gst.type === 'pan' && gst.clickClear && !cancelled) store.clearSelection();
