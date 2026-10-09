@@ -191,11 +191,17 @@ a { color: var(--c-primary); }
   border-radius: var(--radius);
   background: var(--c-input);
   cursor: grab;
+  color: var(--c-text);
+  -webkit-user-select: none;
+  user-select: none;
   font-size: 11.5px;
   line-height: 1.2;
   text-align: left;
   min-height: 38px;
 }
+/* Safari needs -webkit-user-drag to start HTML5 drags from non-link elements reliably. */
+[draggable='true'] { -webkit-user-drag: element; }
+.palette-item:focus-visible { outline: 2px solid var(--c-primary); outline-offset: 1px; }
 .palette-item:hover { border-color: var(--c-primary); background: var(--c-hover); }
 .palette-item img, .palette-item .ph { width: 24px; height: 24px; flex: none; }
 .ph { display: inline-grid; flex: none; overflow: hidden; line-height: 1; place-items: center; background: var(--c-primary); color: #fff; border-radius: 4px; font-size: 8px; font-weight: 700; }
@@ -204,7 +210,7 @@ a { color: var(--c-primary); }
 /* explorer tree */
 .tree, .tree ul { list-style: none; margin: 0; padding: 0; }
 .tree ul { padding-left: 14px; border-left: 1px dotted var(--c-border); margin-left: 9px; }
-.tree-row { display: flex; align-items: center; gap: 6px; padding: 2px 4px; border-radius: 4px; cursor: pointer; user-select: none; }
+.tree-row { display: flex; align-items: center; gap: 6px; padding: 2px 4px; border-radius: 4px; cursor: pointer; -webkit-user-select: none; user-select: none; }
 .tree-row:hover { background: var(--c-hover); }
 .tree-row.selected { background: var(--c-selected); }
 .tree-row.drop-ok { outline: 2px dashed var(--c-primary); }
@@ -216,7 +222,7 @@ a { color: var(--c-primary); }
 
 /* ---------------------------------------------------------------- canvas */
 .canvas-wrap { position: relative; overflow: hidden; min-width: 0; outline: none; }
-.canvas { width: 100%; height: 100%; display: block; touch-action: none; user-select: none; }
+.canvas { width: 100%; height: 100%; display: block; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 .canvas.panning { cursor: grabbing; }
 .canvas .node { cursor: move; }
 .canvas .connection { cursor: pointer; }

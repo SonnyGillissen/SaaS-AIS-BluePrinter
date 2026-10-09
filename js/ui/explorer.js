@@ -32,18 +32,21 @@
     }
 
     function dropHandlers(target, targetId) {
-      target.addEventListener('dragover', (e) => {
+      // Safari only allows a drop when both dragenter and dragover are cancelled.
+      const allow = (e) => {
         if (!canDrop(targetId)) return;
         e.preventDefault();
         e.dataTransfer.dropEffect = dragIds ? 'move' : 'copy';
         target.classList.add('drop-ok');
-      });
+      };
+      target.addEventListener('dragenter', allow);
+      target.addEventListener('dragover', allow);
       target.addEventListener('dragleave', () => target.classList.remove('drop-ok'));
       target.addEventListener('drop', (e) => {
         target.classList.remove('drop-ok');
         e.preventDefault();
         e.stopPropagation();
-        const type = e.dataTransfer.getData(AISBP.Palette.DRAG_TYPE);
+        const type = e.dataTransfer.getData(AISBP.Palette.DRAG_TYPE) || app.dragType;
         if (dragIds) app.actions.reparent(dragIds, targetId);
         else if (type) app.actions.addInto(type, targetId);
         dragIds = null;

@@ -34,13 +34,22 @@
         const details = h('details', { class: 'palette-group', open: q || !collapsed.has(cat.id) },
           h('summary', { text: cat.label + ' (' + types.length + ')' }),
           h('div', { class: 'palette-items' }, types.map((t) => {
-            const item = h('button', {
-              type: 'button',
+            // A <div role="button"> instead of <button>: Safari (WebKit) does not start HTML5
+            // drags from button elements and selects the page text instead.
+            const item = h('div', {
+              role: 'button',
+              tabindex: '0',
               class: 'palette-item',
               draggable: 'true',
               title: t.label + (t.provider ? '\n' + t.provider : '') + '\nDrag onto the canvas or click to add',
               'data-type': t.id,
               onclick: () => app.actions.addAuto(t.id),
+              onkeydown: (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  app.actions.addAuto(t.id);
+                }
+              },
               ondragstart: (e) => {
                 e.dataTransfer.setData(DRAG_TYPE, t.id);
                 e.dataTransfer.setData('text/plain', t.label);

@@ -218,6 +218,11 @@
       return d.snapToGrid !== false ? Math.round(v / gs) * gs : v;
     };
 
+    // Safari (WebKit) starts a text selection on mousedown even with user-select: none on the
+    // canvas, which selects the whole page while dragging. Pointer events still drive all gestures.
+    svg.addEventListener('mousedown', (e) => e.preventDefault());
+    svg.addEventListener('selectstart', (e) => e.preventDefault());
+
     svg.addEventListener('pointerdown', (e) => {
       if (e.button !== 0 && e.button !== 1) return;
       wrap.focus({ preventScroll: true });
@@ -394,6 +399,12 @@
       if (types.indexOf(AISBP.Palette.DRAG_TYPE) !== -1 || app.dragType) return app.dragType || 'unknown';
       return null;
     }
+
+    // Safari only allows a drop when both dragenter and dragover are cancelled.
+    wrap.addEventListener('dragenter', (e) => {
+      const files = Array.from(e.dataTransfer.types || []).indexOf('Files') !== -1;
+      if (paletteType(e) || files) e.preventDefault();
+    });
 
     wrap.addEventListener('dragover', (e) => {
       const type = paletteType(e);
