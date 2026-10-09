@@ -15,14 +15,15 @@
  *
  * Node: { id, type, parentId|null, seq, label, nameMode: 'convention'|'custom', name,
  *         naming: { pattern?, tokens: {} }, attributes: {}, custom: [{key,value}],
- *         display: { [attributeKey]: boolean }, network: [id], x, y }
+ *         display: { [attributeKey]: boolean }, network: [id], x, y, w?, h? }
  * Connection: { id, from, to, kind, direction: 'forward'|'bidirectional', label, attributes: {} }
  *
  * `network` lists the ids of the virtual networks / subnets a resource is attached to (only for
  * types where `Catalog.supportsNetwork` is true).
  *
  * Nodes store absolute canvas coordinates (x/y of their top-left corner). Containers grow
- * automatically to wrap their children (see AISBP.Layout).
+ * automatically to wrap their children (see AISBP.Layout). Containers that were resized by hand
+ * also store a minimum size (w/h); "Tidy up" removes it again.
  *
  * @module AISBP.Model
  */
@@ -219,6 +220,9 @@
     return '';
   }
 
+  /** Valid manual container size (see node.w / node.h). */
+  const validSize = (v) => Number.isFinite(v) && v > 0 && v <= 100000;
+
   /** Whether node `id` exists and is a virtual network or subnet. */
   function isNetworkTarget(project, id) {
     const n = getNode(project, id);
@@ -305,6 +309,7 @@
     if (p.attributes) Object.assign(node.attributes, p.attributes);
     if (Array.isArray(p.custom)) node.custom = p.custom.map((c) => ({ key: String(c.key || ''), value: String(c.value || '') }));
     if (p.display) node.display = Object.assign({}, p.display);
+    if (validSize(p.w) && validSize(p.h)) { node.w = p.w; node.h = p.h; }
     if (Array.isArray(p.network)) node.network = p.network.filter((nid) => Util.isValidId(nid) && isNetworkTarget(project, nid));
     project.nodes[node.id] = node;
     touch(project);
@@ -490,7 +495,9 @@
         naming: src.naming,
         attributes: src.attributes,
         custom: src.custom,
-        display: src.display
+        display: src.display,
+        w: src.w,
+        h: src.h
       });
       if (Array.isArray(src.network) && src.network.length) pendingNetwork.push([node.id, src.network]);
       idMap[src.id] = node.id;
@@ -638,6 +645,10 @@
         x: Number.isFinite(n.x) ? n.x : 0,
         y: Number.isFinite(n.y) ? n.y : 0
       };
+      if (validSize(n.w) && validSize(n.h)) {
+        project.nodes[n.id].w = n.w;
+        project.nodes[n.id].h = n.h;
+      }
     });
     // Fix hierarchy: drop references to missing parents, invalid placements and cycles.
     Object.keys(project.nodes).forEach((id) => {

@@ -221,6 +221,7 @@ a { color: var(--c-primary); }
 .canvas .node { cursor: move; }
 .canvas .connection { cursor: pointer; }
 .canvas .handle { cursor: crosshair; }
+.canvas .handle.resize { cursor: nwse-resize; }
 .canvas-empty {
   position: absolute;
   inset: 0;

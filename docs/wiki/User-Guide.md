@@ -36,9 +36,12 @@ There are several ways to add objects:
 - **Drag** a palette item onto a row in the explorer.
 - Use **Add child…** in the properties panel.
 
-Containers grow automatically to fit their contents. Drag objects to rearrange them. Dropping an
-object on another container moves it there (if allowed). **Tidy up** arranges everything
-automatically.
+Containers grow automatically to fit their contents. To make a container (management group,
+subscription, resource group, …) larger, select it and drag the **resize grip** in its bottom-right
+corner; it never shrinks below its contents. Drag objects to rearrange them. While you drag, every
+container keeps its current boundary, so an object dropped anywhere inside its own container stays
+there; dropping it on another container moves it there (if allowed). **Tidy up** arranges
+everything automatically and resets manually resized containers to the size they need.
 
 ## Attributes
 

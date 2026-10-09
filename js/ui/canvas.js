@@ -102,10 +102,17 @@
     }
 
     function geometry() {
-      if (gesture && gesture.type === 'move' && gesture.moved) {
-        return Layout.compute(store.project, null, { detached: new Set(gesture.ids) });
-      }
+      if (gesture && gesture.type === 'move' && gesture.moved) return moveGeometry(gesture);
       return store.derived().geometry;
+    }
+
+    /**
+     * Geometry while moving objects: the moved objects do not stretch their containers, but every
+     * container keeps (at least) the boundary it had when the drag started. As long as the pointer
+     * stays inside that boundary the objects remain in their container instead of being detached.
+     */
+    function moveGeometry(gst) {
+      return Layout.compute(store.project, null, { detached: new Set(gst.ids), frozen: gst.frozen });
     }
 
     function render() {
@@ -154,6 +161,21 @@
         handle.appendChild(svgEl('circle', { cx: r.x + r.w + 12, cy: r.y + Math.min(r.h / 2, 30), r: 8, fill: '#ffffff', stroke: st.selection, 'stroke-width': 2 }));
         handle.appendChild(svgEl('path', { d: 'M' + (r.x + r.w + 8) + ' ' + (r.y + Math.min(r.h / 2, 30)) + ' h8 m-3 -3 l3 3 l-3 3', stroke: st.selection, 'stroke-width': 1.5, fill: 'none' }));
         overlay.appendChild(handle);
+        if (r.container) {
+          // Resize grip (bottom-right corner) for hierarchy objects and other containers.
+          const grip = svgEl('g', { class: 'handle resize', 'data-handle': 'resize', 'data-node-id': single.id });
+          const gt = svgEl('title', {});
+          gt.textContent = 'Drag to resize (Tidy up resets the size)';
+          grip.appendChild(gt);
+          const sz = 12 / view.k;
+          grip.appendChild(svgEl('rect', { x: r.x + r.w - sz, y: r.y + r.h - sz, width: sz, height: sz, fill: '#ffffff', stroke: st.selection, 'stroke-width': 1.5 / view.k }));
+          grip.appendChild(svgEl('path', { d: 'M' + (r.x + r.w - sz * 0.7) + ' ' + (r.y + r.h - sz * 0.2) + ' L' + (r.x + r.w - sz * 0.2) + ' ' + (r.y + r.h - sz * 0.7), stroke: st.selection, 'stroke-width': 1.5 / view.k }));
+          overlay.appendChild(grip);
+        }
+      }
+      if (gesture && gesture.type === 'resize') {
+        const r = g.rects[gesture.id];
+        if (r) overlay.appendChild(svgEl('rect', { x: r.x, y: r.y, width: r.w, height: r.h, fill: 'none', stroke: st.selection, 'stroke-dasharray': '4 3', 'stroke-width': 1.5 / view.k }));
       }
       if (gesture && gesture.type === 'marquee' && gesture.rect) {
         const m = gesture.rect;
@@ -206,6 +228,10 @@
       if (e.button === 1) {
         gesture = { type: 'pan', sx: e.clientX, sy: e.clientY, vx: view.x, vy: view.y };
         svg.classList.add('panning');
+      } else if (handleEl && handleEl.getAttribute('data-handle') === 'resize') {
+        const id = handleEl.getAttribute('data-node-id');
+        const r = store.derived().geometry.rects[id];
+        gesture = { type: 'resize', id, start: pt, size: { w: r.x + r.w - store.project.nodes[id].x, h: r.y + r.h - store.project.nodes[id].y }, snapshot: null };
       } else if (handleEl) {
         gesture = { type: 'connect', from: handleEl.getAttribute('data-node-id'), to: pt, targetId: null };
       } else if (nodeEl) {
@@ -217,7 +243,14 @@
         const node = store.project.nodes[id];
         const exclude = new Set();
         ids.forEach((x) => { exclude.add(x); Model.descendants(store.project, x).forEach((d) => exclude.add(d.id)); });
-        gesture = { type: 'move', id, ids, exclude, start: pt, origin: { x: node.x, y: node.y }, moved: false, snapshot: null };
+        // Container boundaries at drag start (except for the moved objects themselves).
+        const frozen = {};
+        const startRects = store.derived().geometry.rects;
+        Object.keys(startRects).forEach((rid) => {
+          const r = startRects[rid];
+          if (r.container && !r.hidden && !exclude.has(rid)) frozen[rid] = { x: r.x, y: r.y, w: r.w, h: r.h };
+        });
+        gesture = { type: 'move', id, ids, exclude, frozen, start: pt, origin: { x: node.x, y: node.y }, moved: false, snapshot: null };
       } else if (connEl) {
         store.select([], [connEl.getAttribute('data-conn-id')], additive);
         gesture = null;
@@ -250,12 +283,19 @@
         const node = store.project.nodes[gesture.id];
         const dx = snap(gesture.origin.x + tdx) - node.x;
         const dy = snap(gesture.origin.y + tdy) - node.y;
-        const g = Layout.compute(store.project, null, { detached: new Set(gesture.ids) });
+        const g = moveGeometry(gesture);
         const target = Layout.dropTarget(store.project, g, pt, node.type, gesture.exclude);
         dropTargetId = target === undefined ? null : target;
         gesture.target = target;
         if (dx || dy) store.live((p) => Model.moveNodes(p, gesture.ids, dx, dy));
         else queueRender();
+      } else if (gesture.type === 'resize') {
+        const w = Math.max(Layout.MIN_W, snap(gesture.size.w + pt.x - gesture.start.x));
+        const h = Math.max(Layout.MIN_H, snap(gesture.size.h + pt.y - gesture.start.y));
+        const node = store.project.nodes[gesture.id];
+        if (node.w === w && node.h === h) return;
+        if (!gesture.snapshot) gesture.snapshot = store.begin();
+        store.live((p) => { p.nodes[gesture.id].w = w; p.nodes[gesture.id].h = h; });
       } else if (gesture.type === 'connect') {
         gesture.to = pt;
         const hit = Layout.hitTest(lastGeometry || store.derived().geometry, pt);
@@ -288,6 +328,13 @@
           store.commit(gst.snapshot);
         } else {
           store.rollback(gst.snapshot);
+        }
+        queueRender();
+      }
+      if (gst.type === 'resize') {
+        if (gst.snapshot) {
+          if (cancelled) store.rollback(gst.snapshot);
+          else store.commit(gst.snapshot);
         }
         queueRender();
       }

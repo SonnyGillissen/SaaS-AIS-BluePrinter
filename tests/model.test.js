@@ -143,3 +143,40 @@ test('connections support a bidirectional direction', () => {
   assert.match(drawio, /startArrow=block/);
   assert.match(AISBP.ArchiMate.toArchiMate(p), /Bidirectional/);
 });
+
+test('containers honour a manual size, never shrink below their content and Tidy up resets it', () => {
+  const { Layout } = AISBP;
+  const p = Model.createProject();
+  const sub = Model.addNode(p, 'subscription', null, { x: 0, y: 0 });
+  const rg = Model.addNode(p, 'resource-group', sub.id, { x: 30, y: 60 });
+  Model.addNode(p, 'function-app', rg.id, { x: 60, y: 120 });
+  const auto = Layout.compute(p, null).rects[rg.id];
+
+  rg.w = 600; rg.h = 500;
+  const big = Layout.compute(p, null).rects[rg.id];
+  assert.ok(big.w >= 600 && big.h >= 500 - (rg.y - big.y));
+
+  rg.w = 10; rg.h = 10;
+  const small = Layout.compute(p, null).rects[rg.id];
+  assert.ok(small.w >= auto.w && small.h >= auto.h);
+
+  const frozen = Layout.compute(p, null, { frozen: { [rg.id]: { x: big.x, y: big.y, w: big.w, h: big.h } } }).rects[rg.id];
+  assert.ok(frozen.w >= big.w && frozen.h >= big.h);
+
+  rg.w = 600; rg.h = 500;
+  Layout.autoLayout(p, null);
+  assert.equal(Layout.hasManualSize(rg), false);
+});
+
+test('normalize keeps valid container sizes and drops invalid ones', () => {
+  const p = Model.createProject();
+  const sub = Model.addNode(p, 'subscription', null, { x: 0, y: 0, w: 800, h: 400 });
+  const rg = Model.addNode(p, 'resource-group', sub.id, { x: 30, y: 60 });
+  const raw = JSON.parse(JSON.stringify(p));
+  raw.nodes[rg.id].w = 'huge'; raw.nodes[rg.id].h = -5;
+  const { project } = Model.normalize(raw);
+  assert.equal(project.nodes[sub.id].w, 800);
+  assert.equal(project.nodes[sub.id].h, 400);
+  assert.equal(project.nodes[rg.id].w, undefined);
+  assert.equal(project.nodes[rg.id].h, undefined);
+});

@@ -127,6 +127,11 @@
     return names;
   }
 
+  /** Whether a node has a manual (user-resized) size. */
+  function hasManualSize(node) {
+    return Number.isFinite(node.w) && Number.isFinite(node.h) && node.w > 0 && node.h > 0;
+  }
+
   /** Whether a node is drawn as a container. */
   function isContainer(project, node, childIndex) {
     const def = Catalog.get(node.type);
@@ -137,14 +142,23 @@
    * Compute the geometry of every node.
    * @param {object} project
    * @param {object} [names] pre-resolved names (see resolveNames)
-   * @param {object} [opts] { detached: Set<string> } nodes that do not stretch their container
-   *                        (used while dragging so objects can be dragged out of a container)
+   * @param {object} [opts] {
+   *   detached: Set<string>  nodes that do not stretch their container (used while dragging so
+   *                          objects can be dragged out of a container),
+   *   frozen: Object<string,{x,y,w,h}>  minimum rects for containers (used while dragging so a
+   *                          container keeps its boundary and the object is not detached while
+   *                          the pointer is still inside it)
+   * }
+   * Containers wrap their children and are at least MIN_W x MIN_H. A container with a manual
+   * size (node.w / node.h, set by resizing it on the canvas) is at least that size, measured
+   * from its own x/y; it never becomes smaller than its contents.
    * @returns {{rects: Object<string, object>, bounds: {x,y,w,h}, names: Object<string,string>}}
    * Each rect: { id, x, y, w, h, container, hidden, depth, name, nameLines, typeLabel, attrs, headerH }
    */
   function compute(project, names, opts) {
     const nm = names || resolveNames(project);
     const detached = (opts && opts.detached) || new Set();
+    const frozen = (opts && opts.frozen) || {};
     const diagram = project.settings.diagram;
     const hidden = new Set(diagram.hiddenContainers || []);
     const childIndex = {};
@@ -187,12 +201,23 @@
             x2 = x1; y2 = y1;
           }
         } else {
+          if (hasManualSize(node)) {
+            x2 = Math.max(x2, node.x + node.w);
+            y2 = Math.max(y2, node.y + node.h);
+          }
           visibleKids.forEach((k) => {
             x1 = Math.min(x1, k.x - PAD);
             y1 = Math.min(y1, k.y - r.headerH - PAD / 2);
             x2 = Math.max(x2, k.x + k.w + PAD);
             y2 = Math.max(y2, k.y + k.h + PAD);
           });
+          const f = Object.prototype.hasOwnProperty.call(frozen, node.id) ? frozen[node.id] : null;
+          if (f) {
+            x1 = Math.min(x1, f.x);
+            y1 = Math.min(y1, f.y);
+            x2 = Math.max(x2, f.x + f.w);
+            y2 = Math.max(y2, f.y + f.h);
+          }
         }
         r.x = x1; r.y = y1; r.w = x2 - x1; r.h = y2 - y1;
         const maxChars = Math.max(10, Math.floor((r.w - 60) / 7));
@@ -295,9 +320,13 @@
   /**
    * Tidy up: lay out the whole blueprint (or the subtree of `rootId`) in rows.
    * Children are positioned relative to their container; containers wrap their children.
+   * Manual container sizes in scope are reset, so containers shrink back to what they need.
    */
   function autoLayout(project, rootId) {
     const names = resolveNames(project);
+    // Manually resized containers go back to the size their contents need.
+    const scope = rootId ? [Model.getNode(project, rootId)].concat(Model.descendants(project, rootId)) : Object.keys(project.nodes).map((k) => project.nodes[k]);
+    scope.forEach((n) => { if (n) { delete n.w; delete n.h; } });
     const maxRowWidth = 1400;
     const layoutChildren = (parentId, originX, originY, headerH) => {
       const kids = Model.children(project, parentId);
@@ -343,6 +372,9 @@
     NAME_LINE,
     PAD,
     HEADER,
+    MIN_W,
+    MIN_H,
+    hasManualSize,
     DETAIL_LEVELS,
     formatValue,
     isAttributeShown,
