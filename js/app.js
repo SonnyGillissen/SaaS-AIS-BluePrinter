@@ -566,6 +566,9 @@
   const canvas = AISBP.Canvas.mount(app);
   app.canvas = canvas;
 
+  // Re-render the canvas when the light/dark theme changes (manually or via the system setting).
+  if (AISBP.Theme) AISBP.Theme.onChange(() => canvas.queueRender());
+
   store.subscribe((reason) => {
     if (reason === 'live') {
       canvas.queueRender();

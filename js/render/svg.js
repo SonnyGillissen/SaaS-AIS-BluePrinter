@@ -91,6 +91,47 @@
     return STYLES[id] || STYLES.classic;
   }
 
+  /** Styles that are already dark and need no adaptation for the dark application theme. */
+  const DARK_STYLES = ['blueprint', 'dark'];
+  const editorCache = {};
+
+  /**
+   * Style used on the editor canvas. In the dark application theme, light display styles are shown
+   * with the colours of the 'Dark' style, keeping their own font, corner radius, dash patterns and
+   * transparent ('none') fills, so the character of the style stays recognizable.
+   * Exports always use the chosen display style itself (see renderDocument).
+   * @param {string} id display style id
+   * @param {string} [theme] effective application theme: 'light' | 'dark'
+   */
+  function editorStyle(id, theme) {
+    const st = style(id);
+    if (theme !== 'dark' || DARK_STYLES.indexOf(id) !== -1) return st;
+    const key = STYLES[id] ? id : 'classic';
+    if (editorCache[key]) return editorCache[key];
+    const d = STYLES.dark;
+    const containers = {};
+    Object.keys(st.containers).forEach((type) => {
+      const own = st.containers[type];
+      const dark = d.containers[type] || d.containers.default;
+      containers[type] = { fill: own.fill === 'none' ? 'none' : dark.fill, stroke: dark.stroke, dash: own.dash };
+    });
+    editorCache[key] = Object.assign({}, st, {
+      background: d.background,
+      grid: st.grid ? d.grid : '',
+      text: d.text,
+      subtext: d.subtext,
+      leafFill: st.leafFill === 'none' ? 'none' : d.leafFill,
+      leafStroke: st.leafStroke === 'none' ? 'none' : d.leafStroke,
+      shadow: false,
+      containers,
+      edge: d.edge,
+      edgeText: d.edgeText,
+      edgeLabelBg: d.edgeLabelBg,
+      error: d.error
+    });
+    return editorCache[key];
+  }
+
   function center(r) {
     return { x: r.x + r.w / 2, y: r.y + r.h / 2 };
   }
@@ -275,11 +316,12 @@
    * Render the diagram content (no <svg> wrapper).
    * @param {object} project
    * @param {object} [opts] { geometry, selection:{nodes:Set,conns:Set}, problems, iconHref(typeId),
-   *                          forExport, dropTargetId, idPrefix }
+   *                          forExport, dropTargetId, idPrefix, style (resolved style object,
+   *                          overrides the project's display style; see editorStyle) }
    */
   function renderContent(project, opts) {
     const o = opts || {};
-    const st = style(project.settings.diagram.style);
+    const st = o.style || style(project.settings.diagram.style);
     const g = o.geometry || Layout.compute(project);
     const rects = Object.keys(g.rects).map((k) => g.rects[k]).filter((r) => !r.hidden && r.w);
     const containers = rects.filter((r) => r.container).sort((a, b) => a.depth - b.depth || project.nodes[a.id].seq - project.nodes[b.id].seq);
@@ -325,7 +367,7 @@
     return { svg: s, width, height };
   }
 
-  AISBP.Render = { STYLES, CONNECTORS, style, center, borderPoint, connectorPath, defs, renderContent, renderDocument };
+  AISBP.Render = { STYLES, CONNECTORS, style, editorStyle, center, borderPoint, connectorPath, defs, renderContent, renderDocument };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = AISBP.Render;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

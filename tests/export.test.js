@@ -103,3 +103,24 @@ test('export of an empty project does not throw', () => {
   const { project } = smallProject(AISBP, ['function-app']);
   assert.ok(Package.toJson(project).length > 0);
 });
+
+test('the editor canvas uses a dark variant of light display styles in the dark theme', () => {
+  const { Render } = AISBP;
+  assert.equal(Render.editorStyle('classic', 'light'), Render.STYLES.classic);
+  assert.equal(Render.editorStyle('blueprint', 'dark'), Render.STYLES.blueprint);
+  assert.equal(Render.editorStyle('dark', 'dark'), Render.STYLES.dark);
+  const classic = Render.editorStyle('classic', 'dark');
+  assert.equal(classic.background, Render.STYLES.dark.background);
+  assert.equal(classic.text, Render.STYLES.dark.text);
+  assert.equal(classic.font, Render.STYLES.classic.font);
+  const minimal = Render.editorStyle('minimal', 'dark');
+  assert.equal(minimal.leafFill, 'none');
+  assert.equal(minimal.containers.subscription.fill, 'none');
+  assert.equal(minimal.grid, '');
+  const sketch = Render.editorStyle('sketch', 'dark');
+  assert.equal(sketch.containers['resource-group'].dash, Render.STYLES.sketch.containers['resource-group'].dash);
+  assert.notEqual(sketch.leafStroke, Render.STYLES.sketch.leafStroke);
+  // Exports keep the chosen style.
+  const p = AISBP.Model.createProject({ sample: true });
+  assert.match(Render.renderDocument(p, {}).svg, /fill="#ffffff"/);
+});

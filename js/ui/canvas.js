@@ -118,7 +118,9 @@
     function render() {
       renderQueued = false;
       const project = store.project;
-      const st = Render.style(project.settings.diagram.style);
+      // In the dark application theme the canvas uses a dark variant of light display styles.
+      const theme = AISBP.Theme ? AISBP.Theme.effective() : 'light';
+      const st = Render.editorStyle(project.settings.diagram.style, theme);
       const g = geometry();
       lastGeometry = g;
       // Static renderer output: all user text is escaped by AISBP.Render.
@@ -131,7 +133,8 @@
         problems: store.derived().problems,
         iconHref,
         dropTargetId,
-        idPrefix: PREFIX
+        idPrefix: PREFIX,
+        style: st
       });
       renderOverlay(g, st);
       empty.hidden = Object.keys(project.nodes).length > 0;

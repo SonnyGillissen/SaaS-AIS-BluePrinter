@@ -118,8 +118,10 @@ The **Theme** selector in the toolbar switches the application between **System*
 follows the light/dark setting of your operating system, also when it changes), **Light** and
 **Dark**. The choice is remembered in this browser (`localStorage`). In server mode it is also
 stored in the database, so it applies to everyone using that instance (there are no user
-accounts). The theme only changes the application itself; the diagram keeps its own *display
-style* (choose *Dark* there for a dark diagram).
+accounts). In the dark theme the editor canvas is dark too: light display styles (Azure classic,
+Minimal, Whiteboard) are shown with dark colours while keeping their own fonts, corners and line
+patterns. **Exports always use the chosen display style** as-is; pick the *Dark* or *Blueprint*
+style if you want a dark exported diagram.
 
 ## Projects
 
