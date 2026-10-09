@@ -269,7 +269,9 @@
   function dropTarget(project, geometry, pt, type, exclude) {
     const candidates = Object.keys(geometry.rects)
       .map((id) => geometry.rects[id])
-      .filter((r) => r.container && !(exclude && exclude.has(r.id)) && pt.x >= r.x && pt.y >= r.y && pt.x <= r.x + r.w && pt.y <= r.y + r.h && r.w > 0)
+      // Objects without children (e.g. an empty virtual network) are not drawn as containers yet,
+      // but still accept the types they can contain.
+      .filter((r) => (r.container || (!r.hidden && Model.canContain(project, r.id, type))) && !(exclude && exclude.has(r.id)) && pt.x >= r.x && pt.y >= r.y && pt.x <= r.x + r.w && pt.y <= r.y + r.h && r.w > 0)
       .sort((a, b) => b.depth - a.depth || (a.hidden ? 1 : 0) - (b.hidden ? 1 : 0));
     for (let i = 0; i < candidates.length; i++) {
       if (Model.canContain(project, candidates[i].id, type)) return candidates[i].id;

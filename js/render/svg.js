@@ -252,8 +252,10 @@
     const selected = o.selection && o.selection.nodes.has(r.id);
     const problems = o.problems && o.problems[r.id];
     const cx = r.x + r.w / 2;
+    // An object without children (e.g. an empty virtual network) can still be a drop target.
+    const isDrop = o.dropTargetId === r.id;
     let s = '<g class="node leaf" data-node-id="' + esc(r.id) + '">' + tooltip(project, r);
-    s += '<rect x="' + r.x + '" y="' + r.y + '" width="' + r.w + '" height="' + r.h + '" rx="' + st.radius + '" fill="' + (st.leafFill === 'none' && !o.forExport ? 'rgba(255,255,255,0.001)' : st.leafFill) + '" stroke="' + st.leafStroke + '" stroke-width="1"' + (st.shadow ? ' filter="url(#' + (o.idPrefix || '') + 'shadow)"' : '') + '/>';
+    s += '<rect x="' + r.x + '" y="' + r.y + '" width="' + r.w + '" height="' + r.h + '" rx="' + st.radius + '" fill="' + (st.leafFill === 'none' && !o.forExport ? 'rgba(255,255,255,0.001)' : st.leafFill) + '" stroke="' + (isDrop ? st.selection : st.leafStroke) + '" stroke-width="' + (isDrop ? 3 : 1) + '"' + (st.shadow ? ' filter="url(#' + (o.idPrefix || '') + 'shadow)"' : '') + '/>';
     s += icon(cx - Layout.ICON / 2, r.y + 10, Layout.ICON, node.type, st, o.iconHref);
     let y = r.y + 10 + Layout.ICON + 8;
     r.nameLines.forEach((line) => {

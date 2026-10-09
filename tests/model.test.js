@@ -180,3 +180,17 @@ test('normalize keeps valid container sizes and drops invalid ones', () => {
   assert.equal(project.nodes[rg.id].w, undefined);
   assert.equal(project.nodes[rg.id].h, undefined);
 });
+
+test('an empty virtual network accepts a subnet dropped on it', () => {
+  const { Layout } = AISBP;
+  const p = Model.createProject();
+  const sub = Model.addNode(p, 'subscription', null, { x: 0, y: 0 });
+  const rg = Model.addNode(p, 'resource-group', sub.id, { x: 30, y: 60 });
+  const vnet = Model.addNode(p, 'virtual-network', rg.id, { x: 60, y: 120 });
+  const g = Layout.compute(p, null);
+  const r = g.rects[vnet.id];
+  assert.equal(r.container, false);
+  const pt = { x: r.x + r.w / 2, y: r.y + r.h / 2 };
+  assert.equal(Layout.dropTarget(p, g, pt, 'subnet'), vnet.id);
+  assert.equal(Layout.dropTarget(p, g, pt, 'function-app'), rg.id);
+});
