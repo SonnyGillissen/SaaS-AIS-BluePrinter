@@ -18,17 +18,6 @@ window.AISBP_CONFIG = {
   },
 
   /**
-   * Footer branding: "Community Project by <footerText>". Set `footerLogo` to an image URL
-   * (or relative path such as 'assets/logo.svg') to show a logo instead of the text; the text
-   * is then used as the logo's alternative text. Users can override this in Options > Branding.
-   */
-  branding: {
-    footerText: 'Sonny Gillissen',
-    footerLogo: '',
-    footerLink: ''
-  },
-
-  /**
    * Default settings for new projects (merged into the built-in defaults), e.g.
    * { naming: { tokens: { org: 'contoso', workload: 'integration', env: 'dev' } },
    *   diagram: { style: 'classic' },

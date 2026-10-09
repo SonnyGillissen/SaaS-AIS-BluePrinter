@@ -51,12 +51,14 @@ human-readable format. It's easy to diff in Git and to generate or process with 
       "attributes": { "location": "westeurope" },
       "custom": [{ "key": "Owner", "value": "Team A" }],
       "display": { "location": true },   // per-attribute diagram visibility overrides
+      "network": [],                     // ids of attached virtual networks / subnets
       "x": 40, "y": 60                    // position on the canvas (container sizes are calculated)
     }
   },
   "connections": {
     "c1": {
       "id": "c1", "from": "n5", "to": "n7", "kind": "flow",
+      "direction": "forward",            // or "bidirectional"
       "label": "send order", "attributes": { "protocol": "AMQP" }
     }
   },

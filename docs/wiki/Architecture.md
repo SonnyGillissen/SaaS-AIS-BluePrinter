@@ -8,9 +8,9 @@ risk.
 ## Repository layout
 
 ```
-index.html              App shell (toolbar, panels, footer with branding and MS Icons credit)
+index.html              App shell (toolbar, panels, footer with community credit and MS Icons credit)
 css/app.css             All styles (CSS custom properties; light UI)
-js/config.js            Deployment configuration (storage mode, branding, defaults)
+js/config.js            Deployment configuration (storage mode, defaults)
 js/core/                Pure logic, no DOM. Runs in the browser and in Node (unit tests).
   util.js               Ids, escaping, cloning, URL checks
   catalog.js            Resource types: hierarchy rules, attributes, naming rules, icons, ArchiMate types
@@ -95,7 +95,7 @@ directly is a core requirement. Classic scripts load in the order listed in `ind
   escaped. All other UI components build DOM nodes with `h()` / `textContent`.
 - Imports and clipboard payloads are untrusted: `Model.normalize` / `Model.sanitizeClipboard`
   validate ids, types, hierarchy, lengths and URLs, and protect against prototype pollution.
-- Image URLs (logo, icon base) are restricted to `http(s)`, relative paths and `data:image/...`.
+- Image URLs (icon base) are restricted to `http(s)`, relative paths and `data:image/...`.
 - A Content Security Policy in `index.html` disallows inline and third-party scripts.
 - The PHP API uses prepared statements, size limits, JSON-only bodies and an optional API key.
 

@@ -84,11 +84,9 @@ Microsoft's [icon terms](https://learn.microsoft.com/azure/architecture/icons/).
 from msicons.com at runtime. For offline or intranet use, run `node tools/mirror-icons.js` to
 host them yourself (see [Configuration](docs/wiki/Configuration.md#icons)).
 
-## Branding
+## Credits
 
-The footer reads **"Community Project by Sonny Gillissen"**. You can replace the name with your
-own text or a **logo**, per user in *Options › Branding*, or per deployment in
-[`js/config.js`](js/config.js) (`branding.footerLogo`).
+AIS BluePrinter is a **Community Project by Sonny Gillissen**, as shown in the footer of the app.
 
 ## Development
 

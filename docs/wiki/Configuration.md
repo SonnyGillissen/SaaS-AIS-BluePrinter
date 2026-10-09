@@ -12,11 +12,6 @@ window.AISBP_CONFIG = {
     apiUrl: 'server/php/api.php',
     apiKey: ''
   },
-  branding: {
-    footerText: 'Sonny Gillissen',  // "Community Project by <footerText>"
-    footerLogo: '',                 // image URL / relative path; replaces the text when set
-    footerLink: ''                  // optional link (https://...)
-  },
   defaults: {                       // defaults for NEW projects (merged into built-in defaults)
     naming: { tokens: { org: 'fabrikam', workload: 'integration', env: 'dev' } },
     diagram: { style: 'classic', detailLevel: 'selected' },
@@ -25,21 +20,10 @@ window.AISBP_CONFIG = {
 };
 ```
 
-## Branding: footer text or logo
+## Footer
 
-The footer always reads **"Community Project by Sonny Gillissen"**. You can replace the name
-**"Sonny Gillissen"** with your own text, or with a **logo**:
-
-- **Per user**: *Options › Branding*. Enter a name, a logo URL, or upload a logo (PNG, JPEG, SVG,
-  GIF or WebP, up to 300 KB), and optionally a link. This is stored in the user's browser, not
-  in the project.
-- **Per deployment**: set `branding.footerLogo` in `js/config.js`, for example
-  `footerLogo: 'assets/logo.svg'`. The text is then used as the logo's alternative text, for
-  accessibility. Users can still override it in *Options › Branding*; *Restore defaults* goes
-  back to the deployment values.
-
-Logo URLs are restricted to `http(s)`, relative paths, and `data:image/...`, so script URLs are
-rejected.
+The footer always reads **"Community Project by Sonny Gillissen"**. This text is fixed and
+cannot be configured.
 
 ## Icons
 
@@ -63,6 +47,6 @@ the designer stays fully usable offline.
 ## Content Security Policy
 
 `index.html` ships with a restrictive Content Security Policy: scripts only from the app itself,
-no inline scripts, and images from https/data/blob. If you host the icons or the logo on another
+no inline scripts, and images from https/data/blob. If you host the icons on another
 domain, they are already allowed (`img-src https:`). If your server sends its own CSP header,
 make sure it permits the same.

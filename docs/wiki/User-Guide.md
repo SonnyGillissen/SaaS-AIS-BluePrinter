@@ -50,6 +50,22 @@ The **eye icon** next to each attribute controls whether that attribute appears 
 when the detail level is *Selected attributes*. A grey eye means the per-type default from
 *Options › Diagram* applies. See [Diagram styles](Diagram-Styles.md).
 
+## Virtual networks and subnets
+
+Resources that can be placed in or connected to a virtual network have a **Virtual networks /
+subnets** section in the properties panel. This includes resources with a private endpoint, VNet
+integration or a VNet mode, such as Logic App (Standard), Function App, App Service, API
+Management, Service Bus, Event Hubs, Storage, Key Vault, SQL and Cosmos DB. It also includes
+networking resources such as Private Endpoint, Private DNS Zone, NSG, Application Gateway,
+Firewall, VNet Gateway, Container Apps Environment and Data Factory.
+
+Add a **Virtual Network** (with **Subnets**) from the *Networking* palette first. Then tick the
+VNets and/or subnets the resource is attached to. A resource can be attached to several. On the
+diagram they appear as a **Network** line, for example `vnet-integration-dev-weu-001 /
+snet-integration`. Use the eye icon in the section header to hide that line. When you delete a VNet
+or subnet, its links are removed. When you paste a resource, it keeps its links to existing
+networks, or links to the pasted copies if the VNet/subnet was copied as well.
+
 ## Connections
 
 Drag the **○ handle** that appears on the selected object onto another object. Select a
@@ -57,6 +73,8 @@ connection to set its:
 
 - **Type**: data flow, trigger / event, dependency, data access, network path, or association.
   These map to ArchiMate relationships.
+- **Direction**: *One-way* (source → target, the default) or *Bidirectional* (source ↔ target,
+  drawn with an arrow head at both ends). *Reverse direction* swaps source and target.
 - **Protocol** (HTTPS, AMQP, SFTP, AS2, Private Link, …) and a **label**.
 
 ## Copy, paste and drag-and-drop

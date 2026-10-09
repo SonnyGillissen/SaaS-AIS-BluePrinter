@@ -2,7 +2,7 @@
  * AIS BluePrinter - dialogs: options, projects and help.
  *
  * The options dialog edits a working copy of the project settings (naming conventions,
- * diagram display, icons) and the browser preferences (footer branding). Nothing is applied
+ * diagram display, icons). Nothing is applied
  * until "Save" is pressed, and the change is a single undo step.
  *
  * @module AISBP.Dialogs
@@ -16,8 +16,6 @@
   const Model = AISBP.Model;
   const Naming = AISBP.Naming;
   const Util = AISBP.Util;
-
-  const MAX_LOGO_BYTES = 300 * 1024;
 
   /** Tab strip helper: returns { el, panels } where panels[id] are containers. */
   function tabs(defs) {
@@ -59,7 +57,6 @@
   function openOptions(app, initialTab) {
     const project = app.store.project;
     const s = Util.clone(project.settings);
-    const branding = Object.assign({}, app.branding());
     // A preview project shares the working settings so examples update live.
     const preview = Object.assign({}, project, { settings: s });
 
@@ -68,7 +65,6 @@
       { id: 'types', label: 'Per resource type' },
       { id: 'diagram', label: 'Diagram' },
       { id: 'icons', label: 'Icons' },
-      { id: 'branding', label: 'Branding' },
       { id: 'storage', label: 'Storage & privacy' }
     ]);
 
@@ -203,36 +199,6 @@
       h('button', { type: 'button', class: 'btn small', text: 'Reset to msicons.com', onclick: () => { s.icons.baseUrl = AISBP.Icons.DEFAULT_BASE; baseInput.value = s.icons.baseUrl; } })
     ]);
 
-    // ---- Branding
-    const logoPreview = h('div', { class: 'inline' });
-    const renderLogoPreview = () => {
-      clear(logoPreview);
-      logoPreview.appendChild(h('span', { text: 'Preview: Community Project by ' }));
-      if (branding.footerLogo && Util.isSafeImageUrl(branding.footerLogo)) logoPreview.appendChild(h('img', { src: branding.footerLogo, alt: branding.footerText, style: { height: '20px', maxWidth: '160px' } }));
-      else logoPreview.appendChild(h('strong', { text: branding.footerText }));
-    };
-    const logoInput = textInput(branding.footerLogo.indexOf('data:') === 0 ? '' : branding.footerLogo, (v) => { branding.footerLogo = v.trim(); renderLogoPreview(); }, { placeholder: 'https://example.com/logo.svg or assets/logo.svg' });
-    const upload = h('input', { type: 'file', accept: 'image/png,image/jpeg,image/svg+xml,image/gif,image/webp' });
-    upload.addEventListener('change', async () => {
-      const file = upload.files[0];
-      if (!file) return;
-      if (file.size > MAX_LOGO_BYTES) return toast('The logo must be smaller than 300 KB.', 'error');
-      branding.footerLogo = await AISBP.Dom.readDataUrl(file);
-      logoInput.value = '';
-      renderLogoPreview();
-    });
-    AISBP.Dom.append(t.panels.branding, [
-      h('p', { class: 'note', text: 'The footer shows "Community Project by \u2026". Replace the text with your own name, or use a logo instead. Branding is stored in this browser; hosting providers can set defaults in js/config.js.' }),
-      field('Name', textInput(branding.footerText, (v) => { branding.footerText = v; renderLogoPreview(); }, { id: 'opt-brand-text', maxlength: 120 })),
-      field('Logo URL (optional, replaces the name)', logoInput),
-      field('Or upload a logo (stored in this browser)', upload),
-      field('Link (optional)', textInput(branding.footerLink, (v) => { branding.footerLink = v.trim(); }, { placeholder: 'https://\u2026' })),
-      h('div', { class: 'inline' }, h('button', { type: 'button', class: 'btn small', text: 'Remove logo', onclick: () => { branding.footerLogo = ''; logoInput.value = ''; renderLogoPreview(); } }),
-        h('button', { type: 'button', class: 'btn small', text: 'Restore defaults', onclick: () => { Object.assign(branding, app.defaultBranding()); renderLogoPreview(); } })),
-      logoPreview
-    ]);
-    renderLogoPreview();
-
     // ---- Storage & privacy
     const adapter = app.storage;
     AISBP.Dom.append(t.panels.storage, [
@@ -266,7 +232,6 @@
             const clean = Model.deepMerge(Model.defaultSettings(), Model.sanitizeSettings(s));
             if (s.icons.baseUrl && clean.icons.baseUrl !== s.icons.baseUrl) toast('The icon base URL is not valid and was not changed.', 'error');
             app.store.change('options', (p) => { p.settings = clean; });
-            app.setBranding(branding);
             app.refreshAll();
             toast('Options saved.', 'success');
           }
@@ -348,13 +313,13 @@
           h('li', { text: 'Drop resources inside a resource group, and child resources (queues, workflows, APIs, \u2026) inside their parent resource. Invalid placements are refused.' }),
           h('li', { text: 'Select an object to edit its name, attributes and diagram display in the properties panel. Use the eye buttons to choose which attributes appear on the diagram.' }),
           h('li', { text: 'Drag the round handle next to a selected object onto another object to connect them.' }),
-          h('li', { text: 'Use Options for naming conventions, display styles and branding, and Export for JSON, PNG, PDF, SVG, draw.io and ArchiMate.' })),
+          h('li', { text: 'Use Options for naming conventions and display styles, and Export for JSON, PNG, PDF, SVG, draw.io and ArchiMate.' })),
         h('h3', { text: 'Keyboard shortcuts' }),
         h('table', { class: 'data' }, h('tbody', {}, shortcuts.map((s) => h('tr', {}, h('td', {}, h('span', { class: 'kbd', text: s[0] })), h('td', { text: s[1] }))))),
         h('h3', { text: 'Privacy' }),
         h('p', { text: app.storage.kind === 'local' ? 'Everything runs in your browser and is stored in localStorage on this machine. Nothing is uploaded. Icons are loaded from msicons.com (or your own mirror).' : 'This instance stores blueprints in a server database.' }),
         h('h3', { text: 'Credits' }),
-        h('p', {}, 'AIS BluePrinter \u2014 Community Project by ', h('strong', { text: app.branding().footerText || 'Sonny Gillissen' }), '. Version ' + AISBP.Package.APP_VERSION + '.'),
+        h('p', {}, 'AIS BluePrinter \u2014 Community Project by ', h('strong', { text: 'Sonny Gillissen' }), '. Version ' + AISBP.Package.APP_VERSION + '.'),
         h('p', {}, 'Resource icons: ', h('a', { href: 'https://msicons.com/', target: '_blank', rel: 'noopener', text: 'MS Icons (msicons.com)' }), ', a community project by Daniel Bradley. Azure icons \u00a9 Microsoft, used according to the Microsoft architecture icon terms.'))
     });
   }

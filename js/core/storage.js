@@ -15,7 +15,7 @@
  *   aisbp.index          JSON array of { id, name, modified }
  *   aisbp.project.<id>   JSON project
  *   aisbp.last           id of the last opened project
- *   aisbp.prefs          user preferences (branding, UI)
+ *   aisbp.prefs          user preferences (UI)
  *
  * @module AISBP.Storage
  */
@@ -173,22 +173,8 @@
   }
 
   // ---------------------------------------------------------------------------
-  // Preferences (footer branding and UI state). Kept per browser, not per project.
+  // Preferences (UI state). Kept per browser, not per project.
   // ---------------------------------------------------------------------------
-
-  /**
-   * Sanitize branding settings: the footer shows "Community Project by <text>" or a logo.
-   * @param {object} b { footerText, footerLogo (http(s) URL, relative path or data:image URI), footerLink }
-   */
-  function sanitizeBranding(b, defaults) {
-    const d = defaults || { footerText: 'Sonny Gillissen', footerLogo: '', footerLink: '' };
-    const src = b && typeof b === 'object' ? b : {};
-    return {
-      footerText: typeof src.footerText === 'string' ? src.footerText.slice(0, 120) : d.footerText,
-      footerLogo: typeof src.footerLogo === 'string' && (src.footerLogo === '' || Util.isSafeImageUrl(src.footerLogo)) ? src.footerLogo.slice(0, 500000) : d.footerLogo || '',
-      footerLink: typeof src.footerLink === 'string' && (src.footerLink === '' || /^https?:\/\//i.test(src.footerLink)) ? src.footerLink.slice(0, 500) : d.footerLink || ''
-    };
-  }
 
   function loadPrefs(storage) {
     const p = readJson(storage || root.localStorage, PREFS_KEY, {});
@@ -199,7 +185,7 @@
     writeJson(storage || root.localStorage, PREFS_KEY, prefs);
   }
 
-  AISBP.Storage = { LocalAdapter, ApiAdapter, create, lastProjectId, setLastProjectId, sanitizeBranding, loadPrefs, savePrefs, PREFIX };
+  AISBP.Storage = { LocalAdapter, ApiAdapter, create, lastProjectId, setLastProjectId, loadPrefs, savePrefs, PREFIX };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = AISBP.Storage;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

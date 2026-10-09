@@ -6,7 +6,6 @@ machine.**
 | Data | Where it is stored | Leaves your machine? |
 |---|---|---|
 | Blueprints (projects) | Your browser's `localStorage` (keys `aisbp.index`, `aisbp.project.<id>`, `aisbp.last`) | **No** |
-| Preferences (branding, logo) | Your browser's `localStorage` (`aisbp.prefs`) | **No** |
 | Exports (PNG, PDF, SVG, draw.io, ArchiMate, JSON) | Generated in the browser and downloaded to your computer | **No** |
 | Clipboard | Your system clipboard (only when you copy) | **No** |
 

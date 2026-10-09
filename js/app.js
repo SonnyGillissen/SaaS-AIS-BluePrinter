@@ -18,16 +18,8 @@
   // Configuration and preferences
   // ---------------------------------------------------------------------------
 
-  const config = Object.assign({ storage: { mode: 'local' }, branding: {}, defaults: {} }, root.AISBP_CONFIG || {});
+  const config = Object.assign({ storage: { mode: 'local' }, defaults: {} }, root.AISBP_CONFIG || {});
   const storage = Storage.create(config);
-  const defaultBranding = Storage.sanitizeBranding(config.branding);
-  let prefs = {};
-  try {
-    prefs = Storage.loadPrefs();
-  } catch (e) {
-    prefs = {};
-  }
-  let branding = Storage.sanitizeBranding(prefs.branding, defaultBranding);
 
   function newProject(sample) {
     return Model.createProject({ name: sample ? 'Sample integration landing zone' : 'New integration blueprint', settings: Model.sanitizeSettings(config.defaults || {}), sample });
@@ -42,18 +34,6 @@
     storage,
     dragType: null,
     clipboard: null,
-    branding: () => branding,
-    defaultBranding: () => Object.assign({}, defaultBranding),
-    setBranding(b) {
-      branding = Storage.sanitizeBranding(b, defaultBranding);
-      prefs.branding = branding;
-      try {
-        Storage.savePrefs(prefs);
-      } catch (e) {
-        toast(e.message, 'error');
-      }
-      applyBranding();
-    },
     refreshAll() {
       palette.render();
       syncToolbar();
@@ -356,9 +336,6 @@
         if (k && k.indexOf(Storage.PREFIX) === 0) keys.push(k);
       }
       keys.forEach((k) => root.localStorage.removeItem(k));
-      prefs = {};
-      branding = Object.assign({}, defaultBranding);
-      applyBranding();
       openProject(newProject(false), true);
       toast('All local data was deleted.', 'success');
     }
@@ -406,27 +383,8 @@
   }
 
   // ---------------------------------------------------------------------------
-  // Chrome: branding, toolbar
+  // Chrome: toolbar
   // ---------------------------------------------------------------------------
-
-  function applyBranding() {
-    const text = doc.getElementById('brand-text');
-    const logo = doc.getElementById('brand-logo');
-    const link = doc.getElementById('brand-link');
-    text.textContent = branding.footerText || defaultBranding.footerText || 'Sonny Gillissen';
-    if (branding.footerLogo && Util.isSafeImageUrl(branding.footerLogo)) {
-      logo.src = branding.footerLogo;
-      logo.alt = branding.footerText || 'Logo';
-      logo.hidden = false;
-      text.hidden = true;
-    } else {
-      logo.removeAttribute('src');
-      logo.hidden = true;
-      text.hidden = false;
-    }
-    if (branding.footerLink) link.href = branding.footerLink;
-    else link.removeAttribute('href');
-  }
 
   const styleSelect = doc.getElementById('style-select');
   const detailSelect = doc.getElementById('detail-select');
@@ -620,7 +578,6 @@
     note.classList.add('server');
   }
 
-  applyBranding();
 
   (async function start() {
     let project = null;

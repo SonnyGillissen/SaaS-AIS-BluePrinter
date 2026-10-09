@@ -21,7 +21,7 @@ and the whole setup to a JSON **configuration package**.
 | [Configuration package](Configuration-Package.md) | The JSON format for export and import |
 | [Resource catalog](Resource-Catalog.md) | All resource types, allowed parents, naming rules and attributes |
 | [Deployment and database](Deployment-and-Database.md) | Static hosting, optional MySQL / SQL Server storage, one-click installers |
-| [Configuration](Configuration.md) | `js/config.js`, branding (footer text or logo), icon mirror |
+| [Configuration](Configuration.md) | `js/config.js`, footer, icon mirror |
 | [Architecture](Architecture.md) | How the code is organized, and how to extend it |
 | [Privacy](Privacy.md) | What is stored where |
 | [Credits](Credits.md) | MS Icons and other acknowledgements |

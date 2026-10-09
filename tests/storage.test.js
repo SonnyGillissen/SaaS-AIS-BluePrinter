@@ -33,12 +33,3 @@ test('create() defaults to browser-only storage', () => {
   assert.equal(Storage.create({}).kind, 'local');
   assert.equal(Storage.create({ storage: { mode: 'server', apiUrl: 'server/php/api.php' } }).kind, 'server');
 });
-
-test('sanitizeBranding only accepts safe logo and link URLs', () => {
-  const ok = Storage.sanitizeBranding({ footerText: 'Contoso', footerLogo: 'assets/logo.svg', footerLink: 'https://contoso.com' });
-  assert.deepEqual(ok, { footerText: 'Contoso', footerLogo: 'assets/logo.svg', footerLink: 'https://contoso.com' });
-  const bad = Storage.sanitizeBranding({ footerText: 'X', footerLogo: 'javascript:alert(1)', footerLink: 'javascript:alert(1)' });
-  assert.equal(bad.footerLogo, '');
-  assert.equal(bad.footerLink, '');
-  assert.equal(Storage.sanitizeBranding(null).footerText, 'Sonny Gillissen');
-});

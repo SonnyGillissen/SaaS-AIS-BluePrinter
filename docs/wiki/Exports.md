@@ -29,8 +29,10 @@ either way.
 - Management groups, subscriptions, resource groups and parent resources become **draw.io
   containers**: moving a container moves its contents.
 - Resources become image shapes with the MS Icons icon.
-- All attributes are attached as **shape data** (*Edit › Edit Data* in draw.io).
-- Connections become labelled orthogonal edges.
+- All attributes, including the attached VNets/subnets (`network`), are attached as **shape data**
+  (*Edit › Edit Data* in draw.io).
+- Connections become labelled orthogonal edges. Bidirectional connections get arrow heads at both
+  ends.
 
 Open the file via *File › Open from › Device* in draw.io.
 
@@ -57,6 +59,10 @@ against the official ArchiMate 3.1 XSD schemas.
   | Data access | Access (only towards passive elements, otherwise Association) |
   | Network path, Association | Association |
 
+- Bidirectional connections get a *Direction: Bidirectional* property, because ArchiMate
+  relationships are always directed.
+- Links from a resource to its VNets/subnets become **Association** relationships ("attached to
+  network") and a *Network* property.
 - One **view** is included, with the same layout as the blueprint.
 
 To import into **Archi**, use *File › Import › Open Exchange XML Model…*.
