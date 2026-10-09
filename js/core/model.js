@@ -15,8 +15,11 @@
  *
  * Node: { id, type, parentId|null, seq, label, nameMode: 'convention'|'custom', name,
  *         naming: { pattern?, tokens: {} }, attributes: {}, custom: [{key,value}],
- *         display: { [attributeKey]: boolean }, x, y }
- * Connection: { id, from, to, kind, label, attributes: {} }
+ *         display: { [attributeKey]: boolean }, network: [id], x, y }
+ * Connection: { id, from, to, kind, direction: 'forward'|'bidirectional', label, attributes: {} }
+ *
+ * `network` lists the ids of the virtual networks / subnets a resource is attached to (only for
+ * types where `Catalog.supportsNetwork` is true).
  *
  * Nodes store absolute canvas coordinates (x/y of their top-left corner). Containers grow
  * automatically to wrap their children (see AISBP.Layout).
@@ -42,6 +45,14 @@
     { id: 'network', label: 'Network path', archimate: 'Association', dashed: true },
     { id: 'association', label: 'Association', archimate: 'Association', dashed: true }
   ];
+
+  /** Connection directions. `forward` points from source to target. */
+  const DIRECTIONS = [
+    { id: 'forward', label: 'One-way (source \u2192 target)' },
+    { id: 'bidirectional', label: 'Bidirectional (source \u2194 target)' }
+  ];
+
+  const cleanDirection = (d) => (DIRECTIONS.some((x) => x.id === d) ? d : 'forward');
 
   const PROTOCOLS = ['', 'HTTPS', 'HTTP', 'AMQP', 'Kafka', 'MQTT', 'SFTP', 'FTP', 'AS2', 'SOAP', 'gRPC', 'WebSocket', 'SQL/TDS', 'SMB', 'Private Link', 'VNet', 'Event Grid', 'Other'];
 
@@ -208,6 +219,28 @@
     return '';
   }
 
+  /** Whether node `id` exists and is a virtual network or subnet. */
+  function isNetworkTarget(project, id) {
+    const n = getNode(project, id);
+    return !!n && Catalog.NETWORK_TARGET_TYPES.indexOf(n.type) !== -1;
+  }
+
+  /** All virtual networks and subnets of a project, in tree order (subnets follow their VNet). */
+  function networkTargets(project) {
+    const out = [];
+    const walk = (pid) => children(project, pid).forEach((c) => {
+      if (Catalog.NETWORK_TARGET_TYPES.indexOf(c.type) !== -1) out.push(c);
+      walk(c.id);
+    });
+    walk(null);
+    return out;
+  }
+
+  /** The virtual network / subnet nodes a node is attached to. */
+  function networkLinks(project, node) {
+    return (node && Array.isArray(node.network) ? node.network : []).map((id) => getNode(project, id)).filter((n) => n && Catalog.NETWORK_TARGET_TYPES.indexOf(n.type) !== -1);
+  }
+
   // ---------------------------------------------------------------------------
   // Mutations (all operate in place and return the affected objects)
   // ---------------------------------------------------------------------------
@@ -261,6 +294,7 @@
       attributes: defaultAttributes(type),
       custom: [],
       display: {},
+      network: [],
       x: Number.isFinite(p.x) ? p.x : 0,
       y: Number.isFinite(p.y) ? p.y : 0
     };
@@ -271,6 +305,7 @@
     if (p.attributes) Object.assign(node.attributes, p.attributes);
     if (Array.isArray(p.custom)) node.custom = p.custom.map((c) => ({ key: String(c.key || ''), value: String(c.value || '') }));
     if (p.display) node.display = Object.assign({}, p.display);
+    if (Array.isArray(p.network)) node.network = p.network.filter((nid) => Util.isValidId(nid) && isNetworkTarget(project, nid));
     project.nodes[node.id] = node;
     touch(project);
     return node;
@@ -304,6 +339,10 @@
       descendants(project, id).forEach((d) => doomed.add(d.id));
     });
     doomed.forEach((id) => delete project.nodes[id]);
+    Object.keys(project.nodes).forEach((id) => {
+      const n = project.nodes[id];
+      if (Array.isArray(n.network) && n.network.some((nid) => doomed.has(nid))) n.network = n.network.filter((nid) => !doomed.has(nid));
+    });
     Object.keys(project.connections).forEach((cid) => {
       const c = project.connections[cid];
       if (doomed.has(c.from) || doomed.has(c.to)) delete project.connections[cid];
@@ -360,6 +399,7 @@
       from,
       to,
       kind,
+      direction: cleanDirection(p.direction),
       label: p.label ? String(p.label) : '',
       attributes: Object.assign({ protocol: '' }, p.attributes || {})
     };
@@ -373,7 +413,8 @@
     if (!c) return undefined;
     Object.keys(patch || {}).forEach((key) => {
       if (key === 'id' || key === 'from' || key === 'to') return;
-      if (key === 'attributes') c.attributes = Object.assign({}, c.attributes, patch.attributes);
+      if (key === 'direction') c.direction = cleanDirection(patch.direction);
+      else if (key === 'attributes') c.attributes = Object.assign({}, c.attributes, patch.attributes);
       else c[key] = patch[key];
     });
     touch(project);
@@ -432,6 +473,7 @@
     const dy = offset && Number.isFinite(offset.dy) ? offset.dy : 30;
     const idMap = {};
     const byId = {};
+    const pendingNetwork = [];
     payload.nodes.forEach((n) => { if (n && Util.isValidId(n.id)) byId[n.id] = n; });
     const roots = (payload.roots || []).filter((id) => byId[id]);
     const insert = (src, parentId) => {
@@ -450,6 +492,7 @@
         custom: src.custom,
         display: src.display
       });
+      if (Array.isArray(src.network) && src.network.length) pendingNetwork.push([node.id, src.network]);
       idMap[src.id] = node.id;
       result.nodeIds.push(node.id);
       payload.nodes.filter((c) => c.parentId === src.id).sort((a, b) => a.seq - b.seq).forEach((c) => insert(c, node.id));
@@ -466,11 +509,15 @@
       }
       insert(src, parent);
     });
+    // Network links: point to pasted copies when the VNet/subnet was copied too, else to existing ones.
+    pendingNetwork.forEach(([id, links]) => {
+      project.nodes[id].network = links.map((nid) => idMap[nid] || nid).filter((nid, i, a) => isNetworkTarget(project, nid) && a.indexOf(nid) === i);
+    });
     (payload.connections || []).forEach((c) => {
       const from = idMap[c.from] || (getNode(project, c.from) ? c.from : null);
       const to = idMap[c.to] || (getNode(project, c.to) ? c.to : null);
       if (!from || !to || (!idMap[c.from] && !idMap[c.to])) return;
-      const conn = addConnection(project, from, to, { kind: c.kind, label: c.label, attributes: c.attributes });
+      const conn = addConnection(project, from, to, { kind: c.kind, direction: c.direction, label: c.label, attributes: c.attributes });
       if (conn) result.connectionIds.push(conn.id);
     });
     return result;
@@ -486,10 +533,12 @@
     if (!payload || typeof payload !== 'object' || payload.format !== FORMAT + '/clipboard' || !Array.isArray(payload.nodes)) return null;
     const nodes = {};
     const originalParents = {};
+    const originalNetwork = {};
     payload.nodes.slice(0, 5000).forEach((n) => {
       if (n && Util.isValidId(n.id) && !Object.prototype.hasOwnProperty.call(nodes, n.id)) {
         nodes[n.id] = n;
         originalParents[n.id] = Util.isValidId(n.parentId) ? n.parentId : null;
+        originalNetwork[n.id] = cleanIdList(n.network);
       }
     });
     const connections = {};
@@ -500,7 +549,11 @@
     const outside = (Array.isArray(payload.connections) ? payload.connections : []).filter((c) => c && Util.isValidId(c.id) && Util.isValidId(c.from) && Util.isValidId(c.to) && (!nodes[c.from] || !nodes[c.to]));
     const clean = normalize({ format: FORMAT, version: VERSION, meta: {}, settings: {}, nodes, connections }).project;
     const list = Object.keys(clean.nodes).map((k) => clean.nodes[k]);
-    list.forEach((n) => { if (!n.parentId) n.parentId = originalParents[n.id]; });
+    list.forEach((n) => {
+      if (!n.parentId) n.parentId = originalParents[n.id];
+      // Links may point to VNets/subnets outside the payload; `paste` validates them.
+      if (Catalog.supportsNetwork(n.type)) n.network = originalNetwork[n.id];
+    });
     return {
       format: FORMAT + '/clipboard',
       version: VERSION,
@@ -509,6 +562,7 @@
       connections: Object.keys(clean.connections).map((k) => clean.connections[k]).concat(outside.map((c) => ({
         id: c.id, from: c.from, to: c.to,
         kind: CONNECTION_KINDS.some((k) => k.id === c.kind) ? c.kind : 'flow',
+        direction: cleanDirection(c.direction),
         label: str(c.label, 200),
         attributes: cleanMap(c.attributes)
       })))
@@ -520,6 +574,12 @@
   // ---------------------------------------------------------------------------
 
   const str = (v, max) => (v === undefined || v === null ? '' : String(v)).slice(0, max || 4000);
+
+  /** Sanitize a list of node ids (deduplicated, at most 200). */
+  function cleanIdList(list) {
+    if (!Array.isArray(list)) return [];
+    return list.filter((id, i) => Util.isValidId(id) && list.indexOf(id) === i).slice(0, 200);
+  }
 
   /** Sanitize a flat object of primitive values with safe keys. */
   function cleanMap(obj, maxLen) {
@@ -574,6 +634,7 @@
         attributes: cleanMap(n.attributes),
         custom: Array.isArray(n.custom) ? n.custom.slice(0, 200).map((c) => ({ key: str(c && c.key, 100), value: str(c && c.value, 2000) })) : [],
         display: cleanMap(n.display),
+        network: cleanIdList(n.network),
         x: Number.isFinite(n.x) ? n.x : 0,
         y: Number.isFinite(n.y) ? n.y : 0
       };
@@ -608,6 +669,13 @@
       }
     });
     project.meta.seq = Math.max(maxSeq, Number(meta.seq) || 0);
+    // Network links must point to existing virtual networks / subnets on supporting types.
+    Object.keys(project.nodes).forEach((id) => {
+      const n = project.nodes[id];
+      const valid = Catalog.supportsNetwork(n.type) ? n.network.filter((nid) => isNetworkTarget(project, nid)) : [];
+      if (valid.length !== n.network.length) warnings.push('Removed invalid network links of "' + (n.name || n.label || id) + '".');
+      n.network = valid;
+    });
 
     const rawConns = input.connections && typeof input.connections === 'object' ? input.connections : {};
     Object.keys(rawConns).forEach((key) => {
@@ -618,6 +686,7 @@
         from: c.from,
         to: c.to,
         kind: CONNECTION_KINDS.some((k) => k.id === c.kind) ? c.kind : 'flow',
+        direction: cleanDirection(c.direction),
         label: str(c.label, 200),
         attributes: cleanMap(c.attributes)
       };
@@ -662,6 +731,7 @@
     FORMAT,
     VERSION,
     CONNECTION_KINDS,
+    DIRECTIONS,
     PROTOCOLS,
     defaultSettings,
     deepMerge,
@@ -676,6 +746,9 @@
     isSelfOrDescendant,
     canContain,
     effectiveLocation,
+    isNetworkTarget,
+    networkTargets,
+    networkLinks,
     addNode,
     updateNode,
     removeNodes,

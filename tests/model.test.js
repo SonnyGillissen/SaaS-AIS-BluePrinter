@@ -95,3 +95,51 @@ test('normalize rejects non-project input', () => {
   assert.throws(() => Model.normalize(null));
   assert.throws(() => Model.normalize({ format: 'something-else' }));
 });
+
+test('resources can be attached to virtual networks and subnets', () => {
+  const p = Model.createProject();
+  const sub = Model.addNode(p, 'subscription', null, {});
+  const rg = Model.addNode(p, 'resource-group', sub.id, {});
+  const vnet = Model.addNode(p, 'virtual-network', rg.id, {});
+  const snet = Model.addNode(p, 'subnet', vnet.id, {});
+  const kv = Model.addNode(p, 'key-vault', rg.id, {});
+  assert.ok(AISBP.Catalog.supportsNetwork('function-app'));
+  assert.ok(AISBP.Catalog.supportsNetwork('private-endpoint'));
+  assert.ok(!AISBP.Catalog.supportsNetwork('service-bus-queue'));
+  assert.deepEqual(Model.networkTargets(p).map((n) => n.id), [vnet.id, snet.id]);
+
+  Model.updateNode(p, kv.id, { network: [snet.id] });
+  const attrs = AISBP.Layout.visibleAttributes(p, p.nodes[kv.id]);
+  assert.ok(attrs.some((a) => a.key === 'network' && a.value.indexOf(' / ') > 0), 'network line shows vnet / subnet');
+
+  // Invalid links are dropped on import; links survive a round trip.
+  const raw = JSON.parse(JSON.stringify(p));
+  raw.nodes[kv.id].network.push(rg.id, 'missing');
+  const { project, warnings } = Model.normalize(raw);
+  assert.deepEqual(project.nodes[kv.id].network, [snet.id]);
+  assert.ok(warnings.length === 1);
+
+  // Pasting keeps links to existing networks; deleting the subnet removes the link.
+  const res = Model.paste(p, Model.extract(p, [kv.id]), rg.id);
+  assert.deepEqual(p.nodes[res.nodeIds[0]].network, [snet.id]);
+  Model.removeNodes(p, [vnet.id]);
+  assert.deepEqual(p.nodes[kv.id].network, []);
+  assert.deepEqual(p.nodes[res.nodeIds[0]].network, []);
+});
+
+test('connections support a bidirectional direction', () => {
+  const p = Model.createProject({ sample: true });
+  const c = p.connections[Object.keys(p.connections)[0]];
+  assert.equal(c.direction, 'forward');
+  Model.updateConnection(p, c.id, { direction: 'bidirectional' });
+  assert.equal(c.direction, 'bidirectional');
+  Model.updateConnection(p, c.id, { direction: 'sideways' });
+  assert.equal(c.direction, 'forward');
+  Model.updateConnection(p, c.id, { direction: 'bidirectional' });
+  assert.equal(Model.normalize(JSON.parse(JSON.stringify(p))).project.connections[c.id].direction, 'bidirectional');
+  assert.match(AISBP.Render.renderDocument(p, {}).svg, /marker-start="url\(#[^"]*arrow/);
+  const drawio = AISBP.DrawIo.toDrawio(p, {});
+  assert.match(drawio, /direction="bidirectional"/);
+  assert.match(drawio, /startArrow=block/);
+  assert.match(AISBP.ArchiMate.toArchiMate(p), /Bidirectional/);
+});

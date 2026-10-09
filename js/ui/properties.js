@@ -191,6 +191,31 @@
       return [rows, h('button', { type: 'button', class: 'btn small', text: '+ Add custom attribute', onclick: () => store.change('add custom', (p) => { Model.updateNode(p, node.id, { custom: (node.custom || []).concat([{ key: '', value: '' }]) }); }) })];
     }
 
+    /**
+     * Virtual network / subnet picker for resources that can be attached to a network.
+     * Lists every VNet and subnet of the blueprint (subnets indented below their VNet).
+     */
+    function networkSection(node, derived) {
+      const project = store.project;
+      const targets = Model.networkTargets(project);
+      const linked = new Set(Model.networkLinks(project, node).map((n) => n.id));
+      const head = h('h3', {}, h('span', { text: 'Virtual networks / subnets' }), eye(node, Layout.NETWORK_KEY));
+      if (!targets.length) return [head, h('p', { class: 'subtitle', text: 'No virtual networks or subnets yet. Add a Virtual Network (with subnets) from the Networking palette to attach this resource to it.' })];
+      const rows = targets.map((t) => {
+        const id = 'prop-net-' + t.id;
+        const cb = h('input', {
+          type: 'checkbox', id, checked: linked.has(t.id),
+          onchange: () => store.change('network', (p) => {
+            const current = Model.networkLinks(p, p.nodes[node.id]).map((n) => n.id);
+            Model.updateNode(p, node.id, { network: cb.checked ? current.concat([t.id]) : current.filter((x) => x !== t.id) });
+          })
+        });
+        const label = (t.type === 'subnet' ? '\u00a0\u00a0\u21b3 ' : '') + (derived.geometry.names[t.id] || t.id) + ' (' + Catalog.get(t.type).label + ')';
+        return field(label, cb, { check: true });
+      });
+      return [head, h('div', { class: 'network-list' }, rows)];
+    }
+
     function nodeConnections(node, derived) {
       const project = store.project;
       const list = Object.keys(project.connections).map((k) => project.connections[k]).filter((c) => c.from === node.id || c.to === node.id);
@@ -198,7 +223,7 @@
       return h('ul', { class: 'tree' }, list.map((c) => h('li', {}, h('div', {
         class: 'tree-row',
         onclick: () => store.select([], [c.id])
-      }, h('span', { class: 'name', text: (c.from === node.id ? '\u2192 ' + derived.geometry.names[c.to] : '\u2190 ' + derived.geometry.names[c.from]) + (c.label ? ' (' + c.label + ')' : '') })))));
+      }, h('span', { class: 'name', text: (c.direction === 'bidirectional' ? '\u2194 ' : c.from === node.id ? '\u2192 ' : '\u2190 ') + derived.geometry.names[c.from === node.id ? c.to : c.from] + (c.label ? ' (' + c.label + ')' : '') })))));
     }
 
     function renderNode(node) {
@@ -216,6 +241,7 @@
       })));
       if (level !== 'selected') out.push(h('p', { class: 'note', text: 'The detail level is "' + Layout.DETAIL_LEVELS.find((d) => d.id === level).label + '". The \u{1F441} toggles apply to the "Selected attributes" level.' }));
       def.attributes.forEach((a) => out.push(attributeControl(node, a)));
+      if (def.network) out.push(networkSection(node, derived));
       out.push(h('h3', { text: 'Custom attributes' }), customSection(node));
       out.push(h('h3', { text: 'Connections' }), nodeConnections(node, derived));
       out.push(h('h3', { text: 'Actions' }), h('div', { class: 'inline' },
@@ -228,9 +254,12 @@
 
     function renderConnection(c) {
       const derived = store.derived();
-      const out = [h('h2', { text: 'Connection' }), h('p', { class: 'subtitle', text: (derived.geometry.names[c.from] || '?') + ' \u2192 ' + (derived.geometry.names[c.to] || '?') })];
+      const both = c.direction === 'bidirectional';
+      const out = [h('h2', { text: 'Connection' }), h('p', { class: 'subtitle', text: (derived.geometry.names[c.from] || '?') + (both ? ' \u2194 ' : ' \u2192 ') + (derived.geometry.names[c.to] || '?') })];
       const kind = select(Model.CONNECTION_KINDS.map((k) => ({ value: k.id, label: k.label + ' (ArchiMate: ' + k.archimate + ')' })), c.kind, { id: 'prop-conn-kind', onchange: () => patchConn(c.id, { kind: kind.value }) });
       out.push(field('Type', kind));
+      const dir = select(Model.DIRECTIONS.map((d) => ({ value: d.id, label: d.label })), both ? 'bidirectional' : 'forward', { id: 'prop-conn-direction', onchange: () => patchConn(c.id, { direction: dir.value }) });
+      out.push(field('Direction', dir));
       out.push(field('Label', textInput('prop-conn-label', c.label, (v) => patchConn(c.id, { label: v }, c.id + ':label'))));
       const proto = select(Model.PROTOCOLS, (c.attributes && c.attributes.protocol) || '', { id: 'prop-conn-protocol', onchange: () => patchConn(c.id, { attributes: { protocol: proto.value } }) });
       out.push(field('Protocol', proto));

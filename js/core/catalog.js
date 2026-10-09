@@ -112,6 +112,11 @@
   const PRIVATE_ENDPOINT = bool('privateEndpoint', 'Private endpoint');
   const DIAGNOSTICS = bool('diagnostics', 'Diagnostic settings');
 
+  /** Attribute keys that imply a resource can be attached to virtual networks / subnets. */
+  const NETWORK_ATTRIBUTE_KEYS = ['privateEndpoint', 'vnetIntegration', 'vnetMode'];
+  /** Types a resource can be attached to (see `node.network` in AISBP.Model). */
+  const NETWORK_TARGET_TYPES = ['virtual-network', 'subnet'];
+
   // ---------------------------------------------------------------------------
   // Naming rule presets. Rule shape:
   // { min, max, chars (regex character class body), lower?, start?, end?, noDoubleHyphen?,
@@ -246,7 +251,9 @@
    * The catalog. Order inside a category is the order shown in the palette.
    * Fields: label, category, icon, abbr, provider, parents, archimate, rule, attributes,
    * container (rendered as group even without children), pattern (default naming pattern),
-   * nameMode ('convention' | 'custom'), seed (default short name for {name} token), azure (bool).
+   * nameMode ('convention' | 'custom'), seed (default short name for {name} token), azure (bool),
+   * network (bool: can be attached to virtual networks / subnets; also derived automatically for
+   * types with a private endpoint, VNet integration or VNet mode attribute).
    */
   const TYPES = {
     // ----- Hierarchy -----------------------------------------------------------
@@ -397,7 +404,7 @@
     },
     'data-factory': {
       label: 'Data Factory', category: 'integration', icon: I.dataFactory, abbr: 'adf', provider: 'Microsoft.DataFactory/factories',
-      parents: RG, archimate: 'ApplicationComponent', rule: R.dataFactory,
+      parents: RG, archimate: 'ApplicationComponent', rule: R.dataFactory, network: true,
       attributes: [
         select('integrationRuntime', 'Integration runtime', ['AutoResolve', 'Managed VNet', 'Self-hosted', 'Azure-SSIS'], { default: 'AutoResolve', show: true }),
         bool('gitIntegration', 'Git integration'), NETWORK_ACCESS, MANAGED_IDENTITY, DIAGNOSTICS
@@ -561,7 +568,7 @@
     },
     'container-apps-environment': {
       label: 'Container Apps Environment', category: 'compute', icon: I.containerAppsEnvironment, abbr: 'cae', provider: 'Microsoft.App/managedEnvironments',
-      parents: RG, archimate: 'Node', rule: R.containerAppEnv,
+      parents: RG, archimate: 'Node', rule: R.containerAppEnv, network: true,
       attributes: [select('plan', 'Plan', ['Consumption', 'Workload profiles'], { default: 'Workload profiles', show: true }), bool('internal', 'Internal only'), text('subnet', 'Infrastructure subnet'), bool('zoneRedundant', 'Zone redundant')]
     },
     'container-app': {
@@ -683,22 +690,22 @@
     },
     'private-endpoint': {
       label: 'Private Endpoint', category: 'networking', icon: I.privateEndpoint, abbr: 'pep', provider: 'Microsoft.Network/privateEndpoints',
-      parents: RG, archimate: 'TechnologyInterface', rule: R.network,
+      parents: RG, archimate: 'TechnologyInterface', rule: R.network, network: true,
       attributes: [text('target', 'Target resource', { show: true }), select('groupId', 'Sub-resource', ['blob', 'queue', 'table', 'file', 'dfs', 'namespace', 'sites', 'vault', 'Gateway', 'sqlServer', 'Sql', 'configurationStores', 'topic', 'domain', 'registry'], { show: true }), text('subnet', 'Subnet'), text('privateDnsZone', 'Private DNS zone')]
     },
     'private-dns-zone': {
       label: 'Private DNS Zone', category: 'networking', icon: I.dnsZone, abbr: 'pdnsz', provider: 'Microsoft.Network/privateDnsZones',
-      parents: RG, archimate: 'TechnologyService', rule: R.dnsZone, nameMode: 'custom', seed: 'privatelink.servicebus.windows.net',
+      parents: RG, archimate: 'TechnologyService', rule: R.dnsZone, nameMode: 'custom', seed: 'privatelink.servicebus.windows.net', network: true,
       attributes: [area('vnetLinks', 'Virtual network links', { show: true })]
     },
     nsg: {
       label: 'Network Security Group', category: 'networking', icon: I.nsg, abbr: 'nsg', provider: 'Microsoft.Network/networkSecurityGroups',
-      parents: RG, archimate: 'TechnologyService', rule: R.network80,
+      parents: RG, archimate: 'TechnologyService', rule: R.network80, network: true,
       attributes: [area('rules', 'Security rules')]
     },
     'application-gateway': {
       label: 'Application Gateway', category: 'networking', icon: I.appGateway, abbr: 'agw', provider: 'Microsoft.Network/applicationGateways',
-      parents: RG, archimate: 'TechnologyService', rule: R.network80,
+      parents: RG, archimate: 'TechnologyService', rule: R.network80, network: true,
       attributes: [select('sku', 'SKU', ['Standard_v2', 'WAF_v2', 'Basic'], { default: 'WAF_v2', show: true }), num('capacity', 'Capacity / autoscale max', { default: 2 }), text('listeners', 'Listeners'), bool('zoneRedundant', 'Zone redundant')]
     },
     'front-door': {
@@ -713,12 +720,12 @@
     },
     'virtual-network-gateway': {
       label: 'Virtual Network Gateway', category: 'networking', icon: I.vnetGateway, abbr: 'vgw', provider: 'Microsoft.Network/virtualNetworkGateways',
-      parents: RG, archimate: 'TechnologyService', rule: R.network80,
+      parents: RG, archimate: 'TechnologyService', rule: R.network80, network: true,
       attributes: [select('gatewayType', 'Gateway type', ['VPN', 'ExpressRoute'], { default: 'VPN', show: true }), text('sku', 'SKU', { default: 'VpnGw1AZ' }), bool('activeActive', 'Active-active')]
     },
     firewall: {
       label: 'Azure Firewall', category: 'networking', icon: I.firewall, abbr: 'afw', provider: 'Microsoft.Network/azureFirewalls',
-      parents: RG, archimate: 'TechnologyService', rule: R.network,
+      parents: RG, archimate: 'TechnologyService', rule: R.network, network: true,
       attributes: [select('tier', 'Tier', ['Basic', 'Standard', 'Premium'], { default: 'Standard', show: true }), text('policy', 'Firewall policy')]
     },
     'data-gateway': {
@@ -775,6 +782,7 @@
     t.id = id;
     if (t.azure === undefined) t.azure = true;
     t.container = !!t.container;
+    t.network = !!t.network || (t.attributes || []).some((a) => NETWORK_ATTRIBUTE_KEYS.indexOf(a.key) !== -1);
     const common = t.azure && id !== 'resource-group' && t.category !== 'hierarchy' ? COMMON_RESOURCE_ATTRIBUTES : t.azure ? [] : COMMON_GENERIC_ATTRIBUTES;
     const own = t.attributes || [];
     const seen = new Set(own.map((a) => a.key));
@@ -819,6 +827,12 @@
     return t ? t.attributes.find((a) => a.key === key) : undefined;
   }
 
+  /** Whether objects of a type can be attached to virtual networks / subnets. */
+  function supportsNetwork(typeId) {
+    const t = get(typeId);
+    return !!(t && t.network);
+  }
+
   /** Region lookup by id. */
   function region(id) {
     return REGIONS.find((r) => r.id === id);
@@ -835,7 +849,9 @@
     canContain,
     childTypesOf,
     attribute,
-    region
+    region,
+    supportsNetwork,
+    NETWORK_TARGET_TYPES
   };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = AISBP.Catalog;

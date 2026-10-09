@@ -54,6 +54,8 @@
       if (v === '' || v === undefined || v === '(inherit)') return;
       s += ' ' + k + '="' + esc(v) + '"';
     });
+    const links = Layout.networkLabel(project, node);
+    if (links) s += ' network="' + esc(links) + '"';
     (node.custom || []).forEach((c) => {
       const key = 'custom_' + String(c.key).replace(/[^A-Za-z0-9_.-]/g, '_');
       if (c.key && /^[A-Za-z_]/.test(key)) s += ' ' + key + '="' + esc(c.value) + '"';
@@ -117,12 +119,14 @@
       const c = project.connections[cid];
       if (!g.rects[c.from] || !g.rects[c.to] || g.rects[c.from].hidden || g.rects[c.to].hidden) return;
       const kind = Model.CONNECTION_KINDS.find((k) => k.id === c.kind) || Model.CONNECTION_KINDS[0];
-      const noArrow = c.kind === 'network' || c.kind === 'association';
+      const both = c.direction === 'bidirectional';
+      const noArrow = !both && (c.kind === 'network' || c.kind === 'association');
       const edgeStyle = project.settings.diagram.connector === 'straight' ? '' : project.settings.diagram.connector === 'curved' ? 'curved=1;' : 'edgeStyle=orthogonalEdgeStyle;rounded=1;';
       const style = edgeStyle + 'html=1;strokeColor=' + st.edge + ';fontColor=' + st.edgeText + ';fontSize=10;' + (kind.dashed ? 'dashed=1;' : '') +
-        (noArrow ? 'endArrow=none;' : c.kind === 'dependency' ? 'endArrow=open;endFill=0;' : 'endArrow=block;endFill=1;') + (c.kind === 'trigger' ? 'startArrow=oval;startFill=1;' : '');
+        (noArrow ? 'endArrow=none;' : c.kind === 'dependency' ? 'endArrow=open;endFill=0;' : 'endArrow=block;endFill=1;') +
+        (both ? (c.kind === 'dependency' ? 'startArrow=open;startFill=0;' : 'startArrow=block;startFill=1;') : c.kind === 'trigger' ? 'startArrow=oval;startFill=1;' : '');
       const label = [c.label, c.attributes && c.attributes.protocol && c.attributes.protocol !== c.label ? c.attributes.protocol : ''].filter(Boolean).join(' \u00b7 ');
-      cells.push('<object label="' + esc(html(label)) + '" id="e-' + esc(c.id) + '" connectionType="' + esc(kind.label) + '"' + (c.attributes && c.attributes.protocol ? ' protocol="' + esc(c.attributes.protocol) + '"' : '') + '>' +
+      cells.push('<object label="' + esc(html(label)) + '" id="e-' + esc(c.id) + '" connectionType="' + esc(kind.label) + '" direction="' + (both ? 'bidirectional' : 'forward') + '"' + (c.attributes && c.attributes.protocol ? ' protocol="' + esc(c.attributes.protocol) + '"' : '') + '>' +
         '<mxCell style="' + esc(style) + '" edge="1" parent="1" source="' + cellId(c.from) + '" target="' + cellId(c.to) + '"><mxGeometry relative="1" as="geometry"/></mxCell></object>');
     });
 

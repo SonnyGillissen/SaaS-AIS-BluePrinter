@@ -250,11 +250,14 @@
     const selected = o.selection && o.selection.conns.has(c.id);
     const color = selected ? st.selection : st.edge;
     const p = o.idPrefix || '';
-    const noArrow = c.kind === 'network' || c.kind === 'association';
-    const markerEnd = noArrow ? '' : ' marker-end="url(#' + p + (selected ? 'arrow-sel' : c.kind === 'dependency' ? 'arrow-open' : 'arrow') + ')"';
-    const markerStart = c.kind === 'trigger' ? ' marker-start="url(#' + p + 'dot)"' : '';
+    // Bidirectional connections get an arrow head at both ends (markers use orient="auto-start-reverse").
+    const both = c.direction === 'bidirectional';
+    const noArrow = !both && (c.kind === 'network' || c.kind === 'association');
+    const arrow = ' url(#' + p + (selected ? 'arrow-sel' : c.kind === 'dependency' ? 'arrow-open' : 'arrow') + ')"';
+    const markerEnd = noArrow ? '' : ' marker-end="' + arrow.trim();
+    const markerStart = both ? ' marker-start="' + arrow.trim() : c.kind === 'trigger' ? ' marker-start="url(#' + p + 'dot)"' : '';
     let s = '<g class="connection" data-conn-id="' + esc(c.id) + '">';
-    const title = [kind.label, c.label, c.attributes && c.attributes.protocol].filter(Boolean).join(' \u2022 ');
+    const title = [kind.label, both ? 'bidirectional' : '', c.label, c.attributes && c.attributes.protocol].filter(Boolean).join(' \u2022 ');
     s += '<title>' + esc(title) + '</title>';
     if (!o.forExport) s += '<path d="' + path.d + '" fill="none" stroke="transparent" stroke-width="12" class="hit"/>';
     s += '<path d="' + path.d + '" fill="none" stroke="' + color + '" stroke-width="' + (selected ? 2.5 : 1.6) + '"' + (kind.dashed ? ' stroke-dasharray="6 4"' : '') + markerEnd + markerStart + '/>';

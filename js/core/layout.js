@@ -51,6 +51,18 @@
     return String(value).replace(/\s*\n\s*/g, ', ');
   }
 
+  /** Display key of the virtual network / subnet links (see `node.network`). Shown by default. */
+  const NETWORK_KEY = 'network';
+
+  /** Readable list of the VNets/subnets a node is attached to ("vnet-a / snet-b, vnet-c"). */
+  function networkLabel(project, node) {
+    return Model.networkLinks(project, node).map((n) => {
+      const own = Naming.resolveName(project, n);
+      const parent = n.type === 'subnet' && n.parentId ? project.nodes[n.parentId] : null;
+      return parent ? Naming.resolveName(project, parent) + ' / ' + own : own;
+    }).join(', ');
+  }
+
   /**
    * Whether an attribute is selected for display, honoring (in order): per-object choice,
    * per-type choice in the options and the catalog default.
@@ -60,6 +72,7 @@
     const td = project.settings.diagram.typeDisplay && project.settings.diagram.typeDisplay[node.type];
     if (td && typeof td[key] === 'boolean') return td[key];
     if (key.indexOf('custom:') === 0) return false;
+    if (key === NETWORK_KEY) return true;
     const attr = Catalog.attribute(node.type, key);
     return !!(attr && attr.show);
   }
@@ -75,6 +88,8 @@
       if (!value) return;
       if (level === 'detailed' || isAttributeShown(project, node, attr.key)) out.push({ key: attr.key, label: attr.label.replace(/\s*\(.*\)$/, ''), value });
     });
+    const links = def && def.network ? networkLabel(project, node) : '';
+    if (links && (level === 'detailed' || isAttributeShown(project, node, NETWORK_KEY))) out.push({ key: NETWORK_KEY, label: 'Network', value: links });
     (node.custom || []).forEach((c) => {
       if (!c.key || c.value === '') return;
       if (level === 'detailed' || isAttributeShown(project, node, 'custom:' + c.key)) out.push({ key: 'custom:' + c.key, label: c.key, value: String(c.value) });
@@ -331,6 +346,8 @@
     DETAIL_LEVELS,
     formatValue,
     isAttributeShown,
+    networkLabel,
+    NETWORK_KEY,
     visibleAttributes,
     truncate,
     wrapName,

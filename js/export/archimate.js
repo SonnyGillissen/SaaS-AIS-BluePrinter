@@ -73,6 +73,8 @@
         const v = Layout.formatValue(a, node.attributes[a.key]);
         if (v && a.key !== 'description') props += prop(a.label, v);
       });
+      const links = Layout.networkLabel(project, node);
+      if (links) props += prop('Network', links);
       (node.custom || []).forEach((c) => { if (c.key && c.value !== '') props += prop(c.key, c.value); });
       elements += '<element identifier="' + eid(node.id) + '" xsi:type="' + elementType(node) + '">' + name(r ? r.name : node.name) + doc(node.attributes && node.attributes.description) + '<properties>' + props + '</properties></element>';
     });
@@ -97,8 +99,19 @@
       const rid = 'id-' + c.id;
       relIds[c.id] = rid;
       let props = '';
-      if (c.attributes && c.attributes.protocol) props = '<properties>' + prop('Protocol', c.attributes.protocol) + '</properties>';
+      if (c.attributes && c.attributes.protocol) props += prop('Protocol', c.attributes.protocol);
+      if (c.direction === 'bidirectional') props += prop('Direction', 'Bidirectional');
+      if (props) props = '<properties>' + props + '</properties>';
       relationships += '<relationship identifier="' + rid + '" source="' + eid(c.from) + '" target="' + eid(c.to) + '" xsi:type="' + type + '">' + (c.label ? name(c.label) : '') + props + '</relationship>';
+    });
+
+    // Network links (resource attached to a VNet/subnet) become Association relationships.
+    nodes.forEach((node) => {
+      Model.networkLinks(project, node).forEach((target) => {
+        const rid = 'id-net-' + node.id + '-' + target.id;
+        relIds['net-' + node.id + '-' + target.id] = rid;
+        relationships += '<relationship identifier="' + rid + '" source="' + eid(node.id) + '" target="' + eid(target.id) + '" xsi:type="Association">' + name('attached to network') + '</relationship>';
+      });
     });
 
     // Organizations: mirror the Azure hierarchy in a folder structure.
