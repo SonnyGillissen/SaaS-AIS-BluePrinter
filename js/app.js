@@ -25,7 +25,7 @@
     return Model.createProject({ name: sample ? 'Sample integration landing zone' : 'New integration blueprint', settings: Model.sanitizeSettings(config.defaults || {}), sample });
   }
 
-  const store = Store.createStore(newProject(true));
+  const store = Store.createStore(newProject(false));
 
   /** Shared application context passed to the UI modules. */
   const app = {
@@ -579,23 +579,18 @@
   }
 
 
+  // Start with a new, blank blueprint (the "New" screen). Saved blueprints stay available via
+  // Open, and the sample can be loaded from the empty canvas or the Open dialog. A blank blueprint
+  // is only stored once something is changed.
   (async function start() {
-    let project = null;
-    try {
-      const last = Storage.lastProjectId();
-      if (last) project = await storage.load(last);
-    } catch (e) {
-      project = null;
-    }
-    if (!project) {
+    openProject(store.project, true);
+    if (storage.kind === 'server') {
       try {
-        const list = await storage.list();
-        if (list.length) project = await storage.load(list[0].id);
+        await storage.list();
       } catch (e) {
-        if (storage.kind === 'server') toast('Could not reach the database server: ' + e.message, 'error');
+        toast('Could not reach the database server: ' + e.message, 'error');
       }
     }
-    openProject(project || store.project, !project);
   })();
 
   AISBP.app = app;

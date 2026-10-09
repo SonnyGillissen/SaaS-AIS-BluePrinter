@@ -44,8 +44,9 @@ existing PHP hosting.
 
 ## Your first blueprint
 
-1. On first start a **sample landing zone** is loaded so you can explore. Use **New** to start
-   with an empty blueprint, or a new copy of the sample.
+1. The app always starts with a new, blank blueprint. Use **Load the sample blueprint** on the
+   empty canvas, or *New with sample* in **Open**, to explore a sample landing zone. Your saved
+   blueprints are listed under **Open**.
 2. Click **Function App** in the palette. AIS BluePrinter adds it to the selected (or the first)
    resource group, and creates the subscription and resource group for it if they don't exist yet.
    You can also drag palette items onto a container on the canvas.
