@@ -121,7 +121,8 @@ stored in the database, so it applies to everyone using that instance (there are
 accounts). In the dark theme the editor canvas is dark too: light display styles (Azure classic,
 Minimal, Whiteboard) are shown with dark colours while keeping their own fonts, corners and line
 patterns. **Exports always use the chosen display style** as-is; pick the *Dark* or *Blueprint*
-style if you want a dark exported diagram.
+style if you want a dark exported diagram. The browser tab icon (favicon) switches to a light variant in the dark theme
+so it stays visible.
 
 ## Projects
 

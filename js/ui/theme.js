@@ -10,6 +10,7 @@
  *   'light' / 'dark'   - always use that theme
  *
  * The effective theme is written to <html data-theme="light|dark">; css/app.css defines the palette.
+ * The favicon (<link id="favicon">) is switched to the matching variant as well.
  * Only the application chrome is themed - the diagram keeps its own display style.
  */
 (function (root) {
@@ -20,6 +21,7 @@
   const PREFS_KEY = 'aisbp.prefs';
   const media = root.matchMedia ? root.matchMedia('(prefers-color-scheme: dark)') : null;
   const listeners = [];
+  const FAVICONS = { light: 'assets/favicon.svg', dark: 'assets/favicon-dark.svg' };
   let mode = 'system';
 
   function readPrefs() {
@@ -50,6 +52,8 @@
   function apply() {
     const doc = root.document && root.document.documentElement;
     if (doc) doc.setAttribute('data-theme', effective());
+    const icon = root.document && root.document.getElementById('favicon');
+    if (icon && icon.getAttribute('href') !== FAVICONS[effective()]) icon.setAttribute('href', FAVICONS[effective()]);
     listeners.forEach((fn) => fn(mode, effective()));
   }
 
