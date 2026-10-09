@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="AIS BluePrinter - design Azure Integration Services architectures visually and export them to PDF, PNG, SVG, draw.io and ArchiMate.">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https: http:; connect-src 'self' https: http:; object-src 'none'; base-uri 'self'; form-action 'none'">
+  <title>AIS BluePrinter</title>
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <a class="skip-link" href="#canvas">Skip to canvas</a>
+
+  <header class="app-header">
+    <div class="brand">
+      <img src="assets/favicon.svg" alt="" width="26" height="26">
+      <span class="brand-name">AIS <strong>BluePrinter</strong></span>
+    </div>
+    <input id="project-name" class="project-name" type="text" aria-label="Project name" spellcheck="false" maxlength="200">
+    <span id="save-state" class="save-state" aria-live="polite"></span>
+
+    <nav class="toolbar" aria-label="Main toolbar">
+      <div class="group">
+        <button type="button" data-action="new" title="New blueprint">New</button>
+        <button type="button" data-action="projects" title="Open a saved blueprint">Open</button>
+        <button type="button" data-action="import" title="Import a configuration package (.json)">Import</button>
+        <div class="menu">
+          <button type="button" data-action="export-menu" aria-haspopup="true" aria-expanded="false" title="Export">Export &#9662;</button>
+          <div class="menu-list" role="menu" hidden>
+            <button type="button" role="menuitem" data-action="export-json">Configuration package (.json)</button>
+            <hr>
+            <button type="button" role="menuitem" data-action="export-png">PNG image</button>
+            <button type="button" role="menuitem" data-action="export-pdf">PDF document</button>
+            <button type="button" role="menuitem" data-action="export-svg">SVG image</button>
+            <hr>
+            <button type="button" role="menuitem" data-action="export-drawio">draw.io / diagrams.net (.drawio)</button>
+            <button type="button" role="menuitem" data-action="export-archimate">ArchiMate exchange format (.xml)</button>
+          </div>
+        </div>
+      </div>
+      <div class="group">
+        <button type="button" data-action="undo" title="Undo (Ctrl+Z)" aria-label="Undo">&#8630;</button>
+        <button type="button" data-action="redo" title="Redo (Ctrl+Y)" aria-label="Redo">&#8631;</button>
+        <button type="button" data-action="copy" title="Copy (Ctrl+C)">Copy</button>
+        <button type="button" data-action="paste" title="Paste (Ctrl+V)">Paste</button>
+        <button type="button" data-action="delete" title="Delete (Del)" aria-label="Delete">&#128465;</button>
+      </div>
+      <div class="group">
+        <label class="select-label">Style
+          <select id="style-select" aria-label="Display style"></select>
+        </label>
+        <label class="select-label">Detail
+          <select id="detail-select" aria-label="Detail level"></select>
+        </label>
+      </div>
+      <div class="group">
+        <button type="button" data-action="zoom-out" title="Zoom out (-)" aria-label="Zoom out">&minus;</button>
+        <button type="button" data-action="zoom-reset" id="zoom-label" title="Reset zoom (0)">100%</button>
+        <button type="button" data-action="zoom-in" title="Zoom in (+)" aria-label="Zoom in">+</button>
+        <button type="button" data-action="fit" title="Fit to screen (F)">Fit</button>
+        <button type="button" data-action="tidy" title="Automatically arrange the blueprint">Tidy up</button>
+      </div>
+      <div class="group">
+        <button type="button" data-action="options" title="Options: naming conventions, diagram, icons, branding">Options</button>
+        <button type="button" data-action="help" title="Help and keyboard shortcuts" aria-label="Help">?</button>
+      </div>
+    </nav>
+  </header>
+
+  <main class="workspace">
+    <aside class="sidebar left" aria-label="Palette and explorer">
+      <div class="tabs" role="tablist">
+        <button type="button" role="tab" id="tab-palette" aria-controls="panel-palette" aria-selected="true">Palette</button>
+        <button type="button" role="tab" id="tab-explorer" aria-controls="panel-explorer" aria-selected="false">Explorer</button>
+      </div>
+      <section id="panel-palette" class="tab-panel" role="tabpanel" aria-labelledby="tab-palette"></section>
+      <section id="panel-explorer" class="tab-panel" role="tabpanel" aria-labelledby="tab-explorer" hidden></section>
+    </aside>
+
+    <section id="canvas" class="canvas-wrap" tabindex="0" aria-label="Diagram canvas">
+      <svg id="canvas-svg" class="canvas" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Architecture diagram">
+        <defs id="canvas-defs"></defs>
+        <rect id="canvas-bg" x="-100000" y="-100000" width="200000" height="200000"></rect>
+        <g id="viewport">
+          <g id="content"></g>
+          <g id="overlay"></g>
+        </g>
+      </svg>
+      <div id="canvas-empty" class="canvas-empty" hidden>
+        <h2>Start your blueprint</h2>
+        <p>Drag a <strong>management group</strong>, <strong>subscription</strong> or <strong>resource group</strong> from the palette onto the canvas, then drop resources inside it.</p>
+        <p><button type="button" data-action="sample">Load the sample blueprint</button></p>
+      </div>
+      <div class="canvas-hint" id="canvas-hint">Drag empty space to pan &bull; Shift+drag to select &bull; Ctrl+wheel to zoom &bull; Drag the &#9675; handle to connect</div>
+    </section>
+
+    <aside class="sidebar right" aria-label="Properties">
+      <section id="panel-properties" class="properties"></section>
+    </aside>
+  </main>
+
+  <footer class="app-footer">
+    <span class="community">Community Project by <a id="brand-link" class="brand-slot" rel="noopener" target="_blank"><span id="brand-text">Sonny Gillissen</span><img id="brand-logo" alt="" hidden></a></span>
+    <span class="sep" aria-hidden="true">&bull;</span>
+    <span class="attribution">Icons: <a href="https://msicons.com/" target="_blank" rel="noopener">MS Icons</a> community library by <a href="https://github.com/DanielBradley1/msicons" target="_blank" rel="noopener">Daniel Bradley</a> &mdash; icons &copy; Microsoft</span>
+    <span class="sep" aria-hidden="true">&bull;</span>
+    <span id="storage-note" class="storage-note">&#128274; Your data stays in this browser (localStorage)</span>
+    <span class="spacer"></span>
+    <a href="docs/wiki/Home.md" target="_blank" rel="noopener">Documentation</a>
+  </footer>
+
+  <input id="file-input" type="file" accept=".json,application/json" hidden>
+  <div id="toasts" class="toasts" role="status" aria-live="polite"></div>
+
+  <!-- Configuration (edit for hosted deployments) -->
+  <script src="js/config.js"></script>
+  <!-- Core (no DOM dependencies, unit tested in Node) -->
+  <script src="js/core/util.js"></script>
+  <script src="js/core/catalog.js"></script>
+  <script src="js/core/model.js"></script>
+  <script src="js/core/naming.js"></script>
+  <script src="js/core/layout.js"></script>
+  <script src="js/core/store.js"></script>
+  <script src="js/core/storage.js"></script>
+  <!-- Rendering and exports -->
+  <script src="js/render/svg.js"></script>
+  <script src="js/render/icons.js"></script>
+  <script src="js/export/package.js"></script>
+  <script src="js/export/drawio.js"></script>
+  <script src="js/export/archimate.js"></script>
+  <script src="js/export/raster.js"></script>
+  <!-- User interface -->
+  <script src="js/ui/dom.js"></script>
+  <script src="js/ui/palette.js"></script>
+  <script src="js/ui/explorer.js"></script>
+  <script src="js/ui/properties.js"></script>
+  <script src="js/ui/canvas.js"></script>
+  <script src="js/ui/dialogs.js"></script>
+  <script src="js/ui/exporter.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
