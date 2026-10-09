@@ -7,6 +7,8 @@
  *   GET  api.php?action=load&id=ID     -> { ok: true, project }
  *   POST api.php?action=save&id=ID     body: project JSON -> { ok: true }
  *   POST api.php?action=delete&id=ID   -> { ok: true }
+ *   GET  api.php?action=prefs          -> { ok: true, prefs: { theme? } }
+ *   POST api.php?action=save-prefs     body: { theme: 'system'|'light'|'dark' } -> { ok: true }
  *   GET  api.php?action=ping           -> { ok: true, installed: bool }
  * Errors: { ok: false, error } with an appropriate HTTP status.
  *
@@ -46,13 +48,15 @@ $needsId = in_array($action, ['load', 'save', 'delete'], true);
 if ($needsId && !preg_match(AISBP\ID_PATTERN, $id)) {
     json_response(['ok' => false, 'error' => 'Invalid project id.'], 400);
 }
-$writes = ['save', 'delete'];
+$writes = ['save', 'delete', 'save-prefs'];
 if (in_array($action, $writes, true) && $method !== 'POST') {
     json_response(['ok' => false, 'error' => 'Use POST for this action.'], 405);
 }
 
 try {
-    $repo = new AISBP\ProjectRepository(connect((array)$config['db']));
+    $db = (array)$config['db'];
+    $pdo = connect($db);
+    $repo = new AISBP\ProjectRepository($pdo);
     switch ($action) {
         case 'list':
             json_response(['ok' => true, 'projects' => $repo->list()]);
@@ -88,6 +92,21 @@ try {
             // no break
         case 'delete':
             $repo->delete($id);
+            json_response(['ok' => true]);
+            // no break
+        case 'prefs':
+            $settings = new AISBP\SettingsRepository($pdo, (string)($db['driver'] ?? 'mysql'));
+            json_response(['ok' => true, 'prefs' => (object)$settings->all()]);
+            // no break
+        case 'save-prefs':
+            if (stripos((string)($_SERVER['CONTENT_TYPE'] ?? ''), 'application/json') !== 0) {
+                json_response(['ok' => false, 'error' => 'Content-Type must be application/json.'], 415);
+            }
+            $prefs = json_decode((string)file_get_contents('php://input', false, null, 0, 4096), true, 4);
+            if (!is_array($prefs)) {
+                json_response(['ok' => false, 'error' => 'Body must be a JSON object.'], 400);
+            }
+            (new AISBP\SettingsRepository($pdo, (string)($db['driver'] ?? 'mysql')))->save($prefs);
             json_response(['ok' => true]);
             // no break
         default:

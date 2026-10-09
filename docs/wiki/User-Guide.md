@@ -112,6 +112,15 @@ connection to set its:
 
 On macOS, use ⌘ instead of Ctrl.
 
+## Light and dark mode
+
+The **Theme** selector in the toolbar switches the application between **System** (the default;
+follows the light/dark setting of your operating system, also when it changes), **Light** and
+**Dark**. The choice is remembered in this browser (`localStorage`). In server mode it is also
+stored in the database, so it applies to everyone using that instance (there are no user
+accounts). The theme only changes the application itself; the diagram keeps its own *display
+style* (choose *Dark* there for a dark diagram).
+
 ## Projects
 
 Projects are saved automatically, shortly after every change. **Open** lists your projects, where

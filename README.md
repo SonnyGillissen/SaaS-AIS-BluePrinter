@@ -32,6 +32,8 @@ architectures. Click your environment together, and get an architecture diagram 
 - **Runs anywhere**: open `index.html` from disk, or host the static files anywhere (GitHub Pages,
   Azure Static Web Apps, IIS, Apache, nginx). Vanilla HTML/CSS/JS, **zero dependencies, no build
   step**.
+- **Light and dark mode**: follows your operating system by default, or switch manually in the
+  toolbar (*Theme*). The choice is remembered in the browser (and in the database in server mode).
 - **Optional database storage**: MySQL / MariaDB or SQL Server / Azure SQL, with one-click
   installers (Docker) and a web installer for existing PHP hosting.
 

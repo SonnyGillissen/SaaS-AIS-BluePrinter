@@ -8,6 +8,7 @@
   <title>AIS BluePrinter</title>
   <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="css/app.css">
+  <script src="js/ui/theme.js"></script>
 </head>
 <body>
   <a class="skip-link" href="#canvas">Skip to canvas</a>
@@ -62,6 +63,13 @@
         <button type="button" data-action="tidy" title="Automatically arrange the blueprint">Tidy up</button>
       </div>
       <div class="group">
+        <label class="select-label">Theme
+          <select id="theme-select" aria-label="Colour theme of the application" title="Light or dark mode (System follows your operating system)">
+            <option value="system">System</option>
+            <option value="light">Light</option>
+            <option value="dark">Dark</option>
+          </select>
+        </label>
         <button type="button" data-action="options" title="Options: naming conventions, diagram, icons">Options</button>
         <button type="button" data-action="help" title="Help and keyboard shortcuts" aria-label="Help">?</button>
       </div>

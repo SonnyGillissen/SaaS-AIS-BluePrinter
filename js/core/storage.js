@@ -88,6 +88,13 @@
         s.removeItem(projectKey(id));
         writeJson(s, INDEX_KEY, index().filter((e) => e.id !== id));
       },
+      /** Shared preferences (e.g. the colour theme); stored in this browser. */
+      async loadPrefs() {
+        return loadPrefs(s);
+      },
+      async savePrefs(prefs) {
+        savePrefs(Object.assign(loadPrefs(s), sanitizePrefs(prefs)), s);
+      },
       /** Approximate number of bytes used by AIS BluePrinter in localStorage. */
       usage() {
         let bytes = 0;
@@ -143,6 +150,14 @@
       async remove(id) {
         await call('delete', { id }, {});
       },
+      /** Shared preferences stored in the database (instance-wide, there are no user accounts). */
+      async loadPrefs() {
+        const data = await call('prefs');
+        return sanitizePrefs(data.prefs);
+      },
+      async savePrefs(prefs) {
+        await call('save-prefs', {}, sanitizePrefs(prefs));
+      },
       usage() {
         return 0;
       }
@@ -176,6 +191,16 @@
   // Preferences (UI state). Kept per browser, not per project.
   // ---------------------------------------------------------------------------
 
+  /** Colour themes of the application: follow the operating system, or force light/dark. */
+  const THEMES = ['system', 'light', 'dark'];
+
+  /** Keep only known preference keys with valid values (used for the server API too). */
+  function sanitizePrefs(prefs) {
+    const out = {};
+    if (prefs && typeof prefs === 'object' && THEMES.indexOf(prefs.theme) !== -1) out.theme = prefs.theme;
+    return out;
+  }
+
   function loadPrefs(storage) {
     const p = readJson(storage || root.localStorage, PREFS_KEY, {});
     return p && typeof p === 'object' && !Array.isArray(p) ? p : {};
@@ -185,7 +210,7 @@
     writeJson(storage || root.localStorage, PREFS_KEY, prefs);
   }
 
-  AISBP.Storage = { LocalAdapter, ApiAdapter, create, lastProjectId, setLastProjectId, loadPrefs, savePrefs, PREFIX };
+  AISBP.Storage = { LocalAdapter, ApiAdapter, create, lastProjectId, setLastProjectId, loadPrefs, savePrefs, sanitizePrefs, THEMES, PREFIX };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = AISBP.Storage;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

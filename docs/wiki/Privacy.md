@@ -6,6 +6,7 @@ machine.**
 | Data | Where it is stored | Leaves your machine? |
 |---|---|---|
 | Blueprints (projects) | Your browser's `localStorage` (keys `aisbp.index`, `aisbp.project.<id>`, `aisbp.last`) | **No** |
+| Preferences (light/dark theme) | Your browser's `localStorage` (key `aisbp.prefs`) | **No** |
 | Exports (PNG, PDF, SVG, draw.io, ArchiMate, JSON) | Generated in the browser and downloaded to your computer | **No** |
 | Clipboard | Your system clipboard (only when you copy) | **No** |
 
@@ -22,4 +23,6 @@ machine.**
 
 If an administrator enables the optional [database storage](Deployment-and-Database.md),
 blueprints are stored in that organization's MySQL or SQL Server database instead. The
-*Storage & privacy* tab and the footer indicator show which mode is active.
+*Storage & privacy* tab and the footer indicator show which mode is active. The light/dark theme
+preference is then also stored in the database (`aisbp_settings`), shared by everyone using that
+instance.

@@ -89,6 +89,13 @@ as one JSON document, in the same format as the [configuration package](Configur
 | `GET ?action=load&id=…` | `{ ok, project }` |
 | `POST ?action=save&id=…` (JSON body) | `{ ok }` |
 | `POST ?action=delete&id=…` | `{ ok }` |
+| `GET ?action=prefs` | `{ ok, prefs: { theme } }` |
+| `POST ?action=save-prefs` (JSON body `{ "theme": "system" \| "light" \| "dark" }`) | `{ ok }` |
+
+Shared preferences (currently the light/dark theme) are kept in the `aisbp_settings` table
+(`name`, `value`). They apply to the whole instance. Only known names and values are accepted.
+The table is part of the schema and is also created automatically on first use, so existing
+installations do not need to be reinstalled.
 
 ## Security notes
 

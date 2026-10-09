@@ -12,3 +12,13 @@ BEGIN
     updated_at DATETIME2     NOT NULL CONSTRAINT DF_aisbp_projects_updated DEFAULT SYSUTCDATETIME()
   );
 END
+-- ;;
+
+-- Shared preferences of this instance (e.g. the colour theme). Values are small JSON strings.
+IF OBJECT_ID(N'dbo.aisbp_settings', N'U') IS NULL
+BEGIN
+  CREATE TABLE dbo.aisbp_settings (
+    name  NVARCHAR(64)   NOT NULL CONSTRAINT PK_aisbp_settings PRIMARY KEY,
+    value NVARCHAR(2000) NOT NULL
+  );
+END

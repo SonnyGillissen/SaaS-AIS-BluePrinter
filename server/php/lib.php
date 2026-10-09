@@ -183,3 +183,75 @@ final class ProjectRepository
         $stmt->execute([$id]);
     }
 }
+
+/**
+ * Repository for shared preferences (instance-wide; there are no user accounts).
+ * The settings table is created on first use, so installations made before it existed keep working.
+ */
+final class SettingsRepository
+{
+    /** Allowed preferences and their valid values. */
+    public const ALLOWED = ['theme' => ['system', 'light', 'dark']];
+
+    public function __construct(private PDO $pdo, private string $driver)
+    {
+    }
+
+    /** @return array<string,string> */
+    public function all(): array
+    {
+        return $this->withTable(function (): array {
+            $rows = $this->pdo->query('SELECT name, value FROM aisbp_settings')->fetchAll();
+            $out = [];
+            foreach ($rows ?: [] as $r) {
+                $name = (string)$r['name'];
+                $value = (string)$r['value'];
+                if (isset(self::ALLOWED[$name]) && in_array($value, self::ALLOWED[$name], true)) {
+                    $out[$name] = $value;
+                }
+            }
+            return $out;
+        });
+    }
+
+    /** Store the valid entries of $prefs (unknown keys and values are ignored). */
+    public function save(array $prefs): void
+    {
+        $this->withTable(function () use ($prefs): void {
+            foreach (self::ALLOWED as $name => $values) {
+                $value = $prefs[$name] ?? null;
+                if (!is_string($value) || !in_array($value, $values, true)) {
+                    continue;
+                }
+                $this->pdo->beginTransaction();
+                try {
+                    $stmt = $this->pdo->prepare('UPDATE aisbp_settings SET value = ? WHERE name = ?');
+                    $stmt->execute([$value, $name]);
+                    $exists = $this->pdo->prepare('SELECT COUNT(*) FROM aisbp_settings WHERE name = ?');
+                    $exists->execute([$name]);
+                    if ((int)$exists->fetchColumn() === 0) {
+                        $this->pdo->prepare('INSERT INTO aisbp_settings (name, value) VALUES (?, ?)')->execute([$name, $value]);
+                    }
+                    $this->pdo->commit();
+                } catch (\Throwable $e) {
+                    $this->pdo->rollBack();
+                    throw $e;
+                }
+            }
+        });
+    }
+
+    /** Run $fn; when the settings table is missing, create the schema (idempotent) and retry once. */
+    private function withTable(callable $fn): mixed
+    {
+        try {
+            return $fn();
+        } catch (\PDOException $e) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            install_schema($this->pdo, $this->driver);
+            return $fn();
+        }
+    }
+}

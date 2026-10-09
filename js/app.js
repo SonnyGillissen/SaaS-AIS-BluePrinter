@@ -394,6 +394,20 @@
   Layout.DETAIL_LEVELS.forEach((d) => detailSelect.appendChild(AISBP.Dom.h('option', { value: d.id, text: d.label })));
   styleSelect.addEventListener('change', () => store.change('style', (p) => { p.settings.diagram.style = styleSelect.value; }));
   detailSelect.addEventListener('change', () => store.change('detail', (p) => { p.settings.diagram.detailLevel = detailSelect.value; }));
+  // Light / dark mode (AISBP.Theme is loaded in <head>). The choice is cached in this browser and,
+  // in server mode, also stored in the database.
+  const themeSelect = doc.getElementById('theme-select');
+  if (AISBP.Theme) {
+    themeSelect.value = AISBP.Theme.get();
+    themeSelect.addEventListener('change', async () => {
+      const mode = AISBP.Theme.set(themeSelect.value);
+      try {
+        await storage.savePrefs({ theme: mode });
+      } catch (e) {
+        toast('Could not save the theme: ' + e.message, 'error');
+      }
+    });
+  }
   projectName.addEventListener('input', () => store.change('rename', (p) => { p.meta.name = projectName.value; }, { merge: 'meta:name' }));
 
   function syncToolbar() {
@@ -587,6 +601,8 @@
     if (storage.kind === 'server') {
       try {
         await storage.list();
+        const prefs = await storage.loadPrefs();
+        if (prefs.theme && AISBP.Theme && prefs.theme !== AISBP.Theme.get()) themeSelect.value = AISBP.Theme.set(prefs.theme);
       } catch (e) {
         toast('Could not reach the database server: ' + e.message, 'error');
       }

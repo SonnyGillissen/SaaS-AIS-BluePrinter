@@ -68,3 +68,5 @@ jobs:
           curl -sf -H 'X-API-Key: ci-key' "$API?action=load&id=p_ci" | grep -q '"nodes":{}'
           curl -sf -H 'X-API-Key: ci-key' -H 'Content-Type: application/json' -d '{}' "$API?action=delete&id=p_ci"
           curl -sf -H 'X-API-Key: ci-key' "$API?action=list" | grep -q '"projects":\[\]'
+          curl -sf -H 'X-API-Key: ci-key' -H 'Content-Type: application/json' -d '{"theme":"dark"}' "$API?action=save-prefs"
+          curl -sf -H 'X-API-Key: ci-key' "$API?action=prefs" | grep -q '"theme":"dark"'
