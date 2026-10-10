@@ -1,0 +1,8 @@
+.git
+.github
+node_modules
+docs
+tests
+server/php/config.php
+server/php/install.lock
+server/docker/.env

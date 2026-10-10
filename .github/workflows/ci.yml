@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Unit tests (Node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: [20, 22]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - run: npm test
+
+  server:
+    name: PHP API against MySQL
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_DATABASE: aisbp
+          MYSQL_USER: aisbp
+          MYSQL_PASSWORD: ci-password
+          MYSQL_ROOT_PASSWORD: ci-root-password
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1"
+          --health-interval=5s --health-timeout=5s --health-retries=20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_mysql
+      - name: Lint PHP
+        run: for f in server/php/*.php; do php -l "$f"; done
+      - name: Check shell script syntax
+        run: sh -n install.sh && sh -n server/docker/entrypoint.sh
+      - name: Install schema
+        env:
+          AISBP_DB_DRIVER: mysql
+          AISBP_DB_HOST: 127.0.0.1
+          AISBP_DB_USER: aisbp
+          AISBP_DB_PASSWORD: ci-password
+          AISBP_API_KEY: ci-key
+        run: php server/php/setup-cli.php
+      - name: API smoke test
+        run: |
+          php -S 127.0.0.1:8000 >/tmp/php.log 2>&1 &
+          sleep 1
+          API=http://127.0.0.1:8000/server/php/api.php
+          BODY='{"format":"ais-blueprinter","version":1,"meta":{"id":"p_ci","name":"CI","modified":"2026-01-01T00:00:00Z"},"settings":{},"nodes":{},"connections":{}}'
+          test "$(curl -s -o /dev/null -w '%{http_code}' "$API?action=list")" = 401
+          curl -sf -H 'X-API-Key: ci-key' -H 'Content-Type: application/json' -d "$BODY" "$API?action=save&id=p_ci"
+          curl -sf -H 'X-API-Key: ci-key' "$API?action=list" | grep -q '"id":"p_ci"'
+          curl -sf -H 'X-API-Key: ci-key' "$API?action=load&id=p_ci" | grep -q '"nodes":{}'
+          curl -sf -H 'X-API-Key: ci-key' -H 'Content-Type: application/json' -d '{}' "$API?action=delete&id=p_ci"
+          curl -sf -H 'X-API-Key: ci-key' "$API?action=list" | grep -q '"projects":\[\]'
+          curl -sf -H 'X-API-Key: ci-key' -H 'Content-Type: application/json' -d '{"theme":"dark"}' "$API?action=save-prefs"
+          curl -sf -H 'X-API-Key: ci-key' "$API?action=prefs" | grep -q '"theme":"dark"'

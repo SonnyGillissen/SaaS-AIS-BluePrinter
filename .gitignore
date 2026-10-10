@@ -1,0 +1,9 @@
+node_modules/
+/icons/msicons/
+server/php/config.php
+server/php/install.lock
+*.log
+.DS_Store
+Thumbs.db
+
+server/docker/.env

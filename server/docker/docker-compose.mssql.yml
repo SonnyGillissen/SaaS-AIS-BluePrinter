@@ -1,0 +1,40 @@
+# AIS BluePrinter + Microsoft SQL Server - one-click setup.
+#   docker compose -f server/docker/docker-compose.mssql.yml up -d --build
+# (or run ./install.sh mssql / .\install.ps1 -Database mssql, which also generates passwords)
+# Open http://localhost:8080 afterwards. SQL Server Developer/Express editions are subject to
+# Microsoft's license terms (ACCEPT_EULA). The SA password must meet SQL Server complexity rules.
+name: ais-blueprinter-mssql
+services:
+  db:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    restart: unless-stopped
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: ${AISBP_MSSQL_PID:-Express}
+      MSSQL_SA_PASSWORD: ${AISBP_DB_PASSWORD:?Set AISBP_DB_PASSWORD (see server/docker/.env.example)}
+    volumes:
+      - db-data:/var/opt/mssql
+  web:
+    build:
+      context: ../..
+      dockerfile: server/docker/Dockerfile
+      args:
+        DB_DRIVER: sqlsrv
+    restart: unless-stopped
+    depends_on:
+      - db
+    environment:
+      AISBP_DB_DRIVER: sqlsrv
+      AISBP_DB_HOST: db
+      AISBP_DB_PORT: "1433"
+      AISBP_DB_NAME: aisbp
+      AISBP_DB_USER: sa
+      AISBP_DB_PASSWORD: ${AISBP_DB_PASSWORD}
+      AISBP_DB_CREATE: "1"
+      AISBP_DB_TRUST_CERT: "1"
+      AISBP_DB_WAIT: "180"
+      AISBP_API_KEY: ${AISBP_API_KEY:-}
+    ports:
+      - "${AISBP_PORT:-8080}:80"
+volumes:
+  db-data:
