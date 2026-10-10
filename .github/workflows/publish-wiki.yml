@@ -1,16 +1,17 @@
 # Publishes docs/wiki to the GitHub wiki of this repository.
 # One-time setup: enable the wiki (Settings > Features > Wikis) and create any first page, so the
-# wiki git repository exists. After that, every change to docs/wiki on main is published.
+# wiki git repository exists. Add a WIKI_TOKEN secret with a classic PAT (repo scope).
+# After that, every change to docs/wiki on main is published.
 name: Publish wiki
 
 on:
   push:
     branches: [main]
-    paths: ['docs/wiki/**']
+    paths: ['docs/wiki/**', '.github/workflows/publish-wiki.yml']
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: publish-wiki
@@ -21,12 +22,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: Push docs/wiki to the wiki repository
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.WIKI_TOKEN }}
           REPO: ${{ github.repository }}
         run: |
-          git clone "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.wiki.git" /tmp/wiki
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::warning::Wiki publishing skipped: configure the WIKI_TOKEN secret and initialize the wiki. See README.md."
+            exit 0
+          fi
+          if ! git clone "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.wiki.git" /tmp/wiki; then
+            echo "::error::Cannot access the wiki. Enable Wikis, create a first page, and check that WIKI_TOKEN has repo scope and write access."
+            exit 1
+          fi
           rsync -a --delete --exclude .git docs/wiki/ /tmp/wiki/
           # Wiki links have no .md extension: [Page](Page.md) -> [Page](Page)
           find /tmp/wiki -name '*.md' -exec sed -i -E 's/\]\(([A-Za-z0-9_-]+)\.md(#[^)]*)?\)/](\1\2)/g' {} +

@@ -80,6 +80,23 @@ The full documentation lives in [`docs/wiki`](docs/wiki/Home.md):
 [Privacy](docs/wiki/Privacy.md) ·
 [Credits](docs/wiki/Credits.md)
 
+### Publishing to GitHub Wiki
+
+The `Publish wiki` workflow mirrors `docs/wiki` on pushes to `main` and can also be
+run manually. One-time setup:
+
+1. Enable **Settings → Features → Wikis** and save a first wiki page (for example,
+   `Home`) to create the wiki Git repository.
+2. Create a classic personal access token with **repo** scope from an account with
+   write access to this repository (authorize it for SSO if required).
+3. Add it as the repository Actions secret **WIKI_TOKEN** under
+   **Settings → Secrets and variables → Actions**. The automatic `GITHUB_TOKEN`
+   is not used for wiki authentication.
+
+Without `WIKI_TOKEN`, publishing is skipped with a warning. If cloning fails, check
+the wiki initialization and token access. Publishing replaces the wiki contents
+with `docs/wiki`; edit documentation here rather than directly in the wiki.
+
 ## Icons: MS Icons
 
 All resource icons come from **[MS Icons](https://msicons.com/)**, a community project by
