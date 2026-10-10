@@ -26,6 +26,7 @@
   const AISBP = (root.AISBP = root.AISBP || {});
   const Catalog = AISBP.Catalog || (typeof require === 'function' ? require('./catalog.js') : null);
   const Model = AISBP.Model || (typeof require === 'function' ? require('./model.js') : null);
+  const Tags = AISBP.Tags || (typeof require === 'function' ? require('./tags.js') : null);
 
   const TOKEN_RE = /\{([A-Za-z][A-Za-z0-9_]*)\}/g;
 
@@ -266,6 +267,8 @@
       if (!Catalog.canContain(parent ? parent.type : null, node.type)) {
         (result[id] = result[id] || []).push(def.label + ' is not allowed ' + (parent ? 'inside a ' + Catalog.get(parent.type).label : 'at the top level') + '.');
       }
+      const tagProblems = Tags ? Tags.validate(node) : [];
+      if (tagProblems.length) result[id] = (result[id] || []).concat(tagProblems);
     });
     Object.keys(names).forEach((key) => {
       if (names[key].length > 1) {

@@ -14,6 +14,7 @@
   const Util = AISBP.Util || (typeof require === 'function' ? require('../core/util.js') : null);
   const Catalog = AISBP.Catalog || (typeof require === 'function' ? require('../core/catalog.js') : null);
   const Model = AISBP.Model || (typeof require === 'function' ? require('../core/model.js') : null);
+  const Tags = AISBP.Tags || (typeof require === 'function' ? require('../core/tags.js') : null);
   const Layout = AISBP.Layout || (typeof require === 'function' ? require('../core/layout.js') : null);
 
   const esc = Util.escapeXml;
@@ -218,7 +219,32 @@
     const def = Catalog.get(r.type);
     const lines = [r.name, def ? def.label + (def.provider ? ' (' + def.provider + ')' : '') : r.type];
     r.attrs.forEach((a) => lines.push(a.label + ': ' + a.value));
+    const node = project.nodes[r.id];
+    if (node && node.tags && node.tags.length) {
+      lines.push('Tags:');
+      node.tags.forEach((t) => lines.push('  ' + t.key + (t.value ? ': ' + t.value : '')));
+    }
     return '<title>' + esc(lines.join('\n')) + '</title>';
+  }
+
+  /**
+   * Draw tag chips (see Tags.chipRows) starting at (x, y). Rows are centred in `width` when
+   * `center` is set, otherwise left-aligned.
+   */
+  function tagChips(tags, x, y, width, center) {
+    const C = Tags.CHIP;
+    let s = '<g class="tags">';
+    tags.rows.forEach((row, i) => {
+      const rowW = row.reduce((n, c) => n + c.w, 0) + C.gap * (row.length - 1);
+      let cx = center ? x + (width - rowW) / 2 : x;
+      const cy = y + i * (C.h + C.gap);
+      row.forEach((c) => {
+        s += '<g class="tag"><title>' + esc(c.title) + '</title><rect x="' + cx + '" y="' + cy + '" width="' + c.w + '" height="' + C.h + '" rx="' + C.h / 2 + '" fill="' + esc(c.color) + '"/>' +
+          '<text x="' + (cx + c.w / 2) + '" y="' + (cy + C.h / 2 + 3.3) + '" text-anchor="middle" font-size="9.5" font-weight="600" fill="#ffffff">' + esc(c.text) + '</text></g>';
+        cx += c.w + C.gap;
+      });
+    });
+    return s + '</g>';
   }
 
   function renderContainer(project, r, st, o) {
@@ -236,6 +262,7 @@
     r.attrs.forEach((a, i) => {
       s += '<text x="' + (r.x + 12) + '" y="' + (r.y + Layout.HEADER + 8 + i * Layout.LINE) + '" font-size="10.5" fill="' + st.subtext + '">' + esc(Layout.truncate(a.label + ': ' + a.value, maxChars)) + '</text>';
     });
+    if (r.tags && r.tags.height) s += tagChips(r.tags, r.x + 12, r.y + Layout.HEADER + (r.attrs.length ? r.attrs.length * Layout.LINE + 4 : 0), r.w - 24, false);
     if (problems && !o.forExport) s += problemBadge(r.x + r.w - 12, r.y + 12, st, problems);
     if (selected && !o.forExport) {
       s += '<rect class="selection" x="' + (r.x - 3) + '" y="' + (r.y - 3) + '" width="' + (r.w + 6) + '" height="' + (r.h + 6) + '" rx="' + (st.radius + 2) + '" fill="none" stroke="' + st.selection + '" stroke-width="2"/>';
@@ -271,6 +298,7 @@
       y += Layout.LINE;
       s += '<text x="' + cx + '" y="' + (y - 2) + '" text-anchor="middle" font-size="10" fill="' + st.subtext + '">' + esc(Layout.truncate(a.label + ': ' + a.value, 30)) + '</text>';
     });
+    if (r.tags && r.tags.height) s += tagChips(r.tags, r.x + 8, y + 6, r.w - 16, true);
     if (problems && !o.forExport) s += problemBadge(r.x + r.w - 10, r.y + 10, st, problems);
     if (selected && !o.forExport) {
       s += '<rect class="selection" x="' + (r.x - 3) + '" y="' + (r.y - 3) + '" width="' + (r.w + 6) + '" height="' + (r.h + 6) + '" rx="' + (st.radius + 2) + '" fill="none" stroke="' + st.selection + '" stroke-width="2"/>';

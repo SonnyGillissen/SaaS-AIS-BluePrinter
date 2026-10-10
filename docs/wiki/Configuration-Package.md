@@ -35,11 +35,14 @@ human-readable format. It's easy to diff in Git and to generate or process with 
     },
     "diagram": {
       "style": "classic", "detailLevel": "selected", "connector": "orthogonal",
-      "showTypeLabels": true, "showConnectionLabels": true, "showTitle": true,
+      "showTypeLabels": true, "showConnectionLabels": true, "showTitle": true, "showTags": true,
       "hiddenContainers": [], "typeDisplay": { "logic-app-standard": { "sku": true } },
       "snapToGrid": true, "gridSize": 10, "pdfPageSize": "fit"
     },
-    "icons": { "baseUrl": "https://msicons.com/icons/" }
+    "icons": { "baseUrl": "https://msicons.com/icons/" },
+    "tags": {                            // Tag Manager definitions (suggestions, colour, visibility)
+      "definitions": [{ "key": "Managed by", "values": ["customer", "provider"], "color": "#0078d4", "show": true }]
+    }
   },
   "nodes": {
     "n1": {
@@ -50,6 +53,7 @@ human-readable format. It's easy to diff in Git and to generate or process with 
       "naming": { "pattern": "", "tokens": { "workload": "orders" } },  // per-object overrides
       "attributes": { "location": "westeurope" },
       "custom": [{ "key": "Owner", "value": "Team A" }],
+      "tags": [{ "key": "Managed by", "value": "customer" }],  // Azure tags (max. 50, names case-insensitive)
       "display": { "location": true },   // per-attribute diagram visibility overrides
       "network": [],                     // ids of attached virtual networks / subnets
       "x": 40, "y": 60,                   // position on the canvas

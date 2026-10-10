@@ -16,6 +16,11 @@ Exports use the current display style, detail level and attribute selection, exc
 ArchiMate, which always include *all* attributes as data. Selection handles and validation
 markers are left out.
 
+**Tags** appear as coloured chips in PNG, PDF and SVG. In draw.io they become shape data
+(`tag_<name>` properties) and native draw.io tags (`Name:Value`, spaces replaced by `_`), so you
+can filter on them with *Edit › Edit Tags*/*Find*. In ArchiMate they are element properties
+named `Tag: <name>`.
+
 ## Icons in exports
 
 For PNG, PDF, SVG and draw.io, AIS BluePrinter fetches the icons from MS Icons (or your

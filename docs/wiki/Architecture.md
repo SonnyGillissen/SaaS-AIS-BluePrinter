@@ -14,6 +14,7 @@ js/config.js            Deployment configuration (storage mode, defaults)
 js/core/                Pure logic, no DOM. Runs in the browser and in Node (unit tests).
   util.js               Ids, escaping, cloning, URL checks
   catalog.js            Resource types: hierarchy rules, attributes, naming rules, icons, ArchiMate types
+  tags.js               Tags: Azure limits, Tag Manager bulk operations, diagram chip layout
   model.js              Project data model, mutations, clipboard, import validation (normalize)
   naming.js             Naming conventions: patterns, tokens, Azure rule enforcement and validation
   layout.js             Geometry: container sizes, attribute lines, hit testing, auto layout

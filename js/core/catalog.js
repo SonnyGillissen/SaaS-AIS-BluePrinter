@@ -100,7 +100,6 @@
   /** Attributes shared by all Azure resources (prepended automatically). */
   const COMMON_RESOURCE_ATTRIBUTES = [
     select('location', 'Location', ['(inherit)'].concat(REGIONS.map((r) => r.id)), { default: '(inherit)' }),
-    area('tags', 'Tags (key=value per line)'),
     area('description', 'Description')
   ];
 
@@ -283,7 +282,6 @@
       attributes: [
         select('location', 'Location', REGIONS.map((r) => r.id), { default: 'westeurope', show: true }),
         select('lock', 'Resource lock', ['None', 'CanNotDelete', 'ReadOnly'], { default: 'None' }),
-        area('tags', 'Tags (key=value per line)'),
         area('description', 'Description')
       ]
     },

@@ -21,6 +21,9 @@ architectures. Click your environment together, and get an architecture diagram 
 - **High-level or detailed**: choose which attributes appear on the diagram, per resource type or
   per object (eye toggle), switch between names-only, selected attributes or all attributes, and
   hide whole container levels for management views.
+- **Tag Manager**: define tags (e.g. *Managed by: customer*) with suggested values and colours,
+  assign them in bulk to management groups, subscriptions, resource groups and resources, or per
+  object; tags are shown as coloured chips on the diagram and exported to draw.io and ArchiMate.
 - **Naming conventions**: global patterns and tokens (`{abbr}-{workload}-{env}-{region}-{instance}`),
   per-type and per-object overrides, inherited tokens, and the **Azure naming rules** (length,
   characters, case, uniqueness) applied and validated automatically.

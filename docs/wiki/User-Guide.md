@@ -53,6 +53,34 @@ The **eye icon** next to each attribute controls whether that attribute appears 
 when the detail level is *Selected attributes*. A grey eye means the per-type default from
 *Options › Diagram* applies. See [Diagram styles](Diagram-Styles.md).
 
+## Tags and the Tag Manager
+
+Every object - management groups, subscriptions, resource groups and resources - can have
+**tags** (name/value pairs such as *Managed by: customer*). Edit them in the **Tags** section of
+the properties panel: suggestions come from the Tag Manager, and the *+ Managed by* style
+buttons add a defined tag in one click. With several objects selected, *Tag the selection* sets a
+tag on all of them.
+
+**Options › Tag Manager** is the central place for tags:
+
+- define tag names with **suggested values**, a **colour** and whether they are **shown on the
+  diagram**; the *Used by* column counts the objects that have the tag;
+- renaming a tag renames it on all objects; *Remove from objects* removes it everywhere;
+- **Assign a tag to many objects**: set a tag on all management groups & subscriptions, resource
+  groups, Azure resources and/or external objects at once (optionally overwriting existing
+  values).
+
+Nothing is changed until you press *Save* (one undo step). On the diagram, tags are drawn as
+coloured chips ("Key: Value") below the attributes of a resource or in the header of a container.
+They wrap over up to three rows; further tags are summarised in a "+N" chip (hover for the list).
+Tags are hidden at the *High-level* detail level and can be switched off with *Show tags*.
+
+Azure limits are validated: at most 50 tags per object, names up to 512 characters without
+`< > % & \ ? /` (names are case-insensitive, so *Env* and *env* are duplicates) and values up to
+256 characters. Azure does not support tags on management groups; there they are documentation
+only. Older blueprints with the former "Tags (key=value per line)" attribute are converted
+automatically when they are opened or imported.
+
 ## Virtual networks and subnets
 
 Resources that can be placed in or connected to a virtual network have a **Virtual networks /

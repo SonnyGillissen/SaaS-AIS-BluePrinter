@@ -316,6 +316,13 @@ a { color: var(--c-primary); }
 
 .custom-row { display: grid; grid-template-columns: 1fr 1fr auto auto; gap: 4px; margin-bottom: 4px; }
 .custom-row input { width: 100%; padding: 4px 6px; border: 1px solid var(--c-border); border-radius: var(--radius); }
+.tag-row { grid-template-columns: auto 1fr 1fr auto; align-items: center; }
+.tag-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+.tag-quick { flex-wrap: wrap; margin-top: 4px; }
+.tag-table input[type='text'] { width: 100%; min-width: 120px; }
+.tag-table input[type='color'] { width: 36px; height: 24px; padding: 0; border: 1px solid var(--c-border); background: none; }
+.tag-table td.num { text-align: right; }
+.tag-table td.actions { white-space: nowrap; }
 
 .kbd { font-family: Consolas, monospace; background: var(--c-subtle); border: 1px solid var(--c-border); border-radius: 3px; padding: 0 4px; font-size: 11px; }
 

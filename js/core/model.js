@@ -8,13 +8,13 @@
  * {
  *   format: 'ais-blueprinter', version: 1,
  *   meta:      { id, name, description, author, created, modified, seq },
- *   settings:  { naming: {...}, diagram: {...}, icons: {...} },
+ *   settings:  { naming: {...}, diagram: {...}, icons: {...}, tags: { definitions: [...] } },
  *   nodes:     { [id]: Node },        // management groups, subscriptions, resource groups, resources
  *   connections: { [id]: Connection } // arrows between nodes (data flow, triggers, dependencies, ...)
  * }
  *
  * Node: { id, type, parentId|null, seq, label, nameMode: 'convention'|'custom', name,
- *         naming: { pattern?, tokens: {} }, attributes: {}, custom: [{key,value}],
+ *         naming: { pattern?, tokens: {} }, attributes: {}, custom: [{key,value}], tags: [{key,value}],
  *         display: { [attributeKey]: boolean }, network: [id], x, y, w?, h? }
  * Connection: { id, from, to, kind, direction: 'forward'|'bidirectional', label, attributes: {} }
  *
@@ -33,6 +33,7 @@
   const AISBP = (root.AISBP = root.AISBP || {});
   const Util = AISBP.Util || (typeof require === 'function' ? require('./util.js') : null);
   const Catalog = AISBP.Catalog || (typeof require === 'function' ? require('./catalog.js') : null);
+  const Tags = AISBP.Tags || (typeof require === 'function' ? require('./tags.js') : null);
 
   const FORMAT = 'ais-blueprinter';
   const VERSION = 1;
@@ -77,13 +78,15 @@
         showTypeLabels: true,
         showConnectionLabels: true,
         showTitle: true,
+        showTags: true,
         hiddenContainers: [],
         typeDisplay: {},
         snapToGrid: true,
         gridSize: 10,
         pdfPageSize: 'fit'
       },
-      icons: { baseUrl: 'https://msicons.com/icons/' }
+      icons: { baseUrl: 'https://msicons.com/icons/' },
+      tags: { definitions: [] }
     };
   }
 
@@ -297,6 +300,7 @@
       naming: { pattern: '', tokens: {} },
       attributes: defaultAttributes(type),
       custom: [],
+      tags: [],
       display: {},
       network: [],
       x: Number.isFinite(p.x) ? p.x : 0,
@@ -308,6 +312,7 @@
     }
     if (p.attributes) Object.assign(node.attributes, p.attributes);
     if (Array.isArray(p.custom)) node.custom = p.custom.map((c) => ({ key: String(c.key || ''), value: String(c.value || '') }));
+    if (Array.isArray(p.tags)) node.tags = Tags.sanitize(p.tags);
     if (p.display) node.display = Object.assign({}, p.display);
     if (validSize(p.w) && validSize(p.h)) { node.w = p.w; node.h = p.h; }
     if (Array.isArray(p.network)) node.network = p.network.filter((nid) => Util.isValidId(nid) && isNetworkTarget(project, nid));
@@ -495,6 +500,7 @@
         naming: src.naming,
         attributes: src.attributes,
         custom: src.custom,
+        tags: src.tags,
         display: src.display,
         w: src.w,
         h: src.h
@@ -640,11 +646,18 @@
         naming: { pattern: str(n.naming && n.naming.pattern, 200), tokens: cleanMap(n.naming && n.naming.tokens, 100) },
         attributes: cleanMap(n.attributes),
         custom: Array.isArray(n.custom) ? n.custom.slice(0, 200).map((c) => ({ key: str(c && c.key, 100), value: str(c && c.value, 2000) })) : [],
+        tags: Tags.sanitize(n.tags),
         display: cleanMap(n.display),
         network: cleanIdList(n.network),
         x: Number.isFinite(n.x) ? n.x : 0,
         y: Number.isFinite(n.y) ? n.y : 0
       };
+      // Older blueprints stored tags as a "key=value per line" text attribute.
+      const legacy = project.nodes[n.id].attributes.tags;
+      if (legacy !== undefined) {
+        if (!project.nodes[n.id].tags.length) project.nodes[n.id].tags = Tags.parseText(legacy);
+        delete project.nodes[n.id].attributes.tags;
+      }
       if (validSize(n.w) && validSize(n.h)) {
         project.nodes[n.id].w = n.w;
         project.nodes[n.id].h = n.h;
@@ -735,6 +748,7 @@
     if (s.icons && typeof s.icons === 'object' && Util.isSafeImageUrl(s.icons.baseUrl) && !/^data:/i.test(s.icons.baseUrl)) {
       out.icons = { baseUrl: str(s.icons.baseUrl, 500) };
     }
+    if (s.tags && typeof s.tags === 'object') out.tags = { definitions: Tags.sanitizeDefinitions(s.tags.definitions) };
     return out;
   }
 

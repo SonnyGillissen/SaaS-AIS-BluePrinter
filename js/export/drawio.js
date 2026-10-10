@@ -40,6 +40,9 @@
     let s = '<b>' + html(r.name) + '</b>';
     if (r.typeLabel) s += '<br><font style="font-size:10px" color="#5d6670">' + html(r.typeLabel) + '</font>';
     r.attrs.forEach((a) => { s += '<br><font style="font-size:10px">' + html(a.label) + ': ' + html(a.value) + '</font>'; });
+    (r.tags ? r.tags.rows : []).forEach((row) => {
+      s += '<br>' + row.map((c) => '<font style="font-size:9px" color="' + html(c.color) + '">[' + html(c.text) + ']</font>').join(' ');
+    });
     return s;
   }
 
@@ -60,6 +63,16 @@
       const key = 'custom_' + String(c.key).replace(/[^A-Za-z0-9_.-]/g, '_');
       if (c.key && /^[A-Za-z_]/.test(key)) s += ' ' + key + '="' + esc(c.value) + '"';
     });
+    // Tags become tag_<key> data attributes and draw.io's own (space-separated) tags.
+    const tags = node.tags || [];
+    const used = new Set();
+    tags.forEach((t) => {
+      const key = 'tag_' + String(t.key).replace(/[^A-Za-z0-9_.-]/g, '_');
+      if (used.has(key)) return;
+      used.add(key);
+      s += ' ' + key + '="' + esc(t.value) + '"';
+    });
+    if (tags.length) s += ' tags="' + esc(tags.map((t) => (t.value ? t.key + ':' + t.value : t.key).replace(/\s+/g, '_')).join(' ')) + '"';
     return s;
   }
 

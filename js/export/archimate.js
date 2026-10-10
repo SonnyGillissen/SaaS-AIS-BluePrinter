@@ -76,6 +76,7 @@
       const links = Layout.networkLabel(project, node);
       if (links) props += prop('Network', links);
       (node.custom || []).forEach((c) => { if (c.key && c.value !== '') props += prop(c.key, c.value); });
+      (node.tags || []).forEach((t) => { props += prop('Tag: ' + t.key, t.value); });
       elements += '<element identifier="' + eid(node.id) + '" xsi:type="' + elementType(node) + '">' + name(r ? r.name : node.name) + doc(node.attributes && node.attributes.description) + '<properties>' + props + '</properties></element>';
     });
 

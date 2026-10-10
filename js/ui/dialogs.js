@@ -2,8 +2,8 @@
  * AIS BluePrinter - dialogs: options, projects and help.
  *
  * The options dialog edits a working copy of the project settings (naming conventions,
- * diagram display, icons). Nothing is applied
- * until "Save" is pressed, and the change is a single undo step.
+ * diagram display, icons, tag definitions) and - for the Tag Manager - of the tags of all
+ * objects. Nothing is applied until "Save" is pressed, and the change is a single undo step.
  *
  * @module AISBP.Dialogs
  */
@@ -16,6 +16,7 @@
   const Model = AISBP.Model;
   const Naming = AISBP.Naming;
   const Util = AISBP.Util;
+  const Tags = AISBP.Tags;
 
   /** Tab strip helper: returns { el, panels } where panels[id] are containers. */
   function tabs(defs) {
@@ -64,6 +65,7 @@
       { id: 'naming', label: 'Naming conventions' },
       { id: 'types', label: 'Per resource type' },
       { id: 'diagram', label: 'Diagram' },
+      { id: 'tags', label: 'Tag Manager' },
       { id: 'icons', label: 'Icons' },
       { id: 'storage', label: 'Storage & privacy' }
     ]);
@@ -191,6 +193,113 @@
       field('Resource type', typeSel), attrBox
     ]);
 
+    // ---- Tag Manager
+    // Bulk tag changes are made on a working copy of the objects and applied on Save.
+    s.tags = s.tags && Array.isArray(s.tags.definitions) ? s.tags : { definitions: [] };
+    const work = { nodes: Util.clone(project.nodes), settings: s };
+    const defs = s.tags.definitions;
+    // Tags used on objects but not defined yet are listed (and saved) as definitions.
+    const used = Tags.usage(work);
+    Object.keys(used).forEach((k) => { if (!Tags.definition(work, k)) defs.push({ key: used[k].key, values: used[k].values.slice(0, 50), color: '', show: true }); });
+    const tagTable = h('tbody');
+    const keyList = h('datalist', { id: 'opt-tag-keys' });
+    const valueList = h('datalist', { id: 'opt-tag-values' });
+    const bulkKey = h('input', { type: 'text', id: 'opt-tag-bulk-key', list: 'opt-tag-keys', placeholder: 'e.g. Managed by', 'aria-label': 'Tag name', autocomplete: 'off' });
+    const bulkValue = h('input', { type: 'text', id: 'opt-tag-bulk-value', list: 'opt-tag-values', placeholder: 'e.g. customer', 'aria-label': 'Tag value', autocomplete: 'off' });
+    const fillValues = () => {
+      const def = Tags.definition(work, bulkKey.value.trim());
+      clear(valueList);
+      (def ? def.values : []).forEach((v) => valueList.appendChild(h('option', { value: v })));
+    };
+    bulkKey.addEventListener('input', fillValues);
+    const renderTags = () => {
+      const usage = Tags.usage(work);
+      clear(tagTable);
+      clear(keyList);
+      defs.forEach((def, i) => {
+        keyList.appendChild(h('option', { value: def.key }));
+        const u = usage[def.key.toLowerCase()];
+        const keyInput = textInput(def.key, () => {}, { 'aria-label': 'Tag name', maxlength: Tags.MAX_KEY });
+        keyInput.addEventListener('change', () => {
+          const next = keyInput.value.trim();
+          if (!next || Tags.INVALID_KEY.test(next) || defs.some((x, j) => j !== i && x.key.toLowerCase() === next.toLowerCase())) {
+            toast(!next ? 'A tag needs a name.' : Tags.INVALID_KEY.test(next) ? 'Tag names cannot contain < > % & \\ ? /' : 'Tag "' + next + '" already exists.', 'error');
+            keyInput.value = def.key;
+            return;
+          }
+          const n = Tags.rename(work, def.key, next);
+          def.key = next;
+          if (n) toast('Renamed the tag on ' + n + ' object(s).', 'success');
+          renderTags();
+        });
+        const values = textInput(def.values.join(', '), (v) => { def.values = v.split(',').map((x) => x.trim()).filter(Boolean).slice(0, 50); }, { 'aria-label': def.key + ' suggested values', placeholder: 'customer, provider' });
+        const color = h('input', { type: 'color', value: Tags.colorFor(work, def.key), 'aria-label': def.key + ' colour', title: 'Colour on the diagram' });
+        color.addEventListener('input', () => { def.color = color.value; });
+        tagTable.appendChild(h('tr', {},
+          h('td', {}, keyInput),
+          h('td', {}, values),
+          h('td', {}, color),
+          h('td', {}, checkbox(def.show !== false, (v) => { def.show = v; })),
+          h('td', { class: 'num', text: String(u ? u.count : 0) }),
+          h('td', { class: 'actions' },
+            h('button', {
+              type: 'button', class: 'btn small', text: 'Remove from objects', disabled: !u, title: 'Remove this tag from all objects',
+              onclick: () => { const n = Tags.remove(work, def.key); toast('Removed "' + def.key + '" from ' + n + ' object(s).', 'success'); renderTags(); }
+            }),
+            h('button', {
+              type: 'button', class: 'btn small danger', text: '\u2715', 'aria-label': 'Delete tag definition', title: 'Delete the definition (and the tag from all objects)',
+              onclick: () => { Tags.remove(work, def.key); defs.splice(i, 1); renderTags(); }
+            }))));
+      });
+      if (!defs.length) tagTable.appendChild(h('tr', {}, h('td', { colspan: 6, class: 'subtitle', text: 'No tags yet. Add one below.' })));
+      fillValues();
+    };
+    const newTag = h('input', { type: 'text', id: 'opt-tag-new', placeholder: 'new tag, e.g. Managed by', 'aria-label': 'New tag name', maxlength: Tags.MAX_KEY });
+    const addTag = () => {
+      const k = newTag.value.trim();
+      if (!k) return;
+      if (Tags.INVALID_KEY.test(k)) return toast('Tag names cannot contain < > % & \\ ? /', 'error');
+      if (Tags.definition(work, k)) return toast('Tag "' + k + '" already exists.', 'error');
+      if (defs.length >= 200) return toast('At most 200 tag definitions.', 'error');
+      defs.push({ key: k, values: [], color: '', show: true });
+      newTag.value = '';
+      renderTags();
+    };
+    newTag.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); addTag(); } });
+    const scopes = new Set(['hierarchy', 'resource-group', 'resource']);
+    const overwrite = checkbox(true, () => {});
+    const scopeChips = h('div', { class: 'chips' }, Tags.SCOPES.map((x) => h('label', { class: 'chip' }, checkbox(scopes.has(x.id), (v) => { if (v) scopes.add(x.id); else scopes.delete(x.id); }), x.label)));
+    renderTags();
+    AISBP.Dom.append(t.panels.tags, [
+      h('p', { class: 'note', text: 'Define the tags of your environment (for example "Managed by", "Cost center", "Environment") with suggested values and a colour, and assign them to management groups, subscriptions, resource groups and resources in one go. Individual objects can be tagged in the properties panel. Azure allows at most 50 tags per object; names (max. 512 characters, case-insensitive) cannot contain < > % & \\ ? / and values are limited to 256 characters. Note that Azure itself does not support tags on management groups; they are documentation-only there.' }),
+      field('Show tags on the diagram', checkbox(d.showTags !== false, (v) => { d.showTags = v; }), { check: true, help: 'Tags are drawn as coloured chips below the attributes (not at the "High-level" detail level).' }),
+      h('div', { class: 'table-scroll' }, h('table', { class: 'data tag-table' },
+        h('thead', {}, h('tr', {}, h('th', { text: 'Tag name' }), h('th', { text: 'Suggested values (comma-separated)' }), h('th', { text: 'Colour' }), h('th', { text: 'Show' }), h('th', { text: 'Used by' }), h('th', {}))),
+        tagTable)),
+      h('div', { class: 'inline' }, newTag, h('button', { type: 'button', class: 'btn small', text: '+ Add tag', onclick: addTag })),
+      h('h4', { text: 'Assign a tag to many objects' }),
+      h('div', { class: 'grid-2' }, field('Tag name', bulkKey), field('Value', bulkValue)),
+      scopeChips,
+      field('Overwrite existing values', overwrite, { check: true }),
+      h('button', {
+        type: 'button', class: 'btn', id: 'opt-tag-apply', text: 'Apply to objects',
+        onclick: () => {
+          const k = bulkKey.value.trim();
+          if (!k) return toast('Enter a tag name.', 'error');
+          if (Tags.INVALID_KEY.test(k)) return toast('Tag names cannot contain < > % & \\ ? /', 'error');
+          if (!scopes.size) return toast('Select at least one kind of object.', 'error');
+          const n = Tags.apply(work, { key: k, value: bulkValue.value, scopes: Array.from(scopes), overwrite: overwrite.checked });
+          const v = bulkValue.value.trim();
+          const def = Tags.definition(work, k);
+          if (!def) defs.push({ key: k, values: v ? [v] : [], color: '', show: true });
+          else if (v && def.values.indexOf(v) < 0 && def.values.length < 50) def.values.push(v);
+          toast('Tag "' + k + '" set on ' + n + ' object(s). Press Save to keep the changes.', 'success');
+          renderTags();
+        }
+      }),
+      keyList, valueList
+    ]);
+
     // ---- Icons
     const baseInput = textInput(s.icons.baseUrl, (v) => { s.icons.baseUrl = v; }, { id: 'opt-icons-base' });
     AISBP.Dom.append(t.panels.icons, [
@@ -231,7 +340,10 @@
           action: () => {
             const clean = Model.deepMerge(Model.defaultSettings(), Model.sanitizeSettings(s));
             if (s.icons.baseUrl && clean.icons.baseUrl !== s.icons.baseUrl) toast('The icon base URL is not valid and was not changed.', 'error');
-            app.store.change('options', (p) => { p.settings = clean; });
+            app.store.change('options', (p) => {
+              p.settings = clean;
+              Object.keys(work.nodes).forEach((id) => { if (p.nodes[id]) p.nodes[id].tags = Tags.sanitize(work.nodes[id].tags); });
+            });
             app.refreshAll();
             toast('Options saved.', 'success');
           }

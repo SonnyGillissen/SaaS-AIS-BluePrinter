@@ -8,6 +8,7 @@
  *  - all attributes, each with an "eye" toggle that controls whether it is shown on the
  *    diagram (in the "Selected attributes" detail level),
  *  - custom attributes,
+ *  - tags (with suggestions from the Tag Manager definitions),
  *  - connection properties.
  * Without a selection it shows the project properties and a validation summary.
  *
@@ -22,6 +23,7 @@
   const Catalog = AISBP.Catalog;
   const Naming = AISBP.Naming;
   const Layout = AISBP.Layout;
+  const Tags = AISBP.Tags;
 
   function mount(el, app) {
     const store = app.store;
@@ -192,6 +194,56 @@
     }
 
     /**
+     * Tags of an object: name/value rows with suggestions from the Tag Manager definitions
+     * and quick-add buttons for defined tags the object does not have yet.
+     */
+    function tagSection(node) {
+      const project = store.project;
+      const tags = node.tags || [];
+      const defs = Tags.definitions(project);
+      const usage = Tags.usage(project);
+      const keys = defs.map((d) => d.key);
+      Object.keys(usage).forEach((k) => { if (!keys.some((x) => x.toLowerCase() === k)) keys.push(usage[k].key); });
+      const keyList = h('datalist', { id: 'prop-tag-keys' }, keys.map((k) => h('option', { value: k })));
+      const rows = tags.map((t, i) => {
+        const update = (patch) => {
+          const next = node.tags.map((x, j) => (j === i ? Object.assign({}, x, patch) : x));
+          patchNode(node.id, { tags: next }, node.id + ':tags:' + i);
+        };
+        const def = Tags.definition(project, t.key);
+        const suggestions = (def ? def.values : []).concat(usage[t.key.toLowerCase()] ? usage[t.key.toLowerCase()].values : []).filter((v, j, a) => a.indexOf(v) === j);
+        const listId = 'prop-tag-values-' + i;
+        const key = h('input', { type: 'text', id: 'prop-tag-key-' + i, value: t.key, placeholder: 'Name', list: 'prop-tag-keys', maxlength: Tags.MAX_KEY, 'aria-label': 'Tag name', autocomplete: 'off' });
+        key.addEventListener('input', () => update({ key: key.value }));
+        key.addEventListener('change', () => store.endMerge());
+        const val = h('input', { type: 'text', id: 'prop-tag-val-' + i, value: t.value, placeholder: 'Value', list: listId, maxlength: Tags.MAX_VALUE, 'aria-label': 'Tag value', autocomplete: 'off' });
+        val.addEventListener('input', () => update({ value: val.value }));
+        val.addEventListener('change', () => store.endMerge());
+        return h('div', { class: 'custom-row tag-row' },
+          h('span', { class: 'tag-dot', style: { background: Tags.colorFor(project, t.key) }, 'aria-hidden': 'true' }),
+          key, val,
+          h('datalist', { id: listId }, suggestions.map((v) => h('option', { value: v }))),
+          h('button', {
+            type: 'button', class: 'btn small danger', 'aria-label': 'Remove tag', text: '\u2715',
+            onclick: () => store.change('remove tag', (p) => { Model.updateNode(p, node.id, { tags: node.tags.filter((_, j) => j !== i) }); })
+          }));
+      });
+      const has = new Set(tags.map((t) => t.key.toLowerCase()));
+      const quick = defs.filter((d) => !has.has(d.key.toLowerCase())).map((d) => h('button', {
+        type: 'button', class: 'btn small', text: '+ ' + d.key, title: 'Add the tag "' + d.key + '"' + (d.values.length ? ' (' + d.values[0] + ')' : ''),
+        onclick: () => store.change('add tag', (p) => { Model.updateNode(p, node.id, { tags: (node.tags || []).concat([{ key: d.key, value: d.values[0] || '' }]) }); })
+      }));
+      return [keyList, rows,
+        h('div', { class: 'inline' },
+          h('button', {
+            type: 'button', class: 'btn small', text: '+ Add tag', disabled: tags.length >= Tags.MAX_TAGS,
+            onclick: () => store.change('add tag', (p) => { Model.updateNode(p, node.id, { tags: (node.tags || []).concat([{ key: '', value: '' }]) }); })
+          }),
+          h('button', { type: 'button', class: 'btn small', text: 'Tag Manager\u2026', onclick: () => AISBP.Dialogs.openOptions(app, 'tags') })),
+        quick.length ? h('div', { class: 'inline tag-quick' }, quick) : null];
+    }
+
+    /**
      * Virtual network / subnet picker for resources that can be attached to a network.
      * Lists every VNet and subnet of the blueprint (subnets indented below their VNet).
      */
@@ -243,6 +295,7 @@
       def.attributes.forEach((a) => out.push(attributeControl(node, a)));
       if (def.network) out.push(networkSection(node, derived));
       out.push(h('h3', { text: 'Custom attributes' }), customSection(node));
+      out.push(h('h3', { text: 'Tags (' + (node.tags || []).length + ')' }), tagSection(node));
       out.push(h('h3', { text: 'Connections' }), nodeConnections(node, derived));
       out.push(h('h3', { text: 'Actions' }), h('div', { class: 'inline' },
         h('button', { type: 'button', class: 'btn', text: 'Duplicate', onclick: () => app.actions.duplicate() }),
@@ -270,12 +323,32 @@
       return out;
     }
 
+    /** Set a tag on all selected objects at once. */
+    function multiTag() {
+      const keys = Tags.definitions(store.project).map((d) => d.key);
+      const key = h('input', { type: 'text', id: 'prop-multi-tag-key', placeholder: 'Tag name', list: 'prop-multi-tag-keys', maxlength: Tags.MAX_KEY, 'aria-label': 'Tag name', autocomplete: 'off' });
+      const val = h('input', { type: 'text', id: 'prop-multi-tag-val', placeholder: 'Value', maxlength: Tags.MAX_VALUE, 'aria-label': 'Tag value', autocomplete: 'off' });
+      return [h('h3', { text: 'Tag the selection' }),
+        h('datalist', { id: 'prop-multi-tag-keys' }, keys.map((k) => h('option', { value: k }))),
+        h('div', { class: 'custom-row' }, key, val, h('span'), h('button', {
+          type: 'button', class: 'btn small', text: 'Apply',
+          onclick: () => {
+            const k = key.value.trim();
+            if (!k || Tags.INVALID_KEY.test(k)) return AISBP.Dom.toast(k ? 'Tag names cannot contain < > % & \\ ? /' : 'Enter a tag name.', 'error');
+            const ids = Array.from(store.selection.nodes);
+            store.change('tag selection', (p) => { Tags.apply(p, { key: k, value: val.value, nodeIds: ids, overwrite: true }); });
+            AISBP.Dom.toast('Tag "' + k + '" set on ' + ids.length + ' object(s).', 'success');
+          }
+        }))];
+    }
+
     function renderMulti() {
       const n = store.selection.nodes.size;
       const c = store.selection.conns.size;
       return [
         h('h2', { text: (n + c) + ' objects selected' }),
         h('p', { class: 'subtitle', text: n + ' object(s), ' + c + ' connection(s)' }),
+        n ? multiTag() : null,
         h('div', { class: 'inline' },
           h('button', { type: 'button', class: 'btn', text: 'Duplicate', onclick: () => app.actions.duplicate() }),
           h('button', { type: 'button', class: 'btn', text: 'Copy', onclick: () => app.actions.copy() }),
@@ -300,7 +373,7 @@
       out.push(h('h3', { text: 'Diagram' }));
       const conn = select(AISBP.Render.CONNECTORS.map((c) => ({ value: c.id, label: c.label })), d.connector, { id: 'prop-diagram-connector', onchange: () => store.change('diagram', (p) => { p.settings.diagram.connector = conn.value; }) });
       out.push(field('Connector style', conn));
-      out.push(toggle('showTypeLabels', 'Show resource type labels'), toggle('showConnectionLabels', 'Show connection labels'), toggle('showTitle', 'Show title in exports'));
+      out.push(toggle('showTypeLabels', 'Show resource type labels'), toggle('showConnectionLabels', 'Show connection labels'), toggle('showTitle', 'Show title in exports'), toggle('showTags', 'Show tags'));
       const ids = Object.keys(derived.problems);
       out.push(h('h3', { text: 'Validation (' + ids.length + ')' }));
       if (!ids.length) out.push(h('p', { class: 'ok-note', text: '\u2713 All names follow the Azure naming rules and placements are valid.' }));

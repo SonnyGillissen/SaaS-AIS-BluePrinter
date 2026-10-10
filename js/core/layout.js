@@ -20,6 +20,7 @@
   const Catalog = AISBP.Catalog || (typeof require === 'function' ? require('./catalog.js') : null);
   const Model = AISBP.Model || (typeof require === 'function' ? require('./model.js') : null);
   const Naming = AISBP.Naming || (typeof require === 'function' ? require('./naming.js') : null);
+  const Tags = AISBP.Tags || (typeof require === 'function' ? require('./tags.js') : null);
 
   const LEAF_W = 170;
   const ICON = 44;
@@ -153,7 +154,10 @@
    * size (node.w / node.h, set by resizing it on the canvas) is at least that size, measured
    * from its own x/y; it never becomes smaller than its contents.
    * @returns {{rects: Object<string, object>, bounds: {x,y,w,h}, names: Object<string,string>}}
-   * Each rect: { id, x, y, w, h, container, hidden, depth, name, nameLines, typeLabel, attrs, headerH }
+   * Each rect: { id, x, y, w, h, container, hidden, depth, name, nameLines, typeLabel, attrs, headerH,
+   *              tags: { rows: [[{text,color,w,title}]], height } }
+   * Tags are wrapped into rows of chips (at most Tags.CHIP.maxRows, then a "+N" chip): below
+   * the attributes of a leaf, and in the header of a container.
    */
   function compute(project, names, opts) {
     const nm = names || resolveNames(project);
@@ -176,21 +180,24 @@
       const attrs = visibleAttributes(project, node);
       const typeLabel = diagram.showTypeLabels !== false && def ? def.label : '';
       const isHidden = container && hidden.has(node.type);
-      const r = { id: node.id, type: node.type, container, hidden: isHidden, depth, name: nm[node.id] || '', typeLabel, attrs };
+      const tagList = Tags.visible(project, node);
+      const r = { id: node.id, type: node.type, container, hidden: isHidden, depth, name: nm[node.id] || '', typeLabel, attrs, tags: { rows: [], height: 0 } };
       const kids = (childIndex[node.id] || []).map((c) => measure(c, isHidden ? depth : depth + 1));
       if (!container) {
         r.nameLines = wrapName(r.name, LEAF_CHARS, 2);
         r.w = LEAF_W;
-        r.h = 10 + ICON + 8 + r.nameLines.length * NAME_LINE + (typeLabel ? LINE : 0) + (attrs.length ? 4 + attrs.length * LINE : 0) + 10;
+        r.tags = Tags.chipRows(tagList, LEAF_W - 16);
+        r.h = 10 + ICON + 8 + r.nameLines.length * NAME_LINE + (typeLabel ? LINE : 0) + (attrs.length ? 4 + attrs.length * LINE : 0) + (r.tags.height ? 6 + r.tags.height : 0) + 10;
         r.x = node.x;
         r.y = node.y;
       } else {
-        r.headerH = HEADER + (attrs.length ? attrs.length * LINE + 4 : 0);
+        const visibleKids = kids.filter((k) => k && k.w && !detached.has(k.id));
+        if (tagList.length && !isHidden) r.tags = Tags.chipRows(tagList, chipWidth(node, visibleKids, frozen));
+        r.headerH = HEADER + (attrs.length ? attrs.length * LINE + 4 : 0) + (r.tags.height ? r.tags.height + 6 : 0);
         let x1 = node.x;
         let y1 = node.y;
         let x2 = node.x + MIN_W;
         let y2 = node.y + Math.max(MIN_H, r.headerH + 40);
-        const visibleKids = kids.filter((k) => k && k.w && !detached.has(k.id));
         if (isHidden) {
           if (visibleKids.length) {
             x1 = Math.min.apply(null, visibleKids.map((k) => k.x));
@@ -229,6 +236,21 @@
 
     (childIndex[''] || []).forEach((n) => measure(n, 0));
     return { rects, bounds: boundsOf(Object.keys(rects).map((k) => rects[k]).filter((r) => !r.hidden && r.w)), names: nm, childIndex };
+  }
+
+  /**
+   * Width available for the tag chips in a container header: the width the container gets
+   * from its minimum / manual size, its children and a frozen boundary (horizontal extent
+   * only, which does not depend on the header height).
+   */
+  function chipWidth(node, visibleKids, frozen) {
+    let x1 = node.x;
+    let x2 = node.x + MIN_W;
+    if (hasManualSize(node)) x2 = Math.max(x2, node.x + node.w);
+    visibleKids.forEach((k) => { x1 = Math.min(x1, k.x - PAD); x2 = Math.max(x2, k.x + k.w + PAD); });
+    const f = Object.prototype.hasOwnProperty.call(frozen, node.id) ? frozen[node.id] : null;
+    if (f) { x1 = Math.min(x1, f.x); x2 = Math.max(x2, f.x + f.w); }
+    return x2 - x1 - 24;
   }
 
   /** Bounding box of rectangles (with a default when empty). */
