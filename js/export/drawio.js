@@ -41,7 +41,7 @@
     if (r.typeLabel) s += '<br><font style="font-size:10px" color="#5d6670">' + html(r.typeLabel) + '</font>';
     r.attrs.forEach((a) => { s += '<br><font style="font-size:10px">' + html(a.label) + ': ' + html(a.value) + '</font>'; });
     (r.tags ? r.tags.rows : []).forEach((row) => {
-      s += '<br>' + row.map((c) => '<font style="font-size:9px" color="' + html(c.color) + '">[' + html(c.text) + ']</font>').join(' ');
+      s += '<br>' + row.map((c) => '<font style="font-size:9px" color="' + (/^#[0-9a-fA-F]{6}$/.test(c.color) ? c.color : '#6b7280') + '">[' + html(c.text) + ']</font>').join(' ');
     });
     return s;
   }
