@@ -41,7 +41,7 @@ jobs:
           # Wiki links have no .md extension: [Page](Page.md) -> [Page](Page)
           find /tmp/wiki -name '*.md' -exec sed -i -E 's/\]\(([A-Za-z0-9_-]+)\.md(#[^)]*)?\)/](\1\2)/g' {} +
           cd /tmp/wiki
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.name "saas-actions[bot]"
+          git config user.email "info@sonnyasaservice.nl"
           git add -A
           git diff --cached --quiet && echo "Wiki is up to date." || { git commit -m "Update wiki from ${GITHUB_SHA}"; git push; }
