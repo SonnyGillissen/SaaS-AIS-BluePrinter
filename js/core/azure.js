@@ -630,7 +630,8 @@
       other: 'no dedicated resource type ("Include other resource types" is off)',
       supporting: 'supporting resource ("Include supporting resources" is off)',
       hidden: 'hidden system resource',
-      noGroup: 'its resource group was not loaded'
+      noGroup: 'its resource group was not loaded',
+      notAllowed: 'cannot be placed in its resource group ("Include other resource types" is off)'
     };
     const skip = (reason, type) => {
       const k = reason + '|' + type;
@@ -667,7 +668,7 @@
       if (!parentId || !Model.canContain(project, parentId, type)) {
         const rg = rgNodeOf(res._parent || res.id);
         if (rg && Model.canContain(project, rg, type)) parentId = rg;
-        else if (rg && (o.includeOther || supporting)) { parentId = rg; type = 'azure-resource'; } else { skip(rg ? 'other' : 'noGroup', lower(res.type)); return null; }
+        else if (rg && (o.includeOther || supporting)) { parentId = rg; type = 'azure-resource'; } else { skip(!rg ? 'noGroup' : type === 'azure-resource' ? 'other' : 'notAllowed', lower(res.type)); return null; }
       }
       if (type === 'azure-resource') stats.generic++;
       if (counted) stats.drawn++;

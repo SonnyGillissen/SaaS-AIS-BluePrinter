@@ -163,7 +163,8 @@ test('buildProject can leave out resource types without a dedicated catalog type
   assert.equal(stats.skipped['supporting|microsoft.network/networkinterfaces'], 1);
   // Every left-out type is explained.
   assert.ok(warnings.some((w) => /Left out 1 .*microsoft\.contoso\/widgets/.test(w)));
-  assert.ok(warnings.some((w) => /Left out 1 .*microsoft\.network\/networkinterfaces.*supporting/.test(w)));  // The options are independent: supporting resources are drawn while other types are left out.
+  assert.ok(warnings.some((w) => /Left out 1 .*microsoft\.network\/networkinterfaces.*supporting/.test(w)));
+  // The options are independent: supporting resources are drawn while other types are left out.
   const only = Azure.buildProject(inventory(), { includeOther: false });
   assert.equal(byName(only.project, 'pe-sb.nic').type, 'azure-resource');
   assert.equal(byName(only.project, 'w1'), undefined);

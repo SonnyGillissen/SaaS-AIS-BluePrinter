@@ -233,11 +233,11 @@
       if (!only) return { sub: s.subscriptionId, where: 'subscriptionId =~ ' + kql(s.subscriptionId) };
       return { sub: s.subscriptionId, where: '(subscriptionId =~ ' + kql(s.subscriptionId) + ' and resourceGroup in~ (' + only.map(kql).join(', ') + '))' };
     });
-    const known = new Set();
+    const known = new Map(); // lowercase id -> index in inventory.resources
     const addResource = (r) => {
       const key = lower(r && r.id);
       if (!key || known.has(key)) return false;
-      known.add(key);
+      known.set(key, inventory.resources.length);
       inventory.resources.push(r);
       return true;
     };
@@ -311,7 +311,11 @@
           // API Management lists every revision; only draw the current one.
           if (spec.type === 'apim-api' && (String(item.name).indexOf(';rev=') !== -1 || (item.properties && item.properties.isCurrent === false))) return;
           const child = Object.assign({}, item, { id: item.id || parent.id + spec.path + '/' + leaf(item.name), type: item.type || spec.type, _catalogType: spec.type, _parent: parent.id });
-          inventory.resources.push(child);
+          // The resource group list can already contain it (e.g. deployment slots); the child
+          // entry wins because it carries the catalog type and the parent.
+          const key = lower(child.id);
+          if (known.has(key)) inventory.resources[known.get(key)] = child;
+          else addResource(child);
           (spec.children || []).forEach((sub) => jobs.push({ parent: child, spec: sub }));
         });
       };
