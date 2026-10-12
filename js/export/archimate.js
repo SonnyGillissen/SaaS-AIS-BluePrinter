@@ -69,6 +69,10 @@
       const def = Catalog.get(node.type);
       const r = g.rects[node.id];
       let props = prop('Azure type', def ? def.label : node.type);
+      if (def && def.annotation) {
+        props += prop('Annotation content', AISBP.Annotations.plainText(node));
+        Object.keys(node.attributes).forEach((key) => { props += prop('Annotation ' + key, node.attributes[key]); });
+      }
       if (def && def.provider) props += prop('Resource provider', def.provider);
       (def ? def.attributes : []).forEach((a) => {
         const v = Layout.formatValue(a, node.attributes[a.key]);
@@ -78,7 +82,7 @@
       if (links) props += prop('Network', links);
       (node.custom || []).forEach((c) => { if (c.key && c.value !== '') props += prop(c.key, c.value); });
       (node.tags || []).forEach((t) => { props += prop('Tag: ' + t.key, t.value); });
-      elements += '<element identifier="' + eid(node.id) + '" xsi:type="' + elementType(node) + '">' + name(r ? r.name : node.name) + doc(node.attributes && node.attributes.description) + '<properties>' + props + '</properties></element>';
+      elements += '<element identifier="' + eid(node.id) + '" xsi:type="' + elementType(node) + '">' + name(r ? r.name : node.name) + doc(def && def.annotation ? AISBP.Annotations.plainText(node) : node.attributes && node.attributes.description) + '<properties>' + props + '</properties></element>';
     });
 
     // Relationships: hierarchy + connections

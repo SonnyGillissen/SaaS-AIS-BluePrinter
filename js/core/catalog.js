@@ -80,7 +80,8 @@
     { id: 'monitoring', label: 'Monitoring' },
     { id: 'ai', label: 'AI' },
     { id: 'external', label: 'External & On-premises' },
-    { id: 'other', label: 'Other' }
+    { id: 'other', label: 'Other' },
+    { id: 'annotations', label: 'Text & Tables' }
   ];
 
   // ---------------------------------------------------------------------------
@@ -802,6 +803,19 @@
       attributes: [text('channel', 'Channel', { show: true }), area('description', 'Description')]
     },
 
+    'annotation-text': {
+      label: 'Text', category: 'annotations', abbr: 'text', icon: I.allResources, parents: [ROOT], annotation: true,
+      archimate: 'Artifact', rule: R.free, azure: false, nameMode: 'custom', seed: 'Text', attributes: []
+    },
+    'annotation-markdown': {
+      label: 'Markdown', category: 'annotations', abbr: 'markdown', icon: I.allResources, parents: [ROOT], annotation: true,
+      archimate: 'Artifact', rule: R.free, azure: false, nameMode: 'custom', seed: 'Markdown', attributes: []
+    },
+    'annotation-table': {
+      label: 'Table', category: 'annotations', abbr: 'table', icon: I.allResources, parents: [ROOT], annotation: true,
+      archimate: 'Artifact', rule: R.free, azure: false, nameMode: 'custom', seed: 'Table', attributes: []
+    },
+
     // ----- Other ----------------------------------------------------------------------
     // Any Azure resource without a dedicated type, e.g. when loading an existing environment.
     'azure-resource': {
@@ -818,7 +832,7 @@
     if (t.azure === undefined) t.azure = true;
     t.container = !!t.container;
     t.network = !!t.network || (t.attributes || []).some((a) => NETWORK_ATTRIBUTE_KEYS.indexOf(a.key) !== -1);
-    const common = t.azure && id !== 'resource-group' && t.category !== 'hierarchy' ? COMMON_RESOURCE_ATTRIBUTES : t.azure ? [] : COMMON_GENERIC_ATTRIBUTES;
+    const common = t.annotation ? [] : t.azure && id !== 'resource-group' && t.category !== 'hierarchy' ? COMMON_RESOURCE_ATTRIBUTES : t.azure ? [] : COMMON_GENERIC_ATTRIBUTES;
     const own = t.attributes || [];
     const seen = new Set(own.map((a) => a.key));
     // Common attributes come first, but an own attribute with the same key wins.
@@ -848,6 +862,9 @@
   function canContain(parentType, childType) {
     const child = get(childType);
     if (!child) return false;
+    const parent = get(parentType);
+    if (parent && parent.annotation) return false;
+    if (child.annotation) return !parentType || !!(parent && (parent.container || all().some((t) => !t.annotation && t.parents.includes(parentType))));
     return child.parents.indexOf(parentType || ROOT) !== -1;
   }
 

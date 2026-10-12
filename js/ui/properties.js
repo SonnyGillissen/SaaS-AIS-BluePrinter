@@ -156,7 +156,7 @@
       const options = [];
       if (Catalog.canContain(null, node.type)) options.push({ value: '', label: '(top level)' });
       Object.keys(project.nodes).map((k) => project.nodes[k])
-        .filter((p) => p.id === node.parentId || (Catalog.canContain(p.type, node.type) && !Model.isSelfOrDescendant(project, node.id, p.id)))
+        .filter((p) => p.id === node.parentId || (Model.canContain(project, p.id, node.type) && !Model.isSelfOrDescendant(project, node.id, p.id)))
         .sort((a, b) => a.seq - b.seq)
         .forEach((p) => options.push({ value: p.id, label: '\u00a0'.repeat(Model.depth(project, p.id) * 2) + (derived.geometry.names[p.id] || p.id) + ' (' + Catalog.get(p.type).label + ')' }));
       const parentSel = select(options, node.parentId || '', { id: 'prop-parent', onchange: () => app.actions.reparent([node.id], parentSel.value || null) });
@@ -280,6 +280,7 @@
 
     function renderNode(node) {
       const def = Catalog.get(node.type);
+      if (def.annotation) return renderAnnotation(node, def);
       const derived = store.derived();
       const level = store.project.settings.diagram.detailLevel;
       const out = [];
@@ -301,6 +302,43 @@
         h('button', { type: 'button', class: 'btn', text: 'Duplicate', onclick: () => app.actions.duplicate() }),
         h('button', { type: 'button', class: 'btn', text: 'Copy', onclick: () => app.actions.copy() }),
         def.container || Model.children(store.project, node.id).length ? h('button', { type: 'button', class: 'btn', text: 'Tidy contents', onclick: () => app.actions.tidy(node.id) }) : null,
+        h('button', { type: 'button', class: 'btn danger', text: 'Delete', onclick: () => app.actions.remove() })));
+      return out;
+    }
+
+    function renderAnnotation(node, def) {
+      const Annotations = AISBP.Annotations;
+      const a = Annotations.normalize(node.type, node.attributes);
+      const set = (key, value) => patchNode(node.id, { attributes: { [key]: value } }, node.id + ':annotation:' + key);
+      const option = (key, label, values) => {
+        const control = select(values, a[key], { id: 'prop-annotation-' + key, onchange: () => set(key, control.value) });
+        return field(label, control);
+      };
+      const numeric = (key, label, min, max) => {
+        const control = h('input', { id: 'prop-annotation-' + key, type: 'number', min, max, value: a[key], onchange: () => set(key, Number(control.value)) });
+        return field(label, control);
+      };
+      const out = [h('h2', { text: def.label }),
+        field('Title (explorer / exports)', textInput('prop-name', node.name, (v) => patchNode(node.id, { name: v, nameMode: 'custom' }, node.id + ':name'))),
+        h('h3', { text: 'Placement' }), placementSection(node, def)];
+      if (node.type !== 'annotation-table') {
+        out.push(h('h3', { text: 'Appearance' }),
+          option('theme', 'Theme', Annotations.THEMES), option('align', 'Text alignment', Annotations.ALIGN),
+          numeric('fontSize', 'Font size', 8, 48), numeric('padding', 'Padding', 0, 40),
+          h('p', { class: 'subtitle', text: 'Drag the bottom-right handle to resize. Height always grows to fit content.' }),
+          h('button', { type: 'button', class: 'btn small', text: 'Reset size', onclick: () => store.change('reset annotation size', (p) => { delete p.nodes[node.id].w; delete p.nodes[node.id].h; }) }));
+        out.push(h('h3', { text: 'Content' }), field(node.type === 'annotation-markdown' ? 'Markdown' : 'Text',
+          textArea('prop-annotation-content', a.content, (v) => set('content', v))),
+          h('button', { id: 'prop-edit-annotation', type: 'button', class: 'btn', text: 'Edit on canvas', onclick: () => { app.canvas.centerOn(node.id); AISBP.AnnotationEditor.open(app, node.id); } }));
+        if (node.type === 'annotation-markdown') out.push(h('p', { class: 'subtitle', text: 'Headings, bold, italic, code, lists and quotes. Links render as text; HTML and images are not rendered.' }));
+      } else {
+        out.push(h('h3', { text: 'Table' }),
+          h('p', { class: 'subtitle', text: 'Edit cells, rows, columns and appearance in the table editor. You can also double-click the table on the canvas.' }),
+          h('button', { id: 'prop-edit-annotation', type: 'button', class: 'btn', text: 'Edit Table', onclick: () => AISBP.AnnotationEditor.open(app, node.id) }));
+      }
+      out.push(h('h3', { text: 'Actions' }), h('div', { class: 'inline' },
+        h('button', { type: 'button', class: 'btn', text: 'Duplicate', onclick: () => app.actions.duplicate() }),
+        h('button', { type: 'button', class: 'btn', text: 'Copy', onclick: () => app.actions.copy() }),
         h('button', { type: 'button', class: 'btn danger', text: 'Delete', onclick: () => app.actions.remove() })));
       return out;
     }

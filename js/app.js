@@ -514,7 +514,7 @@
   // ---------------------------------------------------------------------------
 
   const isEditable = (el) => !!el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)) && el.type !== 'checkbox' && el.type !== 'button';
-  const dialogOpen = () => !!doc.querySelector('dialog[open]');
+  const dialogOpen = () => !!doc.querySelector('dialog[open]') || AISBP.AnnotationEditor.isOpen(app);
 
   doc.addEventListener('keydown', (e) => {
     if (isEditable(e.target) || dialogOpen()) return;
