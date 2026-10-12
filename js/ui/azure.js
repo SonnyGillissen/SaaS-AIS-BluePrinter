@@ -56,9 +56,12 @@
     let busy = false;
     let closed = false;
 
+    let abort = null;
     const status = h('p', { class: 'azure-status', role: 'status', 'aria-live': 'polite' });
-    const setStatus = (text, kind) => {
-      status.textContent = text || '';
+    const setStatus = (text, kind, extra) => {
+      clear(status);
+      status.appendChild(h('span', { text: text || '' }));
+      if (extra) status.appendChild(extra);
       status.className = 'azure-status' + (kind ? ' ' + kind : '');
     };
 
@@ -95,10 +98,13 @@
       const id = clientId.value.trim();
       const tenant = tenantId.value.trim() || 'organizations';
       busy = true;
-      setStatus('Waiting for sign-in in the popup window\u2026');
+      const controller = typeof AbortController === 'function' ? new AbortController() : null;
+      abort = controller;
+      setStatus('Waiting for sign-in in the popup window\u2026 ', '', controller ? h('button', { type: 'button', class: 'btn small', text: 'Cancel sign-in', onclick: () => controller.abort() }) : null);
       // signIn opens the popup synchronously, inside this click.
-      Auth.signIn({ clientId: id, tenantId: tenant, redirectUri })
+      Auth.signIn({ clientId: id, tenantId: tenant, redirectUri, signal: controller ? controller.signal : undefined })
         .then(async (s) => {
+          abort = null;
           session = Object.assign(s, { clientId: id });
           writePrefs({ clientId: id, tenantId: tenant });
           tree = null;
@@ -108,6 +114,7 @@
           await loadTree();
         })
         .catch((e) => {
+          abort = null;
           busy = false;
           setStatus(e.message, 'error');
         });
@@ -127,7 +134,7 @@
       try {
         tree = await Arm.loadTree(client());
         setStatus(tree.subscriptions.length ? '' : 'No subscriptions found for this account in this tenant.', tree.subscriptions.length ? '' : 'error');
-        tree.managementGroups.filter((m) => !m.parent).forEach((m) => expanded.add(KEY.mg(m.name)));
+        tree.managementGroups.forEach((m) => expanded.add(KEY.mg(m.name)));
       } catch (e) {
         setStatus('Could not read the environment: ' + e.message, 'error');
         tree = null;
@@ -214,8 +221,12 @@
       const sel = Azure.resolveSelection(tree, checked);
       const rgCount = Object.keys(sel.resourceGroups).reduce((n, k) => n + (sel.resourceGroups[k] ? sel.resourceGroups[k].length : 0), 0);
       const full = Object.keys(sel.resourceGroups).filter((k) => !sel.resourceGroups[k]).length;
-      summary.textContent = sel.subscriptions.length
-        ? 'Selected: ' + sel.managementGroups.length + ' management group(s), ' + full + ' complete subscription(s)' + (rgCount ? ' and ' + rgCount + ' resource group(s) in ' + (sel.subscriptions.length - full) + ' other subscription(s)' : '') + '.'
+      const parts = [];
+      if (full) parts.push(full + (full === 1 ? ' subscription' : ' subscriptions'));
+      if (rgCount) parts.push(rgCount + (rgCount === 1 ? ' resource group' : ' resource groups'));
+      const mgs = sel.managementGroups.length;
+      summary.textContent = parts.length
+        ? 'Selected: ' + parts.join(' and ') + (mgs ? ', drawn inside ' + mgs + (mgs === 1 ? ' management group' : ' management groups') : '') + '.'
         : 'Tick what to load: a management group includes everything below it, a subscription includes all of its resource groups.';
     }
 
@@ -282,10 +293,13 @@
       title: 'Load your Azure environment',
       body,
       buttons: [
-        { label: 'Cancel', action: () => (busy ? false : undefined) },
+        { label: 'Cancel' },
         { label: 'Load into diagram', primary: true, action: load }
       ],
-      onClose: () => { closed = true; }
+      onClose: () => {
+        closed = true;
+        if (abort) abort.abort();
+      }
     });
     renderAll();
     if (valid() && !tree) loadTree();

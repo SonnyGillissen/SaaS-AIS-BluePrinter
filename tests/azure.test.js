@@ -288,3 +288,56 @@ test('sign-in helpers build a PKCE authorization request and parse the response'
   assert.equal(AzureAuth.defaultRedirectUri({ protocol: 'https:', href: 'https://x.example/app/index.html?a=1#b' }), 'https://x.example/app/azure-callback.html');
   assert.ok(AzureAuth.randomString(32).length >= 43);
 });
+
+test('sign-in waits for the callback (also when the popup looks closed), exchanges the code and can be cancelled', async () => {
+  const g = globalThis;
+  const saved = { open: g.open, fetch: g.fetch, addEventListener: g.addEventListener, removeEventListener: g.removeEventListener };
+  const popups = [];
+  g.open = () => {
+    // A detached popup (Cross-Origin-Opener-Policy) reports closed: true while still signing in.
+    const popup = { closed: true, location: { href: 'about:blank' }, close() {} };
+    popups.push(popup);
+    return popup;
+  };
+  g.addEventListener = () => {};
+  g.removeEventListener = () => {};
+  const token = (claims) => 'h.' + Buffer.from(JSON.stringify(claims)).toString('base64url') + '.s';
+  const requests = [];
+  g.fetch = async (url, init) => {
+    requests.push({ url, body: new URLSearchParams(init.body) });
+    return { ok: true, status: 200, json: async () => ({ access_token: 'at', expires_in: 3600, id_token: token({ name: 'Ada', preferred_username: 'ada@contoso.com', tid: 'tid-1' }) }) };
+  };
+  try {
+    const redirectUri = 'https://app.example/azure-callback.html';
+    const pending = AzureAuth.signIn({ clientId: '00000000-0000-0000-0000-0000000000aa', tenantId: 'contoso.onmicrosoft.com', redirectUri });
+    while (popups[0].location.href === 'about:blank') await new Promise((r) => setTimeout(r, 10));
+    const sent = new URL(popups[0].location.href);
+    await new Promise((r) => setTimeout(r, 1200)); // several polls with popup.closed === true
+    const channel = new BroadcastChannel(AzureAuth.CHANNEL);
+    channel.postMessage({ type: AzureAuth.CHANNEL, search: '', hash: '#code=the-code&state=' + sent.searchParams.get('state') });
+    channel.close();
+    const session = await pending;
+    assert.equal(session.accessToken, 'at');
+    assert.equal(session.account.username, 'ada@contoso.com');
+    assert.equal(session.tenantId, 'tid-1');
+    assert.equal(requests[0].url, 'https://login.microsoftonline.com/contoso.onmicrosoft.com/oauth2/v2.0/token');
+    assert.equal(requests[0].body.get('code'), 'the-code');
+    assert.equal(await AzureAuth.codeChallenge(requests[0].body.get('code_verifier')), sent.searchParams.get('code_challenge'));
+    assert.equal(requests[0].body.get('client_secret'), null);
+
+    // A response with another state is rejected, and cancelling stops waiting.
+    const wrong = AzureAuth.signIn({ clientId: '00000000-0000-0000-0000-0000000000aa', redirectUri });
+    while (popups[1].location.href === 'about:blank') await new Promise((r) => setTimeout(r, 10));
+    const c2 = new BroadcastChannel(AzureAuth.CHANNEL);
+    c2.postMessage({ type: AzureAuth.CHANNEL, search: '', hash: '#code=x&state=forged' });
+    c2.close();
+    await assert.rejects(wrong, /state/);
+    const controller = new AbortController();
+    const cancelled = AzureAuth.signIn({ clientId: '00000000-0000-0000-0000-0000000000aa', redirectUri, signal: controller.signal });
+    controller.abort();
+    await assert.rejects(cancelled, /cancelled/);
+    assert.equal(requests.length, 1);
+  } finally {
+    Object.assign(g, saved);
+  }
+});

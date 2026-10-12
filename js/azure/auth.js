@@ -139,17 +139,24 @@
     };
   }
 
-  /** Wait for the redirect to reach the callback page in the popup. */
-  function waitForCallback(popup, redirectUri) {
+  /**
+   * Wait for the redirect to reach the callback page in the popup.
+   * `popup.closed` is not treated as cancellation: when the sign-in page sets a
+   * Cross-Origin-Opener-Policy, the browser detaches the popup and reports it as closed while
+   * the user is still signing in. The callback page then reports back via BroadcastChannel.
+   * Cancel with `signal` (AbortSignal) instead.
+   */
+  function waitForCallback(popup, redirectUri, signal) {
     return new Promise((resolve, reject) => {
       let finished = false;
       let channel = null;
-      let closedTicks = 0;
+      const onAbort = () => finish(reject, new Error('Sign-in was cancelled.'));
       const finish = (fn, value) => {
         if (finished) return;
         finished = true;
         clearInterval(timer);
         clearTimeout(timeout);
+        if (signal) signal.removeEventListener('abort', onAbort);
         root.removeEventListener('message', onMessage);
         if (channel) channel.close();
         try { if (!popup.closed) popup.close(); } catch (e) { /* ignore */ }
@@ -172,18 +179,20 @@
             return;
           }
         } catch (e) {
-          /* still on the Microsoft sign-in page (cross-origin) */
+          /* still on the Microsoft sign-in page (cross-origin) or detached */
         }
-        // Give the callback page a moment to post its message after the popup closes.
-        if (popup.closed && ++closedTicks > 3) finish(reject, new Error('Sign-in was cancelled.'));
       }, 250);
       const timeout = setTimeout(() => finish(reject, new Error('Sign-in timed out.')), TIMEOUT_MS);
+      if (signal) {
+        if (signal.aborted) onAbort();
+        else signal.addEventListener('abort', onAbort);
+      }
     });
   }
 
   /**
    * Sign in. Must be called directly from a click handler (the popup is opened synchronously).
-   * @param {object} o { clientId, tenantId, redirectUri? }
+   * @param {object} o { clientId, tenantId, redirectUri?, signal?: AbortSignal to cancel }
    * @returns {Promise<{accessToken: string, expiresAt: number, account: object, tenantId: string}>}
    */
   function signIn(o) {
@@ -204,7 +213,7 @@
       const nonce = randomString(16);
       const challenge = await codeChallenge(verifier);
       popup.location.href = authorizeUrl({ clientId: o.clientId, tenantId, redirectUri, state, nonce, challenge, loginHint: o.loginHint });
-      const params = await waitForCallback(popup, redirectUri);
+      const params = await waitForCallback(popup, redirectUri, o.signal);
       if (params.state !== state) throw new Error('Sign-in failed: the response did not match the request (state).');
       if (params.error) throw new Error('Sign-in failed: ' + String(params.error_description || params.error).split(/\r?\n/)[0]);
       if (!params.code) throw new Error('Sign-in failed: no authorization code was returned.');

@@ -9,6 +9,7 @@ risk.
 
 ```
 index.html              App shell (toolbar, panels, footer with community credit and MS Icons credit)
+azure-callback.html     Sign-in redirect page for Load from Azure
 css/app.css             All styles (CSS custom properties; light UI)
 js/config.js            Deployment configuration (storage mode, defaults)
 js/core/                Pure logic, no DOM. Runs in the browser and in Node (unit tests).
@@ -18,6 +19,7 @@ js/core/                Pure logic, no DOM. Runs in the browser and in Node (uni
   model.js              Project data model, mutations, clipboard, import validation (normalize)
   naming.js             Naming conventions: patterns, tokens, Azure rule enforcement and validation
   layout.js             Geometry: container sizes, attribute lines, hit testing, auto layout
+  azure.js              Load from Azure: scope selection, ARM type mapping, blueprint builder
   store.js              State container: undo/redo, gestures, selection, change events
   storage.js            Persistence adapters: localStorage (default) and the PHP API
 js/render/
@@ -28,6 +30,10 @@ js/export/
   drawio.js             draw.io (mxfile) export
   archimate.js          ArchiMate Model Exchange File Format export
   raster.js             PNG and PDF (minimal PDF writer, no library)
+js/azure/               Load from Azure (browser; testable in Node with a fake fetch)
+  arm.js                Azure Resource Manager / Resource Graph client (paging, throttling)
+  auth.js               Sign-in with Microsoft Entra ID (authorization code + PKCE popup)
+  callback.js           Script of azure-callback.html, the sign-in redirect page
 js/ui/                  Browser-only UI components
   dom.js                Tiny DOM helpers (h(), modal, toast, file reading)
   palette.js            Resource palette (click / drag)
@@ -36,6 +42,7 @@ js/ui/                  Browser-only UI components
   properties.js         Properties panel (naming, attributes, eye toggles, connections)
   dialogs.js            Options, Projects and Help dialogs
   exporter.js           Runs the exports and downloads the files
+  azure.js              Load from Azure dialog (sign-in, scope tree, progress)
 js/app.js               Bootstrap: wires store, storage, UI, actions, keyboard and clipboard
 server/php/             Optional database storage (API, installer, schemas)
 server/docker/          Docker image and compose files for the one-click installers
@@ -98,6 +105,9 @@ directly is a core requirement. Classic scripts load in the order listed in `ind
   validate ids, types, hierarchy, lengths and URLs, and protect against prototype pollution.
 - Image URLs (icon base) are restricted to `http(s)`, relative paths and `data:image/...`.
 - A Content Security Policy in `index.html` disallows inline and third-party scripts.
+- *Load from Azure* keeps the access token in memory only, sends it only to
+  `https://management.azure.com/` (the ARM client refuses other URLs, including `nextLink`s),
+  and validates the sign-in response `state` (PKCE, no client secret).
 - The PHP API uses prepared statements, size limits, JSON-only bodies and an optional API key.
 
 ## Adding a resource type
