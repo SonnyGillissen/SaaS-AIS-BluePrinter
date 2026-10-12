@@ -390,6 +390,13 @@
       }
     });
 
+    // Selection redraws replace SVG nodes between clicks. Remember the native click
+    // count before pointer capture/redraw can prevent the browser's dblclick event.
+    svg.addEventListener('mousedown', (e) => {
+      if (e.detail === 2 && gesture && gesture.type === 'move' &&
+          AISBP.Annotations.isAnnotation(store.project.nodes[gesture.id].type)) gesture.edit = true;
+    });
+
     function endGesture(e, cancelled) {
       if (!gesture) return;
       const gst = gesture;
@@ -439,6 +446,7 @@
         });
         store.select(ids, conns, gst.additive);
       } else if (gst.type === 'marquee') queueRender();
+      if (gst.edit && !gst.moved && !cancelled) AISBP.AnnotationEditor.open(app, gst.id);
     }
 
     svg.addEventListener('pointerup', (e) => endGesture(e, false));
@@ -451,6 +459,7 @@
     });
 
     svg.addEventListener('dblclick', (e) => {
+      if (AISBP.AnnotationEditor.isOpen(app)) return;
       const hit = doc.elementFromPoint(e.clientX, e.clientY);
       const handle = e.target.closest('[data-handle="route"]') || (hit && hit.closest('[data-handle="route"]'));
       if (handle && handle.getAttribute('data-insert') !== 'true') {

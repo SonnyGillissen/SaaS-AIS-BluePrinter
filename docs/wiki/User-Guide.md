@@ -45,19 +45,20 @@ everything automatically and resets manually resized containers to the size they
 
 ## Text blocks and tables
 
-Use the **Text & Tables** palette category to add **Text**, **Markdown** or a **Table**, by clicking
+Use **Text & Tables** at the bottom of the palette to add **Text**, **Markdown** or a **Table**, by clicking
 or dragging it onto the canvas. Annotations can stand alone or sit inside a compatible container;
 they are diagram content, not Azure resources.
 
 **Double-click a text block** to edit it directly on the canvas. Markdown blocks provide a
-formatting toolbar that inserts Markdown into the text field. You can also edit content in
-**Properties**. Outside editing mode, the canvas displays rendered text, not an input field.
+formatting toolbar that inserts Markdown into the text field, plus a safe preview. You can also
+edit content in **Properties** or choose **Edit on canvas** there. Outside editing mode, the
+canvas displays rendered text, not an input field.
 Choose **Markdown** for headings, bold, italic, code, lists and quotes;
 **Text** displays literal text. Links are displayed as text; HTML and images are not rendered.
 The default **Plain** theme has no visible box; **Pill**, **Card** and **Callout** provide
 alternative appearances.
 
-**Double-click a table** to open its pop-out editor, or select it and use the editor button in
+**Double-click a table** to open its pop-out editor, or select it and use **Edit Table** in
 **Properties**. Table contents and adjustment controls are in this pop-out rather than crowded
 into the side pane:
 
@@ -75,7 +76,8 @@ or **Escape** discards the draft. **Ctrl+Enter** (⌘+Enter on macOS) saves. Sav
 undoable change.
 
 Drag the bottom-right resize handle to change an annotation's width and minimum height; height
-always grows to fit the content. **Reset size** in Properties restores automatic sizing.
+always grows to fit the content. For text, **Reset size** in Properties restores automatic sizing.
+For tables, select **Reset size on save** in the pop-out editor.
 Text blocks and tables can be moved, copied, pasted and deleted like other objects, and edits
 support undo/redo. Their content is saved with the blueprint and included in diagram exports.
 SVG, PNG and PDF use the canvas renderer. Draw.io uses editable text/table labels with

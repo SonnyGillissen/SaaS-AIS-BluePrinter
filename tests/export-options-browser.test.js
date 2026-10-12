@@ -47,6 +47,8 @@ async function browserChecks() {
     check(response.ok, 'Native canvas double-click dispatched');
   }
   check(doc.querySelectorAll('[data-type^="annotation-"]').length === 3, 'Palette exposes Text, Markdown and Table annotations');
+  const paletteGroups = Array.from(doc.querySelectorAll('#panel-palette .palette-group > summary'));
+  check(paletteGroups[0].textContent.startsWith('Hierarchy (') && paletteGroups[paletteGroups.length - 2].textContent.startsWith('Other (') && paletteGroups[paletteGroups.length - 1].textContent.startsWith('Text & Tables ('), 'Actual palette puts Azure hierarchy first and Text & Tables last, after Other');
   A.app.actions.addAuto('annotation-markdown');
   const markdownId = A.app.store.singleNode().id;
   change('prop-annotation-content', '# Browser heading\n**Bold** and *italic*\n<script>unsafe<' + '/script>', 'input');
@@ -67,6 +69,29 @@ async function browserChecks() {
   const editorBox = inline.getBoundingClientRect();
   const canvasBox = doc.getElementById('canvas-svg').getBoundingClientRect();
   check(editorBox.left >= canvasBox.left && editorBox.right <= canvasBox.right + 1 && editorBox.bottom <= canvasBox.bottom + 1, 'Inline editor stays inside actual small canvas viewport and scrolls');
+  const originalFrameHeight = annotationFrame.style.height;
+  annotationFrame.style.height = '1400px';
+  const previewDetails = inline.querySelector('details');
+  previewDetails.open = false;
+  await pause();
+  const roomyCanvas = doc.getElementById('canvas-svg').getBoundingClientRect();
+  const anchor = A.app.canvas.annotationBounds(markdownId);
+  doc.getElementById('canvas-svg').dispatchEvent(new win.WheelEvent('wheel', { deltaY: anchor.top - (roomyCanvas.bottom - 25), cancelable: true }));
+  const collapsedTop = inline.getBoundingClientRect().top;
+  previewDetails.open = true;
+  await pause();
+  check(inline.getBoundingClientRect().top < collapsedTop && inline.getBoundingClientRect().bottom <= roomyCanvas.bottom + 1, 'Expanding preview near canvas bottom reclamps editor rather than pushing controls offscreen');
+  previewDetails.open = false;
+  await pause();
+  const resizeTop = inline.getBoundingClientRect().top;
+  editor.style.height = '230px';
+  await pause();
+  const editorActions = Array.from(inline.querySelectorAll('button')).filter((button) => ['Save', 'Cancel'].includes(button.textContent));
+  check(inline.getBoundingClientRect().top < resizeTop && editorActions.every((button) => button.getBoundingClientRect().bottom <= roomyCanvas.bottom + 1), 'Resizing textarea near canvas bottom keeps Save and Cancel inside viewport');
+  editor.style.height = '';
+  previewDetails.open = true;
+  annotationFrame.style.height = originalFrameHeight;
+  await pause();
   editor.setSelectionRange(0, 0);
   clickText('Bold');
   check(editor.value.startsWith('****') && A.app.store.past.length === markdownHistory, 'Toolbar generates Markdown without modifying saved content or history');
@@ -74,6 +99,17 @@ async function browserChecks() {
   key(editor, 'z', { ctrlKey: true });
   key(editor, 'Delete');
   check(A.app.store.selection.nodes.has(markdownId) && A.app.store.past.length === markdownHistory && !!A.app.store.project.nodes[markdownId], 'Editor text shortcuts do not select, undo or delete canvas objects');
+  const toolbarButton = inline.querySelector('.markdown-toolbar button');
+  const toolbarProject = JSON.stringify(A.app.store.project);
+  toolbarButton.focus();
+  for (const name of ['Delete', 'Backspace', 'ArrowRight', 'ArrowDown']) key(toolbarButton, name);
+  for (const name of ['a', 'z', 'y', 'd']) key(toolbarButton, name, { ctrlKey: true });
+  for (const name of ['copy', 'cut', 'paste']) {
+    const clipboardEvent = new win.ClipboardEvent(name, { bubbles: true, cancelable: true, clipboardData: new win.DataTransfer() });
+    toolbarButton.dispatchEvent(clipboardEvent);
+    check(!clipboardEvent.defaultPrevented, 'Focused inline toolbar does not hijack native clipboard: ' + name);
+  }
+  check(JSON.stringify(A.app.store.project) === toolbarProject && A.app.store.past.length === markdownHistory && A.app.store.selection.nodes.has(markdownId), 'Focused inline toolbar cannot leak delete, nudge, select, duplicate or history shortcuts to canvas');
   A.app.canvas.zoomIn();
   const zoomedEditor = inline.getBoundingClientRect();
   check(zoomedEditor.left >= canvasBox.left && zoomedEditor.right <= canvasBox.right + 1, 'Inline overlay tracks view changes');
@@ -120,6 +156,7 @@ async function browserChecks() {
   check(!doc.querySelector('.annotation-inline-editor') && A.app.store.project.nodes[plainId].attributes.content.includes('**literal**'), 'Project/position changes cancel isolated drafts instead of saving stale content');
   A.app.actions.addAuto('annotation-table');
   const tableId = A.app.store.singleNode().id;
+  A.app.store.change('manual table dimensions', (p) => A.Model.updateNode(p, tableId, { w: 640, h: 320 }));
   const tableBefore = JSON.stringify(A.app.store.project);
   const tableHistory = A.app.store.past.length;
   check(!doc.getElementById('prop-cell-0-0') && !doc.getElementById('prop-annotation-theme'), 'Properties replaces all table adjustment controls with shared edit button');
@@ -152,6 +189,7 @@ async function browserChecks() {
   let savedTable = A.app.store.project.nodes[tableId].attributes;
   check(A.Annotations.rows(savedTable.rows).length === 2 && A.Annotations.rows(savedTable.rows)[0].length === 2 && A.Annotations.rows(savedTable.rows)[1][1] === 'Editable\nmultiline', 'Draft row/column removal and cell content save together');
   check(savedTable.caption === 'Draft caption' && savedTable.theme === 'card' && savedTable.align === 'center' && savedTable.fontSize === 18 && savedTable.padding === 9 && savedTable.grid === 'rows' && savedTable.striped && savedTable.firstColumnHeader, 'All table appearance adjustments persist from shared popup');
+  check(A.app.store.project.nodes[tableId].w === 640 && A.app.store.project.nodes[tableId].h === 320, 'Table save preserves manual dimensions unless reset is explicitly checked');
   check(A.app.store.past.length === tableHistory + 1, 'Entire table dialog save is exactly one undo step');
   A.app.store.undo();
   check(JSON.stringify(A.app.store.project) === tableBefore, 'Table undo restores original contents and all adjustments');
@@ -162,6 +200,7 @@ async function browserChecks() {
     clickText('Edit Table');
     check(!!doc.querySelector('dialog.annotation-table-dialog[open]'), 'Properties opens same shared table popup: ' + method);
     change('prop-cell-1-0', 'Discard this', 'input');
+    doc.getElementById('annotation-table-reset-size').click();
     clickText('Add row');
     if (method === 'Escape') await fetch('/escape');
     else if (method === 'Close') doc.querySelector('dialog[open] [aria-label="Close"]').click();
@@ -182,6 +221,15 @@ async function browserChecks() {
   check(!!doc.querySelector('dialog[open]') && JSON.stringify(A.app.store.project) === tableSaved, 'Oversized cells block save without truncation');
   clickText('Cancel');
   await pause();
+  const resetBefore = JSON.stringify(A.app.store.project);
+  const resetHistory = A.app.store.past.length;
+  clickText('Edit Table');
+  doc.getElementById('annotation-table-reset-size').click();
+  clickText('Save');
+  await pause();
+  check(A.app.store.project.nodes[tableId].w === undefined && A.app.store.project.nodes[tableId].h === undefined && A.app.store.past.length === resetHistory + 1, 'Reset size on save removes both manual dimensions in the shared table save');
+  A.app.store.undo();
+  check(JSON.stringify(A.app.store.project) === resetBefore, 'Undo restores both table dimensions after popup size reset');
   A.app.store.change('check Blueprint wrapping', (p) => {
     p.settings.diagram.style = 'blueprint';
     A.Model.updateNode(p, markdownId, { attributes: { content: 'ill '.repeat(15) } });

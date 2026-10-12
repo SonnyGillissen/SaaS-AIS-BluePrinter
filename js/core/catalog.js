@@ -70,7 +70,6 @@
 
   /** Categories shown in the palette (in this order). */
   const CATEGORIES = [
-    { id: 'annotations', label: 'Text & Tables' },
     { id: 'hierarchy', label: 'Hierarchy' },
     { id: 'integration', label: 'Integration' },
     { id: 'messaging', label: 'Messaging & Events' },
@@ -81,7 +80,8 @@
     { id: 'monitoring', label: 'Monitoring' },
     { id: 'ai', label: 'AI' },
     { id: 'external', label: 'External & On-premises' },
-    { id: 'other', label: 'Other' }
+    { id: 'other', label: 'Other' },
+    { id: 'annotations', label: 'Text & Tables' }
   ];
 
   // ---------------------------------------------------------------------------

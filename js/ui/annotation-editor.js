@@ -14,11 +14,15 @@
     const store = app.store;
     const node = store.project.nodes[id];
     if (!node || !N.isAnnotation(node.type)) return;
+    if (node.type !== 'annotation-table' && !app.canvas.annotationBounds(id)) {
+      A.Dom.toast('Expand the annotation’s container to edit on canvas.');
+      return;
+    }
     const originalFocus = doc.activeElement;
     const focusId = originalFocus && originalFocus.id;
     const draft = N.normalize(node.type, node.attributes);
     const error = h('p', { class: 'problems', role: 'alert', hidden: true });
-    let shell, popup, unsubscribe, closed = false, resetSize = false;
+    let shell, popup, unsubscribe, resizeObserver, closed = false, resetSize = false;
     const restoreFocus = () => {
       const target = originalFocus && originalFocus.isConnected ? originalFocus :
         (focusId && doc.getElementById(focusId)) || doc.getElementById('canvas');
@@ -28,6 +32,7 @@
       if (closed) return;
       closed = true;
       if (unsubscribe) unsubscribe();
+      if (resizeObserver) resizeObserver.disconnect();
       root.removeEventListener('resize', position);
       root.removeEventListener('scroll', position, true);
       if (active && active.id === id) active = null;
@@ -101,7 +106,7 @@
       function format(before, after, lines) {
         let start = input.selectionStart, end = input.selectionEnd;
         if (lines) {
-          start = input.value.lastIndexOf('\n', start - 1) + 1;
+          start = start === 0 ? 0 : input.value.lastIndexOf('\n', start - 1) + 1;
           const next = input.value.indexOf('\n', end);
           end = next === -1 ? input.value.length : next;
         }
@@ -126,6 +131,12 @@
       doc.body.appendChild(shell);
       update();
       position();
+      if (root.ResizeObserver) {
+        // Observe only size: changing the clamped position cannot feed back into
+        // this observer when a textarea or preview grows near a viewport edge.
+        resizeObserver = new root.ResizeObserver(position);
+        resizeObserver.observe(shell);
+      }
       root.addEventListener('resize', position);
       root.addEventListener('scroll', position, true);
       input.focus({ preventScroll: true });
@@ -150,7 +161,7 @@
       option('align', 'Text alignment', N.ALIGN);
       numeric('fontSize', 'Font size', 8, 48);
       numeric('padding', 'Padding', 0, 40);
-      const reset = h('input', { type: 'checkbox', onchange: () => { resetSize = reset.checked; } });
+      const reset = h('input', { id: 'annotation-table-reset-size', type: 'checkbox', onchange: () => { resetSize = reset.checked; } });
       options.appendChild(field('Reset size on save', reset, { check: true }));
       const cells = h('div', { class: 'annotation-table-cells' });
       function operation(op, index, target) {
@@ -199,6 +210,7 @@
       popup.dialog.addEventListener('cancel', (e) => { e.preventDefault(); close(); });
       doc.getElementById('prop-cell-0-0').focus();
     }
+    if (closed) return;
     active = { id, close, position, app };
     unsubscribe = store.subscribe((reason) => {
       if (reason !== 'selection' || !store.selection.nodes.has(id)) close();

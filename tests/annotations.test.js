@@ -5,6 +5,13 @@ const { AISBP, smallProject } = require('./helpers');
 const { Annotations: A, Model, Layout, Render, Package, DrawIo, ArchiMate, Store } = AISBP;
 const TYPES = ['annotation-text', 'annotation-markdown', 'annotation-table'];
 
+test('palette orders Azure hierarchy first and Text & Tables last after Other', () => {
+  const categories = AISBP.Catalog.CATEGORIES;
+  assert.equal(categories[0].id, 'hierarchy');
+  assert.equal(categories[categories.length - 2].id, 'other');
+  assert.deepEqual(categories[categories.length - 1], { id: 'annotations', label: 'Text & Tables' });
+});
+
 test('annotation catalog placement accepts root and containers, never annotations', () => {
   const { project, sub, rg, nodes } = smallProject(AISBP, ['key-vault', 'service-bus-namespace']);
   TYPES.forEach((type) => {
