@@ -161,6 +161,8 @@
   /** ARM resource type (lowercase) -> catalog type. Special cases are handled in mapType. */
   const TYPE_MAP = {
     'microsoft.logic/workflows': 'logic-app-consumption',
+    'microsoft.automation/automationaccounts': 'automation-account',
+    'microsoft.automation/automationaccounts/runbooks': 'automation-runbook',
     'microsoft.logic/integrationaccounts': 'integration-account',
     'microsoft.logic/integrationaccounts/maps': 'integration-account-map',
     'microsoft.logic/integrationaccounts/schemas': 'integration-account-schema',
@@ -278,6 +280,7 @@
    */
   const CHILD_SPECS = {
     'logic-app-standard': [{ type: 'logic-app-workflow', path: '/workflows', api: '2022-03-01' }],
+    'automation-account': [{ type: 'automation-runbook', path: '/runbooks', api: '2023-11-01' }],
     'function-app': [{ type: 'function', path: '/functions', api: '2022-03-01' }],
     'integration-account': [
       { type: 'integration-account-map', path: '/maps', api: '2019-05-01' },
@@ -385,6 +388,8 @@
     'logic-app-consumption': (r, p) => ({ state: p.state, trigger: logicTrigger(p.definition), integrationAccount: p.integrationAccount && leaf(p.integrationAccount.id), identity: identity(r) }),
     'logic-app-standard': (r, p) => ({ appServicePlan: leaf(p.serverFarmId), vnetIntegration: p.virtualNetworkSubnetId ? true : undefined, publicNetworkAccess: p.publicNetworkAccess, privateEndpoint: hasPrivateEndpoint(p), identity: identity(r) }),
     'logic-app-workflow': (r, p) => ({ kind: cap(p.kind || r.kind), trigger: logicTrigger(p.definition) }),
+    'automation-account': (r, p) => ({ sku: r.sku && r.sku.name, publicNetworkAccess: p.publicNetworkAccess, identity: identity(r) }),
+    'automation-runbook': (r, p) => ({ runbookType: p.runbookType, state: p.state }),
     'integration-account': (r) => ({ sku: r.sku && r.sku.name }),
     'integration-account-map': (r, p) => ({ mapType: p.mapType }),
     'integration-account-schema': (r, p) => ({ schemaType: p.schemaType === 'Xml' ? 'XML' : p.schemaType }),

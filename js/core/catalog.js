@@ -129,6 +129,8 @@
     subscription: { min: 1, max: 64, invalid: '<>;|', scope: 'tenant' },
     resourceGroup: { min: 1, max: 90, chars: 'A-Za-z0-9_.()\\-', end: 'notPeriod', scope: 'subscription' },
     logicWorkflow: { min: 1, max: 80, chars: 'A-Za-z0-9_.()\\-', scope: 'resourceGroup' },
+    automationAccount: { min: 6, max: 50, chars: 'A-Za-z0-9\\-', start: 'alnum', end: 'alnum', noDoubleHyphen: true, scope: 'resourceGroup' },
+    automationRunbook: { min: 1, max: 63, chars: 'A-Za-z0-9_\\-', scope: 'parent' },
     webSite: { min: 2, max: 60, chars: 'A-Za-z0-9\\-', start: 'alnum', end: 'alnum', scope: 'global' },
     serverFarm: { min: 1, max: 60, chars: 'A-Za-z0-9\\-', scope: 'resourceGroup' },
     standardWorkflow: { min: 1, max: 43, chars: 'A-Za-z0-9_\\-', start: 'letter', scope: 'parent' },
@@ -183,6 +185,7 @@
     resourceGroup: 'general/10007-icon-service-Resource-Groups.svg',
     logicApps: 'integration/02631-icon-service-Logic-Apps.svg',
     workflow: 'general/10852-icon-service-Workflow.svg',
+    automationAccounts: 'management-governance/00039-icon-service-Automation-Accounts.svg',
     integrationAccount: 'integration/10218-icon-service-Integration-Accounts.svg',
     integrationEnvironment: 'integration/03345-icon-service-Integration-Environments.svg',
     businessProcess: 'integration/03637-icon-service-Business-Process-Tracking.svg',
@@ -312,6 +315,11 @@
         DIAGNOSTICS
       ]
     },
+    'logic-app-automation': {
+      label: 'Logic Apps Automation', category: 'integration', icon: I.logicApps, abbr: 'logic',
+      parents: RG, archimate: 'ApplicationComponent', rule: R.generic80,
+      attributes: [select('sku', 'SKU', ['Automation'], { default: 'Automation', show: true })]
+    },
     'logic-app-workflow': {
       label: 'Workflow (Standard)', category: 'integration', icon: I.workflow, abbr: 'wf',
       provider: 'Microsoft.Web/sites/workflows', parents: ['logic-app-standard'], archimate: 'ApplicationProcess',
@@ -319,6 +327,25 @@
       attributes: [
         select('kind', 'Kind', ['Stateful', 'Stateless', 'Agentic'], { default: 'Stateful', show: true }),
         select('trigger', 'Trigger', ['HTTP Request', 'Recurrence', 'Service Bus', 'Event Grid', 'Event Hubs', 'Blob Storage', 'SFTP', 'Workflow call', 'Other'], { show: true }),
+        area('description', 'Description')
+      ]
+    },
+    'automation-account': {
+      label: 'Automation Account', category: 'integration', icon: I.automationAccounts, abbr: 'aa',
+      provider: 'Microsoft.Automation/automationAccounts', parents: RG, archimate: 'ApplicationComponent',
+      rule: R.automationAccount,
+      attributes: [
+        select('sku', 'SKU', ['Free', 'Basic'], { default: 'Free', show: true }),
+        NETWORK_ACCESS, MANAGED_IDENTITY, DIAGNOSTICS
+      ]
+    },
+    'automation-runbook': {
+      label: 'Automation Runbook', category: 'integration', icon: I.workflow, abbr: 'rb',
+      provider: 'Microsoft.Automation/automationAccounts/runbooks', parents: ['automation-account'], archimate: 'ApplicationProcess',
+      rule: R.automationRunbook, pattern: '{name}', seed: 'runbook',
+      attributes: [
+        text('runbookType', 'Runbook type', { show: true }),
+        select('state', 'State', ['Published', 'Draft', 'Other'], { show: true }),
         area('description', 'Description')
       ]
     },

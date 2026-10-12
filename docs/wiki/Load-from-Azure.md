@@ -55,7 +55,7 @@ Administrators can preconfigure the client id and tenant for everyone in
    - a **subscription** includes all of its resource groups,
    - **resource groups** can be picked individually.
 5. Choose the options:
-   - **Include child resources**: Logic App Standard workflows, functions, Service Bus queues,
+   - **Include child resources**: Logic App Standard workflows, Azure Automation runbooks, functions, Service Bus queues,
      topics and subscriptions, event hubs and consumer groups, API Management APIs, products and
      backends, storage containers, queues, tables and file shares, Event Grid subscriptions,
      Relay hybrid connections, integration account artifacts, Azure OpenAI deployments and
