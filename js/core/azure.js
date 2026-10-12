@@ -225,10 +225,11 @@
   };
 
   /**
-   * Plumbing resources that are created implicitly and would only clutter the diagram
-   * (network interfaces of private endpoints, network watchers, smart detector rules, ...).
+   * Supporting resources that are usually created implicitly (network interfaces of private
+   * endpoints, network watchers, smart detector rules, ...). They are drawn by default, as
+   * "Other Azure Resource", and can be left out with the `includeSupporting: false` option.
    */
-  const SKIPPED_TYPES = new Set([
+  const SUPPORTING_TYPES = new Set([
     'microsoft.network/networkinterfaces',
     'microsoft.network/networkwatchers',
     'microsoft.network/networkwatchers/flowlogs',
@@ -238,11 +239,17 @@
     'microsoft.web/sites/slots'
   ]);
 
-  /** Whether a resource is plumbing that is never drawn. */
+  /** Whether a resource is a supporting resource (see SUPPORTING_TYPES). */
+  function isSupporting(res) {
+    return SUPPORTING_TYPES.has(lower(res && res.type));
+  }
+
+  /**
+   * Whether a resource is never drawn: the hidden `master` database of every logical SQL server
+   * (the Azure portal does not show it either).
+   */
   function isSkipped(res) {
     const t = lower(res && res.type);
-    if (SKIPPED_TYPES.has(t)) return true;
-    // Every logical SQL server has a hidden system database.
     return t === 'microsoft.sql/servers/databases' && lower(leaf(res.name)) === 'master';
   }
 
@@ -557,16 +564,19 @@
   /**
    * Build a blueprint from an Azure inventory.
    * @param {object} inventory see the module documentation
-   * @param {object} [opts] { name, settings, includeOther (default true), description }
-   * @returns {{project: object, stats: {nodes: number, connections: number, generic: number, skipped: Object<string, number>}, warnings: string[]}}
+   * @param {object} [opts] { name, settings, includeOther (default true), includeSupporting (default true), description }
+   * @returns {{project: object, stats: {nodes: number, connections: number, generic: number, resources: number, drawn: number, skipped: Object<string, number>}, warnings: string[]}}
+   *          `resources` counts the distinct resources in the inventory, `drawn` those drawn,
+   *          `skipped` the left-out ones per reason and ARM type; every left-out type is also
+   *          explained in `warnings`.
    */
   function buildProject(inventory, opts) {
-    const o = Object.assign({ includeOther: true }, opts || {});
+    const o = Object.assign({ includeOther: true, includeSupporting: true }, opts || {});
     const inv = inventory || {};
     const project = Model.createProject({ name: o.name || 'Azure environment', settings: o.settings || {} });
     project.meta.description = o.description || '';
     const ids = new Map(); // lowercase ARM id -> node id
-    const stats = { nodes: 0, connections: 0, generic: 0, skipped: {} };
+    const stats = { nodes: 0, connections: 0, generic: 0, resources: 0, drawn: 0, skipped: {} };
     const add = (armId, type, parentNodeId, props) => {
       const node = Model.addNode(project, type, parentNodeId, Object.assign({ nameMode: 'custom' }, props));
       if (armId) ids.set(lower(armId), node.id);
@@ -616,7 +626,16 @@
     const resources = arr(inv.resources).filter((r) => r && r.id && r.type).slice().sort((a, b) => segs(a._parent ? a._parent + '/x/y' : a.id) - segs(b._parent ? b._parent + '/x/y' : b.id));
     const created = []; // [{ res, node, type }]
     const seen = new Set();
-    const skip = (type) => { stats.skipped[type] = (stats.skipped[type] || 0) + 1; };
+    const REASONS = {
+      other: 'no dedicated resource type ("Include other resource types" is off)',
+      supporting: 'supporting resource ("Include supporting resources" is off)',
+      hidden: 'hidden system resource',
+      noGroup: 'its resource group was not loaded'
+    };
+    const skip = (reason, type) => {
+      const k = reason + '|' + type;
+      stats.skipped[k] = (stats.skipped[k] || 0) + 1;
+    };
     const rgNodeOf = (id) => {
       const m = /^\/subscriptions\/([^/]+)\/resourcegroups\/([^/]+)/i.exec(String(id || ''));
       return m ? ids.get(lower('/subscriptions/' + m[1] + '/resourcegroups/' + m[2])) : undefined;
@@ -625,10 +644,14 @@
       const key = lower(res.id);
       if (seen.has(key)) return null;
       seen.add(key);
-      if (isSkipped(res)) return null;
+      const counted = forcedType !== 'subnet';
+      if (counted) stats.resources++;
+      if (isSkipped(res)) { skip('hidden', lower(res.type)); return null; }
+      const supporting = isSupporting(res);
+      if (supporting && !o.includeSupporting) { skip('supporting', lower(res.type)); return null; }
       let type = forcedType || mapType(res);
       if (!type) {
-        if (!o.includeOther) { skip(lower(res.type)); return null; }
+        if (!o.includeOther && !supporting) { skip('other', lower(res.type)); return null; }
         type = 'azure-resource';
       }
       // Parent: explicit parent, the nearest resource above in the ARM id, or the resource group.
@@ -644,9 +667,10 @@
       if (!parentId || !Model.canContain(project, parentId, type)) {
         const rg = rgNodeOf(res._parent || res.id);
         if (rg && Model.canContain(project, rg, type)) parentId = rg;
-        else if (rg && o.includeOther) { parentId = rg; type = 'azure-resource'; } else { skip(lower(res.type)); return null; }
+        else if (rg && (o.includeOther || supporting)) { parentId = rg; type = 'azure-resource'; } else { skip(rg ? 'other' : 'noGroup', lower(res.type)); return null; }
       }
       if (type === 'azure-resource') stats.generic++;
+      if (counted) stats.drawn++;
       const name = leaf(res.name) || leaf(res.id);
       const node = add(res.id, type, parentId, { name, label: name, attributes: attributesFor(type, res), tags: tagsOf(res.tags), custom: resourceId(res.id) });
       created.push({ res, node, type });
@@ -765,19 +789,24 @@
     // Validate like an imported file, then arrange everything.
     const result = Model.normalize(JSON.parse(JSON.stringify(project)));
     Layout.autoLayout(result.project);
-    return { project: result.project, stats, warnings: result.warnings };
+    const notes = Object.keys(stats.skipped).sort().map((k) => {
+      const [reason, type] = k.split('|');
+      return 'Left out ' + stats.skipped[k] + ' \u00d7 ' + type + ': ' + REASONS[reason] + '.';
+    });
+    return { project: result.project, stats, warnings: notes.concat(result.warnings) };
   }
 
   AISBP.Azure = {
     KEY,
     TYPE_MAP,
-    SKIPPED_TYPES,
+    SUPPORTING_TYPES,
     CHILD_SPECS,
     ancestorKeys,
     isCovered,
     resolveSelection,
     mapType,
     isSkipped,
+    isSupporting,
     childSpecs,
     attributesFor,
     buildProject

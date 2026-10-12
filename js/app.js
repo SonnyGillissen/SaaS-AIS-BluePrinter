@@ -326,8 +326,22 @@
       openProject(project);
       save();
       const st = stats || { nodes: 0, connections: 0 };
-      toast('Loaded "' + project.meta.name + '": ' + st.nodes + ' item(s), ' + st.connections + ' connection(s).' + (warnings && warnings.length ? ' ' + warnings.length + ' warning(s), see the console.' : ''), warnings && warnings.length ? 'info' : 'success', 6000);
-      if (warnings && warnings.length && root.console) root.console.warn('Azure load warnings:\n' + warnings.join('\n'));
+      const notes = warnings || [];
+      const drawn = typeof st.resources === 'number' ? ' ' + st.drawn + ' of ' + st.resources + ' resource(s) drawn.' : '';
+      const summary = 'Loaded "' + project.meta.name + '": ' + st.nodes + ' item(s), ' + st.connections + ' connection(s).' + drawn;
+      if (!notes.length) {
+        toast(summary, 'success', 6000);
+        return;
+      }
+      if (root.console) root.console.warn('Azure load notes:\n' + notes.join('\n'));
+      const h = AISBP.Dom.h;
+      AISBP.Dom.modal({
+        title: 'Loaded from Azure',
+        body: h('div', {},
+          h('p', { text: summary }),
+          h('p', { text: 'Notes:' }),
+          h('ul', { class: 'azure-notes' }, notes.map((n) => h('li', { text: n }))))
+      });
     },
 
     async exportAs(format) {

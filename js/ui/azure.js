@@ -128,6 +128,7 @@
     const summary = h('p', { class: 'muted azure-summary' });
     const includeChildren = h('input', { type: 'checkbox', checked: true });
     const includeOther = h('input', { type: 'checkbox', checked: true });
+    const includeSupporting = h('input', { type: 'checkbox', checked: true });
 
     async function loadTree() {
       setStatus('Reading management groups and subscriptions\u2026');
@@ -241,7 +242,8 @@
       treeBox.appendChild(summary);
       treeBox.appendChild(h('div', { class: 'grid-2' },
         field('Include child resources', includeChildren, { check: true, help: 'Workflows, functions, queues, topics, subscriptions, event hubs, APIs, blob containers, ... (one extra request per resource).' }),
-        field('Include other resource types', includeOther, { check: true, help: 'Resources without a dedicated type are drawn as "Other Azure Resource".' })));
+        field('Include other resource types', includeOther, { check: true, help: 'Resources without a dedicated type are drawn as "Other Azure Resource".' }),
+        field('Include supporting resources', includeSupporting, { check: true, help: 'Network interfaces, network watchers, private DNS zone links, deployment slots, VM extensions and smart detector alert rules.' })));
       renderTree();
     }
 
@@ -273,7 +275,8 @@
           name: 'Azure environment' + (names.length ? ' \u2013 ' + names[0] : ''),
           description: 'Loaded from Azure on ' + when + (session.tenantId ? ' (tenant ' + session.tenantId + ')' : '') + ' by ' + (session.account.username || session.account.name || 'the signed-in user') + '.',
           settings: AISBP.Model.sanitizeSettings(app.config.defaults || {}),
-          includeOther: includeOther.checked
+          includeOther: includeOther.checked,
+          includeSupporting: includeSupporting.checked
         });
         const warnings = inventory.warnings.concat(result.warnings);
         if (closed) return undefined;

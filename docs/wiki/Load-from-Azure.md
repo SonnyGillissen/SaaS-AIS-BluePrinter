@@ -63,6 +63,9 @@ Administrators can preconfigure the client id and tenant for everyone in
    - **Include other resource types**: resources without a dedicated type in the
      [resource catalog](Resource-Catalog.md) are drawn as **Other Azure Resource** (with their
      resource type). Uncheck to leave them out.
+   - **Include supporting resources**: network interfaces, network watchers (and flow logs),
+     private DNS zone virtual network links, deployment slots, VM extensions and smart detector
+     alert rules are drawn as **Other Azure Resource**. Uncheck for a less busy diagram.
 6. Click **Load into diagram**. The environment opens as a **new blueprint**; your current
    blueprint is saved first and stays available under **Open**.
 
@@ -79,13 +82,21 @@ You stay signed in while the browser tab is open. **Sign out** in the dialog for
 | Relations | Connections, e.g. *hosted on* (App Service plan), *private link* (private endpoint › resource), *peering*, *API connection*, *identity* (user-assigned managed identity), *logs* (Application Insights › workspace), *runs in* (Container Apps environment), *events* and *delivers* (Event Grid), *forwards* (Service Bus auto-forwarding), *backend* (API Management › app) and *monitors* (alert rules) |
 
 Every object keeps its Azure **Resource ID** as a custom attribute, and is named with its real
-name (*custom name* mode, so naming conventions do not rename it). Network interfaces,
-network watchers, VM extensions, deployment slots and similar plumbing are left out to keep the
-diagram readable. Everything is arranged automatically; use **Tidy up**, drag objects, hide
+name (*custom name* mode, so naming conventions do not rename it). Everything is arranged automatically; use **Tidy up**, drag objects, hide
 attributes or change the [display style](Diagram-Styles.md) as with any blueprint.
 
-Warnings (for example resources that could not be read because of missing permissions) are
-listed in the browser console.
+Resources are read from Azure Resource Graph (with all properties) and cross-checked with the
+Azure Resource Manager list of every selected resource group, so resources that Resource Graph
+does not show (yet) are still drawn, without their properties.
+
+After loading, the summary shows how many resources were drawn of how many were found. Any notes
+are listed too, and are also written to the browser console. Notes cover:
+
+- resources that were left out, per resource type, with the reason (an option was unchecked,
+  their resource group was not loaded, or they are hidden system resources such as the SQL
+  `master` database),
+- resource or child resource lists that could not be read (usually missing permissions), and
+- child lists that the resource does not offer (for example a stopped app).
 
 ## Troubleshooting
 
@@ -96,7 +107,8 @@ listed in the browser console.
 | `AADSTS9002326` | The redirect URI is registered under the *Web* platform; register it under **Single-page application**. |
 | `AADSTS65001` (consent) | Grant consent for the **Azure Service Management › user_impersonation** permission, or ask an administrator. |
 | No subscriptions | Check that you selected the right tenant and have at least Reader access. |
-| Few connections or details | Azure Resource Graph was not available; resources were then read without their properties. Check the console warnings. |
+| Resources are missing | Check the notes in the summary after loading. Make sure **Include other resource types** and **Include supporting resources** are checked, and that you have Reader access to the resources (child resources such as workflows or queues need it on the parent). |
+| Few connections or details | Azure Resource Graph was not available; resources were then read without their properties. Check the notes in the summary after loading. |
 
 ## Privacy
 

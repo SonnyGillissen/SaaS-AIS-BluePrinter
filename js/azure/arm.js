@@ -36,11 +36,22 @@
     const base = opts.baseUrl || ARM;
     if (!fetchFn) throw new Error('fetch is not available.');
 
-    /** Absolute URL; the token is only ever sent to the Resource Manager endpoint. */
+    const baseUrl = new URL(base);
+    /**
+     * Absolute URL; the token is only ever sent to the Resource Manager endpoint. `nextLink`s
+     * are absolute and some providers include the default port (`management.azure.com:443`)
+     * or use another host casing, so compare the parsed origin.
+     */
     function absolute(url) {
       const u = String(url || '');
       if (u.charAt(0) === '/' && u.charAt(1) !== '/') return base + u;
-      if (u.indexOf(base + '/') === 0) return u;
+      let parsed = null;
+      try {
+        parsed = new URL(u);
+      } catch (e) {
+        parsed = null;
+      }
+      if (parsed && parsed.protocol === baseUrl.protocol && parsed.host === baseUrl.host && !parsed.username && !parsed.password) return parsed.href;
       throw new Error('Refusing to call a URL outside Azure Resource Manager: ' + u.slice(0, 80));
     }
 
@@ -222,46 +233,68 @@
       if (!only) return { sub: s.subscriptionId, where: 'subscriptionId =~ ' + kql(s.subscriptionId) };
       return { sub: s.subscriptionId, where: '(subscriptionId =~ ' + kql(s.subscriptionId) + ' and resourceGroup in~ (' + only.map(kql).join(', ') + '))' };
     });
+    const known = new Set();
+    const addResource = (r) => {
+      const key = lower(r && r.id);
+      if (!key || known.has(key)) return false;
+      known.add(key);
+      inventory.resources.push(r);
+      return true;
+    };
+    let graphOk = true;
     try {
       for (let i = 0; i < clauses.length; i += 50) {
         const chunk = clauses.slice(i, i + 50);
         const query = 'resources | where ' + chunk.map((c) => c.where).join(' or ') +
           ' | project id, name, type, kind, location, resourceGroup, subscriptionId, tags, sku, identity, zones, properties';
         const rows = await client.graph(query, chunk.map((c) => c.sub));
-        rows.forEach((r) => inventory.resources.push(r));
+        rows.forEach(addResource);
         o.onProgress('Reading resources\u2026 ' + inventory.resources.length);
       }
     } catch (e) {
-      // Fallback without properties (fewer details and connections).
-      warnings.push('Azure Resource Graph is not available (' + e.message + '); resources were loaded without their properties.');
-      inventory.resources = [];
-      await pool(inventory.resourceGroups, o.concurrency, async (g) => {
-        try {
-          const items = await client.list('/subscriptions/' + encodeURIComponent(g.subscriptionId) + '/resourceGroups/' + encodeURIComponent(g.name) + '/resources?api-version=2021-04-01');
-          items.forEach((r) => inventory.resources.push(r));
-        } catch (err) {
-          warnings.push('Resources of "' + g.name + '": ' + err.message);
-        }
-      });
+      graphOk = false;
+      warnings.push('Azure Resource Graph is not available (' + e.message + '); resources were loaded without their properties, so there are fewer details and connections.');
     }
+
+    // Completeness check: the Resource Manager list of every resource group. Resource Graph can
+    // lag behind recent changes and does not index every type; anything it missed is added
+    // (without properties).
+    o.onProgress('Checking the resource lists of ' + inventory.resourceGroups.length + ' resource group(s)\u2026');
+    let fromArm = 0;
+    let checked = 0;
+    await pool(inventory.resourceGroups, o.concurrency, async (g) => {
+      try {
+        const items = await client.list('/subscriptions/' + encodeURIComponent(g.subscriptionId) + '/resourceGroups/' + encodeURIComponent(g.name) + '/resources?api-version=2021-04-01');
+        items.forEach((r) => { if (addResource(r)) fromArm++; });
+      } catch (err) {
+        warnings.push('Resources of resource group "' + g.name + '" could not be listed: ' + err.message);
+      } finally {
+        checked++;
+        if (checked % 5 === 0) o.onProgress('Checking resource lists\u2026 ' + checked + '/' + inventory.resourceGroups.length);
+      }
+    });
+    if (graphOk && fromArm) warnings.push(fromArm + ' resource(s) were not (yet) in Azure Resource Graph; they were added from Azure Resource Manager without their properties.');
 
     // Child resources (workflows, functions, queues, topics, APIs, containers, ...).
     if (o.includeChildren) {
       const jobs = [];
       inventory.resources.forEach((r) => {
-        if (Azure.isSkipped(r)) return;
+        if (Azure.isSkipped(r) || Azure.isSupporting(r)) return;
         Azure.childSpecs(Azure.mapType(r)).forEach((spec) => jobs.push({ parent: r, spec }));
       });
       let done = 0;
-      let failed = 0;
+      const failed = [];
+      const unavailable = [];
+      const what = (parent, spec) => leaf(parent.name) + spec.path.replace(/^\/providers\/[^/]+/, '').replace(/\/(blob|queue|table|file)Services\/default/, '');
       const run = async (job) => {
         const { parent, spec } = job;
         let items;
         try {
           items = await client.list(String(parent.id).split('/').map((s) => encodeURIComponent(s)).join('/') + spec.path + '?api-version=' + spec.api);
         } catch (e) {
-          // Some services (or a stopped app) do not support a child collection; that is fine.
-          if (e.status !== 404 && e.status !== 400 && e.status !== 409) failed++;
+          // Some services, tiers or stopped apps do not offer a child collection (400/404/409);
+          // other errors are usually missing permissions. Both are reported.
+          (e.status === 404 || e.status === 400 || e.status === 409 ? unavailable : failed).push(what(parent, spec) + ' (' + e.message + ')');
           return;
         } finally {
           done++;
@@ -289,7 +322,9 @@
         start = jobs.length;
         await pool(batch, o.concurrency, run);
       }
-      if (failed) warnings.push(failed + ' child resource list(s) could not be read (missing permissions?).');
+      const list = (items) => items.slice(0, 20).join('; ') + (items.length > 20 ? '; and ' + (items.length - 20) + ' more' : '');
+      if (failed.length) warnings.push(failed.length + ' child resource list(s) could not be read (missing permissions?): ' + list(failed));
+      if (unavailable.length) warnings.push(unavailable.length + ' child resource list(s) are not available for these resources (for example a stopped app or an unsupported tier): ' + list(unavailable));
     }
     return inventory;
   }

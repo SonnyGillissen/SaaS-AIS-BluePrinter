@@ -34,7 +34,9 @@ test('Azure resource types map to catalog types (including kinds)', () => {
   assert.equal(Azure.mapType({ type: 'Microsoft.Web/sites', kind: 'app' }), 'app-service');
   assert.equal(Azure.mapType({ type: 'Microsoft.CognitiveServices/accounts', kind: 'OpenAI' }), 'azure-openai');
   assert.equal(Azure.mapType({ type: 'Microsoft.Contoso/widgets' }), null);
-  assert.ok(Azure.isSkipped({ type: 'Microsoft.Network/networkInterfaces' }));
+  assert.ok(Azure.isSupporting({ type: 'Microsoft.Network/networkInterfaces' }));
+  assert.ok(!Azure.isSkipped({ type: 'Microsoft.Network/networkInterfaces' }));
+  assert.ok(Azure.isSkipped({ type: 'Microsoft.Sql/servers/databases', name: 'sql1/master' }));
   Object.keys(Azure.TYPE_MAP).forEach((k) => assert.ok(Catalog.get(Azure.TYPE_MAP[k]), 'unknown catalog type for ' + k));
   Object.keys(Azure.CHILD_SPECS).forEach((k) => {
     assert.ok(Catalog.get(k), k);
@@ -136,11 +138,14 @@ test('buildProject draws the hierarchy, resources, children, network and connect
   assert.ok(linked(pe, sb), 'private endpoint to namespace');
   assert.ok(linked(byName(project, 'orders'), byName(project, 'archive')), 'forwardTo');
 
-  // NICs are skipped, unknown types become generic resources.
-  assert.equal(byName(project, 'pe-sb.nic'), undefined);
+  // Supporting resources (NICs) and unknown types are drawn as generic resources: nothing is lost.
+  assert.equal(byName(project, 'pe-sb.nic').type, 'azure-resource');
   const w = byName(project, 'w1');
   assert.equal(w.type, 'azure-resource');
-  assert.equal(stats.generic, 1);
+  assert.equal(stats.generic, 2);
+  assert.equal(stats.resources, 10);
+  assert.equal(stats.drawn, 10);
+  assert.deepEqual(stats.skipped, {});
   assert.equal(stats.connections, all.length);
 
   // Everything is laid out and valid.
@@ -149,10 +154,39 @@ test('buildProject draws the hierarchy, resources, children, network and connect
 });
 
 test('buildProject can leave out resource types without a dedicated catalog type', () => {
-  const { project, stats } = Azure.buildProject(inventory(), { includeOther: false });
+  const { project, stats, warnings } = Azure.buildProject(inventory(), { includeOther: false, includeSupporting: false });
   assert.equal(byName(project, 'w1'), undefined);
+  assert.equal(byName(project, 'pe-sb.nic'), undefined);
   assert.equal(stats.generic, 0);
-  assert.equal(stats.skipped['microsoft.contoso/widgets'], 1);
+  assert.equal(stats.drawn, stats.resources - 2);
+  assert.equal(stats.skipped['other|microsoft.contoso/widgets'], 1);
+  assert.equal(stats.skipped['supporting|microsoft.network/networkinterfaces'], 1);
+  // Every left-out type is explained.
+  assert.ok(warnings.some((w) => /Left out 1 .*microsoft\.contoso\/widgets/.test(w)));
+  assert.ok(warnings.some((w) => /Left out 1 .*microsoft\.network\/networkinterfaces.*supporting/.test(w)));  // The options are independent: supporting resources are drawn while other types are left out.
+  const only = Azure.buildProject(inventory(), { includeOther: false });
+  assert.equal(byName(only.project, 'pe-sb.nic').type, 'azure-resource');
+  assert.equal(byName(only.project, 'w1'), undefined);
+});
+
+test('buildProject draws supporting resources and reports hidden or orphaned ones', () => {
+  const inv = inventory();
+  const sql = RG + '/providers/Microsoft.Sql/servers/sql1';
+  inv.resources.push(
+    { id: sql, name: 'sql1', type: 'Microsoft.Sql/servers' },
+    { id: sql + '/databases/master', name: 'sql1/master', type: 'Microsoft.Sql/servers/databases', _parent: sql },
+    { id: RG + '/providers/Microsoft.Network/networkWatchers/nw', name: 'nw', type: 'Microsoft.Network/networkWatchers' },
+    { id: RG + '/providers/Microsoft.Web/sites/la-orders/slots/staging', name: 'la-orders/staging', type: 'Microsoft.Web/sites/slots' },
+    { id: '/subscriptions/' + SUB + '/resourceGroups/rg-gone/providers/Microsoft.Logic/workflows/x', name: 'x', type: 'Microsoft.Logic/workflows' }
+  );
+  const { project, stats, warnings } = Azure.buildProject(inv, {});
+  assert.equal(byName(project, 'nw').type, 'azure-resource');
+  assert.equal(byName(project, 'staging').parentId, byName(project, 'rg-int').id);
+  assert.equal(byName(project, 'master'), undefined);
+  assert.equal(stats.skipped['hidden|microsoft.sql/servers/databases'], 1);
+  assert.equal(stats.skipped['noGroup|microsoft.logic/workflows'], 1);
+  assert.equal(stats.drawn, stats.resources - 2);
+  assert.ok(warnings.some((w) => /resource group was not loaded/.test(w)));
 });
 
 test('buildProject handles large environments', () => {
@@ -237,7 +271,9 @@ test('loadInventory reads resource groups, resources (Resource Graph) and child 
       assert.match(body.query, /resourceGroup in~ \('rg-int'\)/);
       return { json: { data: [{ id: site, name: 'la-orders', type: 'Microsoft.Web/sites', kind: 'functionapp,workflowapp', resourceGroup: 'rg-int', subscriptionId: SUB, properties: {} }] } };
     }],
-    ['GET', site + '/workflows?', () => ({ json: { value: [{ id: site + '/workflows/wf1', name: 'la-orders/wf1', type: 'Microsoft.Web/sites/workflows' }] } })]
+    ['GET', site + '/workflows?', () => ({ json: { value: [{ id: site + '/workflows/wf1', name: 'la-orders/wf1', type: 'Microsoft.Web/sites/workflows' }] } })],
+    // Same resource as Resource Graph, with another id casing.
+    ['GET', '/resourceGroups/rg-int/resources?', () => ({ json: { value: [{ id: site.toLowerCase(), name: 'la-orders', type: 'Microsoft.Web/sites' }] } })]
   ];
   const client = AzureArm.createClient({ getToken: () => 't', fetch: fakeFetch(routes, log) });
   const t = tree();
@@ -266,6 +302,32 @@ test('loadInventory falls back to the resources API when Resource Graph fails', 
   assert.deepEqual(inv.resources.map((r) => r.name), ['la1']);
   assert.equal(inv.warnings.length, 1);
   assert.match(inv.warnings[0], /Resource Graph/);
+});
+
+test('loadInventory adds resources missing from Resource Graph and reports unreadable child lists', async () => {
+  const log = [];
+  const site = RG + '/providers/Microsoft.Web/sites/la-orders';
+  const sb = RG + '/providers/Microsoft.ServiceBus/namespaces/sb-int';
+  const routes = [
+    ['GET', '/resourcegroups?api-version', () => ({ json: { value: [{ id: RG, name: 'rg-int' }] } })],
+    ['POST', 'Microsoft.ResourceGraph/resources', () => ({ json: { data: [{ id: site, name: 'la-orders', type: 'Microsoft.Web/sites', kind: 'functionapp,workflowapp', properties: {} }] } })],
+    ['GET', '/resourceGroups/rg-int/resources?', () => ({ json: {
+      value: [{ id: site, name: 'la-orders', type: 'Microsoft.Web/sites' }],
+      // nextLinks may carry the default port and another host casing.
+      nextLink: 'https://Management.Azure.com:443/subscriptions/' + SUB + '/resourceGroups/rg-int/resources?api-version=2021-04-01&$skiptoken=p2'
+    } })],
+    ['GET', '$skiptoken=p2', () => ({ json: { value: [{ id: sb, name: 'sb-int', type: 'Microsoft.ServiceBus/namespaces' }] } })],
+    ['GET', site + '/workflows?', () => ({ status: 403, json: { error: { code: 'AuthorizationFailed', message: 'denied' } } })]
+  ].reverse();
+  const client = AzureArm.createClient({ getToken: () => 't', fetch: fakeFetch(routes, log), maxRetries: 0 });
+  const t = tree();
+  const inv = await AzureArm.loadInventory(client, t, Azure.resolveSelection(t, [KEY.sub(SUB)]), {});
+  assert.deepEqual(inv.resources.filter((r) => !r._parent).map((r) => r.name), ['la-orders', 'sb-int']);
+  assert.ok(inv.warnings.some((w) => /^1 resource\(s\) were not \(yet\) in Azure Resource Graph/.test(w)));
+  assert.ok(inv.warnings.some((w) => /could not be read .*la-orders\/workflows/.test(w)));
+  // Queues/topics of the namespace are not offered by this fake: reported as unavailable, not silently ignored.
+  assert.ok(inv.warnings.some((w) => /not available .*sb-int\/queues/.test(w)));
+  assert.ok(log.some((l) => l.url.indexOf('$skiptoken=p2') !== -1));
 });
 
 test('Resource Graph string literals are escaped', () => {
