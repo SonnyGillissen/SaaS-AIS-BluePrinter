@@ -31,7 +31,11 @@ architectures. Click your environment together, and get an architecture diagram 
   tree, Ctrl+C/V (also between tabs), duplicate, undo/redo.
 - **Configuration package**: export and import the complete setup as an open JSON document.
 - **Exports**: PNG, PDF, SVG, **draw.io** (editable, with containers and shape data) and
-  **ArchiMate** (Open Group exchange format, validated against the official XSD).
+  **ArchiMate** (Open Group exchange format, validated against the official XSD). By default,
+  each includes the complete configuration package so **Import** can restore the blueprint,
+  even from PNG or PDF. The export popup lets you disable embedding for sharing without hidden
+  data and choose a custom or transparent background where supported. `js/config.js` sets the
+  embedding default.
 - **Runs anywhere**: open `index.html` from disk, or host the static files anywhere (GitHub Pages,
   Azure Static Web Apps, IIS, Apache, nginx). Vanilla HTML/CSS/JS, **zero dependencies, no build
   step**.

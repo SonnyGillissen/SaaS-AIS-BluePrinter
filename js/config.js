@@ -23,5 +23,13 @@ window.AISBP_CONFIG = {
    *   diagram: { style: 'classic' },
    *   icons: { baseUrl: 'icons/msicons/' } }   // self-hosted icon mirror, see tools/mirror-icons.js
    */
-  defaults: {}
+  defaults: {},
+
+  /**
+   * Default for the export popup's embedded-blueprint checkbox; users can override per file.
+   * Set to false to default to sharing without hidden data (JSON remains a full package).
+   */
+  exports: {
+    embedDiagram: true
+  }
 };

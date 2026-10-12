@@ -119,7 +119,8 @@ connection to set its:
   to the originals.
 - Drag-and-drop is supported everywhere: palette › canvas, palette › explorer, canvas › canvas
   (move or re-parent), explorer › explorer (re-parent). You can also drop a configuration package
-  file (`.json`) on the canvas to import it.
+  file (`.json`) or an exported PNG, PDF, SVG, draw.io or ArchiMate file with an embedded
+  blueprint on the canvas to import it.
 
 ## Keyboard shortcuts
 

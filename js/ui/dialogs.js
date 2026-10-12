@@ -51,6 +51,60 @@
     return cb;
   }
 
+  function openExportOptions(format, project) {
+    return new Promise((resolve) => {
+      let result = null;
+      const embed = h('input', { type: 'checkbox', checked: AISBP.Embedded.enabled() });
+      const body = h('div', {},
+        field('Embed complete blueprint', embed, { check: true }),
+        h('p', { class: 'note', text: 'Warning: embedding includes the complete blueprint, including hidden resources, attributes, tags, settings and other data not visible in the diagram. Only share it with trusted recipients. Uncheck to export without this hidden data.' }));
+      let mode;
+      let color;
+      if (['svg', 'png', 'pdf', 'drawio'].includes(format)) {
+        const modes = [{ value: 'style', label: 'Style default' }, { value: 'custom', label: 'Custom solid color' }];
+        if (format !== 'pdf') modes.push({ value: 'transparent', label: 'Transparent' });
+        const initialColor = AISBP.Render.style(project.settings.diagram.style).background;
+        const picker = h('input', { type: 'color', value: initialColor, oninput: () => { color.value = picker.value; } });
+        color = h('input', {
+          type: 'text', value: initialColor, placeholder: '#RRGGBB', pattern: '#[0-9a-fA-F]{6}', maxlength: 7, spellcheck: 'false',
+          oninput: () => { if (/^#[0-9a-fA-F]{6}$/.test(color.value)) picker.value = color.value.toLowerCase(); }
+        });
+        const colorField = h('div', {}, h('div', { class: 'grid-2' }, field('Choose background color', picker), field('Background color (#RRGGBB)', color)));
+        colorField.hidden = true;
+        color.disabled = picker.disabled = true;
+        mode = select(modes, 'style', { onchange: () => {
+          colorField.hidden = mode.value !== 'custom';
+          color.disabled = picker.disabled = mode.value !== 'custom';
+        } });
+        body.appendChild(field('Background', mode));
+        body.appendChild(colorField);
+        if (format === 'pdf') body.appendChild(h('p', { class: 'note', text: 'PDF uses an opaque JPEG image and does not support transparency. The selected background also fills the page margins.' }));
+      }
+      modal({
+        title: 'Export ' + (format === 'archimate' ? 'ArchiMate' : format === 'drawio' ? 'draw.io' : format.toUpperCase()),
+        small: true,
+        body,
+        buttons: [
+          { label: 'Cancel' },
+          { label: 'Export', primary: true, action: () => {
+            const opts = { embedDiagram: embed.checked };
+            if (mode && mode.value !== 'style') {
+              try {
+                opts.background = AISBP.Render.background(mode.value === 'transparent' ? 'transparent' : color.value, undefined, format !== 'pdf');
+              } catch (e) {
+                toast(e.message, 'error');
+                color.focus();
+                return false;
+              }
+            }
+            result = opts;
+          } }
+        ],
+        onClose: () => resolve(result)
+      });
+    });
+  }
+
   // ---------------------------------------------------------------------------
   // Options
   // ---------------------------------------------------------------------------
@@ -436,5 +490,5 @@
     });
   }
 
-  AISBP.Dialogs = { openOptions, openProjects, openHelp };
+  AISBP.Dialogs = { openOptions, openProjects, openHelp, openExportOptions };
 })(typeof globalThis !== 'undefined' ? globalThis : this);

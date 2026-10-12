@@ -25,7 +25,7 @@
       <div class="group">
         <button type="button" data-action="new" title="New blueprint">New</button>
         <button type="button" data-action="projects" title="Open a saved blueprint">Open</button>
-        <button type="button" data-action="import" title="Import a configuration package (.json)">Import</button>
+        <button type="button" data-action="import" title="Import a configuration package or an export with an embedded blueprint">Import</button>
         <div class="menu">
           <button type="button" data-action="export-menu" aria-haspopup="true" aria-expanded="false" title="Export">Export &#9662;</button>
           <div class="menu-list" role="menu" hidden>
@@ -118,7 +118,7 @@
     <a href="docs/wiki/Home.md" target="_blank" rel="noopener">Documentation</a>
   </footer>
 
-  <input id="file-input" type="file" accept=".json,application/json" hidden>
+  <input id="file-input" type="file" accept=".json,.png,.pdf,.svg,.drawio,.xml,application/json,image/png,application/pdf,image/svg+xml,application/xml" hidden>
   <div id="toasts" class="toasts" role="status" aria-live="polite"></div>
 
   <!-- Configuration (edit for hosted deployments) -->
@@ -136,6 +136,7 @@
   <script src="js/render/svg.js"></script>
   <script src="js/render/icons.js"></script>
   <script src="js/export/package.js"></script>
+  <script src="js/export/embedded.js"></script>
   <script src="js/export/drawio.js"></script>
   <script src="js/export/archimate.js"></script>
   <script src="js/export/raster.js"></script>
