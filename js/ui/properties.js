@@ -56,7 +56,8 @@
         'aria-pressed': shown ? 'true' : 'false',
         'aria-label': (shown ? 'Shown' : 'Hidden') + ' on diagram',
         title: (shown ? 'Shown on the diagram' : 'Hidden on the diagram') + (explicit ? ' (set for this object)' : ' (default for this type)') + '\nClick to toggle. Applies to the "Selected attributes" detail level.',
-        text: shown ? '\u{1F441}' : '\u2014',
+        'data-icon': shown ? 'eye' : 'eye-off',
+        'data-icon-only': true,
         onclick: () => {
           const display = {};
           display[key] = !shown;
@@ -289,7 +290,7 @@
       out.push(h('h3', { text: 'Name' }), namingSection(node, def, derived));
       out.push(h('h3', { text: 'Placement' }), placementSection(node, def));
       out.push(h('h3', {}, h('span', { text: 'Attributes' }), h('button', {
-        type: 'button', class: 'btn small', text: 'Reset display', title: 'Reset the diagram display choices of this object to the type defaults',
+        type: 'button', class: 'btn small', text: 'Reset display', 'data-icon': 'reset', title: 'Reset the diagram display choices of this object to the type defaults',
         onclick: () => store.change('reset display', (p) => { p.nodes[node.id].display = {}; })
       })));
       if (level !== 'selected') out.push(h('p', { class: 'note', text: 'The detail level is "' + Layout.DETAIL_LEVELS.find((d) => d.id === level).label + '". The \u{1F441} toggles apply to the "Selected attributes" level.' }));
@@ -299,10 +300,10 @@
       out.push(h('h3', { text: 'Tags (' + (node.tags || []).length + ')' }), tagSection(node));
       out.push(h('h3', { text: 'Connections' }), nodeConnections(node, derived));
       out.push(h('h3', { text: 'Actions' }), h('div', { class: 'inline' },
-        h('button', { type: 'button', class: 'btn', text: 'Duplicate', onclick: () => app.actions.duplicate() }),
-        h('button', { type: 'button', class: 'btn', text: 'Copy', onclick: () => app.actions.copy() }),
-        def.container || Model.children(store.project, node.id).length ? h('button', { type: 'button', class: 'btn', text: 'Tidy contents', onclick: () => app.actions.tidy(node.id) }) : null,
-        h('button', { type: 'button', class: 'btn danger', text: 'Delete', onclick: () => app.actions.remove() })));
+        h('button', { type: 'button', class: 'btn', text: 'Duplicate', 'data-icon': 'copy', onclick: () => app.actions.duplicate() }),
+        h('button', { type: 'button', class: 'btn', text: 'Copy', 'data-icon': 'copy', onclick: () => app.actions.copy() }),
+        def.container || Model.children(store.project, node.id).length ? h('button', { type: 'button', class: 'btn', text: 'Tidy contents', 'data-icon': 'tidy', onclick: () => app.actions.tidy(node.id) }) : null,
+        h('button', { type: 'button', class: 'btn danger', text: 'Delete', 'data-icon': 'delete', onclick: () => app.actions.remove() })));
       return out;
     }
 
@@ -326,20 +327,20 @@
           option('theme', 'Theme', Annotations.THEMES), option('align', 'Text alignment', Annotations.ALIGN),
           numeric('fontSize', 'Font size', 8, 48), numeric('padding', 'Padding', 0, 40),
           h('p', { class: 'subtitle', text: 'Drag the bottom-right handle to resize. Height always grows to fit content.' }),
-          h('button', { type: 'button', class: 'btn small', text: 'Reset size', onclick: () => store.change('reset annotation size', (p) => { delete p.nodes[node.id].w; delete p.nodes[node.id].h; }) }));
+          h('button', { type: 'button', class: 'btn small', text: 'Reset size', 'data-icon': 'reset', onclick: () => store.change('reset annotation size', (p) => { delete p.nodes[node.id].w; delete p.nodes[node.id].h; }) }));
         out.push(h('h3', { text: 'Content' }), field(node.type === 'annotation-markdown' ? 'Markdown' : 'Text',
           textArea('prop-annotation-content', a.content, (v) => set('content', v))),
-          h('button', { id: 'prop-edit-annotation', type: 'button', class: 'btn', text: 'Edit on canvas', onclick: () => { app.canvas.centerOn(node.id); AISBP.AnnotationEditor.open(app, node.id); } }));
+          h('button', { id: 'prop-edit-annotation', type: 'button', class: 'btn', text: 'Edit on canvas', 'data-icon': 'edit', onclick: () => { app.canvas.centerOn(node.id); AISBP.AnnotationEditor.open(app, node.id); } }));
         if (node.type === 'annotation-markdown') out.push(h('p', { class: 'subtitle', text: 'Headings, bold, italic, code, lists and quotes. Links render as text; HTML and images are not rendered.' }));
       } else {
         out.push(h('h3', { text: 'Table' }),
           h('p', { class: 'subtitle', text: 'Edit cells, rows, columns and appearance in the table editor. You can also double-click the table on the canvas.' }),
-          h('button', { id: 'prop-edit-annotation', type: 'button', class: 'btn', text: 'Edit Table', onclick: () => AISBP.AnnotationEditor.open(app, node.id) }));
+          h('button', { id: 'prop-edit-annotation', type: 'button', class: 'btn', text: 'Edit Table', 'data-icon': 'edit', onclick: () => AISBP.AnnotationEditor.open(app, node.id) }));
       }
       out.push(h('h3', { text: 'Actions' }), h('div', { class: 'inline' },
-        h('button', { type: 'button', class: 'btn', text: 'Duplicate', onclick: () => app.actions.duplicate() }),
-        h('button', { type: 'button', class: 'btn', text: 'Copy', onclick: () => app.actions.copy() }),
-        h('button', { type: 'button', class: 'btn danger', text: 'Delete', onclick: () => app.actions.remove() })));
+        h('button', { type: 'button', class: 'btn', text: 'Duplicate', 'data-icon': 'copy', onclick: () => app.actions.duplicate() }),
+        h('button', { type: 'button', class: 'btn', text: 'Copy', 'data-icon': 'copy', onclick: () => app.actions.copy() }),
+        h('button', { type: 'button', class: 'btn danger', text: 'Delete', 'data-icon': 'delete', onclick: () => app.actions.remove() })));
       return out;
     }
 
@@ -357,10 +358,10 @@
       out.push(field('Description', textArea('prop-conn-desc', c.attributes && c.attributes.description, (v) => patchConn(c.id, { attributes: { description: v } }, c.id + ':desc'))));
       out.push(h('p', { class: 'subtitle', text: 'Drag round points to adjust the route, or square endpoints to anchor them on their node border. Editing locks both endpoints. Double-click a routing point to remove it.' }));
       out.push(h('div', { class: 'inline' },
-        h('button', { type: 'button', class: 'btn', text: 'Reset route', disabled: !(c.waypoints && c.waypoints.length), onclick: () => patchConn(c.id, { waypoints: [] }) }),
-        h('button', { type: 'button', class: 'btn', text: 'Reset anchors', disabled: !(c.sourceAnchor || c.targetAnchor), onclick: () => patchConn(c.id, { sourceAnchor: null, targetAnchor: null }) }),
-        h('button', { type: 'button', class: 'btn', text: 'Reverse direction', onclick: () => store.change('reverse', (p) => Model.reverseConnection(p, c.id)) }),
-        h('button', { type: 'button', class: 'btn danger', text: 'Delete', onclick: () => app.actions.remove() })));
+        h('button', { type: 'button', class: 'btn', text: 'Reset route', 'data-icon': 'reset', disabled: !(c.waypoints && c.waypoints.length), onclick: () => patchConn(c.id, { waypoints: [] }) }),
+        h('button', { type: 'button', class: 'btn', text: 'Reset anchors', 'data-icon': 'reset', disabled: !(c.sourceAnchor || c.targetAnchor), onclick: () => patchConn(c.id, { sourceAnchor: null, targetAnchor: null }) }),
+        h('button', { type: 'button', class: 'btn', text: 'Reverse direction', 'data-icon': 'reverse', onclick: () => store.change('reverse', (p) => Model.reverseConnection(p, c.id)) }),
+        h('button', { type: 'button', class: 'btn danger', text: 'Delete', 'data-icon': 'delete', onclick: () => app.actions.remove() })));
       return out;
     }
 
@@ -372,7 +373,7 @@
       return [h('h3', { text: 'Tag the selection' }),
         h('datalist', { id: 'prop-multi-tag-keys' }, keys.map((k) => h('option', { value: k }))),
         h('div', { class: 'custom-row' }, key, val, h('span'), h('button', {
-          type: 'button', class: 'btn small', text: 'Apply',
+          type: 'button', class: 'btn small', text: 'Apply', 'data-icon': 'check',
           onclick: () => {
             const k = key.value.trim();
             if (!k || Tags.INVALID_KEY.test(k)) return AISBP.Dom.toast(k ? 'Tag names cannot contain < > % & \\ ? /' : 'Enter a tag name.', 'error');
@@ -391,9 +392,9 @@
         h('p', { class: 'subtitle', text: n + ' object(s), ' + c + ' connection(s)' }),
         n ? multiTag() : null,
         h('div', { class: 'inline' },
-          h('button', { type: 'button', class: 'btn', text: 'Duplicate', onclick: () => app.actions.duplicate() }),
-          h('button', { type: 'button', class: 'btn', text: 'Copy', onclick: () => app.actions.copy() }),
-          h('button', { type: 'button', class: 'btn danger', text: 'Delete', onclick: () => app.actions.remove() }))
+          h('button', { type: 'button', class: 'btn', text: 'Duplicate', 'data-icon': 'copy', onclick: () => app.actions.duplicate() }),
+          h('button', { type: 'button', class: 'btn', text: 'Copy', 'data-icon': 'copy', onclick: () => app.actions.copy() }),
+          h('button', { type: 'button', class: 'btn danger', text: 'Delete', 'data-icon': 'delete', onclick: () => app.actions.remove() }))
       ];
     }
 

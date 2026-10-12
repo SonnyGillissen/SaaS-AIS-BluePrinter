@@ -25,6 +25,31 @@ async function browserChecks() {
     if (!condition) throw new Error(label);
     results.push(label);
   };
+  const actionButtons = Array.from(doc.querySelectorAll('button[data-icon]'));
+  check(actionButtons.length >= 20 && actionButtons.every((button) => button.querySelectorAll('.action-icon').length === 1), 'Static toolbar and export actions have one local SVG icon each');
+  check(actionButtons.every((button) => {
+    const svg = button.querySelector('.action-icon');
+    return svg.namespaceURI === 'http://www.w3.org/2000/svg' && svg.getAttribute('aria-hidden') === 'true' && svg.getAttribute('focusable') === 'false' && (button.textContent.trim() || button.getAttribute('aria-label'));
+  }), 'Action icons are decorative and all controls retain accessible labels');
+  const copyButton = doc.querySelector('[data-action="copy"]');
+  A.Dom.decorateAction(copyButton);
+  check(copyButton.textContent === 'Copy' && copyButton.querySelectorAll('.action-icon').length === 1, 'Decoration is idempotent and preserves button text');
+  const dynamicButton = A.Dom.h('button', { text: '<unsafe>', 'data-icon': 'save', disabled: true });
+  check(dynamicButton.textContent === '<unsafe>' && dynamicButton.disabled && !dynamicButton.querySelector('unsafe') && !!dynamicButton.querySelector('.action-icon'), 'Dynamic buttons preserve safe text and disabled state');
+  check(!A.Dom.h('button', { text: 'Unknown', 'data-icon': '__proto__' }).querySelector('svg'), 'Unknown icon names do not produce SVG markup');
+  const themeBefore = doc.documentElement.getAttribute('data-theme');
+  for (const theme of ['light', 'dark']) {
+    doc.documentElement.setAttribute('data-theme', theme);
+    const svg = copyButton.querySelector('.action-icon');
+    check(win.getComputedStyle(svg).stroke === win.getComputedStyle(copyButton).color && win.getComputedStyle(svg).pointerEvents === 'none' && svg.getBoundingClientRect().width === 16, 'Action icons inherit theme colour and do not intercept clicks: ' + theme);
+  }
+  if (themeBefore === null) doc.documentElement.removeAttribute('data-theme');
+  else doc.documentElement.setAttribute('data-theme', themeBefore);
+  doc.querySelector('[data-action="help"] .action-icon path').dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+  const helpDialog = doc.querySelector('dialog[open]');
+  check(!!helpDialog && !!helpDialog.querySelector('.dlg-head button .action-icon') && !!helpDialog.querySelector('.dlg-foot button .action-icon'), 'Clicking SVG content still invokes delegated actions; dialog close actions have icons');
+  helpDialog.querySelector('.dlg-head button').click();
+  check(!doc.querySelector('dialog[open]'), 'Icon-only dialog close remains functional');
   const annotationsBefore = A.Util.clone(A.app.store.project);
   const clickText = (text) => {
     const button = Array.from(doc.querySelectorAll('dialog[open] button, .annotation-inline-editor button, #panel-properties button')).find((b) => b.textContent === text);
@@ -55,6 +80,7 @@ async function browserChecks() {
   change('prop-annotation-theme', 'callout');
   A.app.canvas.render();
   check(!doc.getElementById('prop-name-mode') && !doc.getElementById('prop-label'), 'Annotation properties omit Azure naming fields');
+  check(Array.from(doc.querySelectorAll('#panel-properties button[data-icon]')).every((button) => !!button.querySelector('.action-icon')), 'Re-rendered Properties actions have icons');
   const annotation = doc.querySelector('#content [data-node-id="' + markdownId + '"]');
   check(annotation && annotation.querySelector('text') && !annotation.querySelector('textarea,input,foreignObject,script'), 'Markdown canvas is safe rendered SVG text, never an input');
   check(!!doc.querySelector('#overlay [data-handle="resize"][data-node-id="' + markdownId + '"]'), 'Annotations expose a canvas resize handle');

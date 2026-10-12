@@ -440,9 +440,9 @@
         const current = it.id === app.store.project.meta.id;
         list.appendChild(h('li', { class: current ? 'current' : '' },
           h('div', { class: 'meta' }, h('strong', { text: it.name || '(untitled)' }), h('small', { text: (current ? 'Open now \u2022 ' : '') + 'Modified ' + new Date(it.modified).toLocaleString() })),
-          h('button', { type: 'button', class: 'btn small', text: 'Open', disabled: current, onclick: async () => { await app.actions.open(it.id); dlg.close(); } }),
+          h('button', { type: 'button', class: 'btn small', text: 'Open', 'data-icon': 'open', disabled: current, onclick: async () => { await app.actions.open(it.id); dlg.close(); } }),
           h('button', {
-            type: 'button', class: 'btn small danger', text: 'Delete',
+            type: 'button', class: 'btn small danger', text: 'Delete', 'data-icon': 'delete',
             onclick: async () => {
               if (!(await confirm('Delete blueprint', 'Delete "' + (it.name || 'untitled') + '"? This cannot be undone.', 'Delete'))) return;
               await app.actions.deleteProject(it.id);
@@ -455,8 +455,8 @@
       title: 'Open blueprint',
       body,
       buttons: [
-        { label: 'New with sample', action: () => app.actions.newProject(true) },
-        { label: 'New blank blueprint', primary: true, action: () => app.actions.newProject(false) }
+        { label: 'New with sample', icon: 'diagram', action: () => app.actions.newProject(true) },
+        { label: 'New blank blueprint', icon: 'new', primary: true, action: () => app.actions.newProject(false) }
       ]
     });
     refresh();

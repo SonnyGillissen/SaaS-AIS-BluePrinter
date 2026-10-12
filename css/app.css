@@ -88,6 +88,17 @@ body {
 button, input, select, textarea { font: inherit; color: inherit; }
 input, select, textarea { background-color: var(--c-input); }
 
+.action-icon {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  margin-right: 6px;
+  vertical-align: -3px;
+  flex: none;
+  pointer-events: none;
+}
+[data-icon-only] .action-icon { margin-right: 0; }
+
 a { color: var(--c-primary); }
 
 .skip-link { position: absolute; left: -9999px; }
