@@ -492,6 +492,7 @@
     const result = { nodeIds: [], connectionIds: [], skipped: 0 };
     const payload = sanitizeClipboard(untrusted);
     if (!payload) return result;
+    const Naming = AISBP.Naming || (typeof require === 'function' ? require('./naming.js') : null);
     const dx = offset && Number.isFinite(offset.dx) ? offset.dx : 30;
     const dy = offset && Number.isFinite(offset.dy) ? offset.dy : 30;
     const idMap = {};
@@ -518,6 +519,7 @@
         w: src.w,
         h: src.h
       });
+      Naming.renumberCopy(project, node);
       if (Array.isArray(src.network) && src.network.length) pendingNetwork.push([node.id, src.network]);
       idMap[src.id] = node.id;
       result.nodeIds.push(node.id);

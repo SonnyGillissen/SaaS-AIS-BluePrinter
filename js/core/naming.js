@@ -212,6 +212,46 @@
     return name;
   }
 
+  /** Give a convention-based copy an unused number in its destination naming scope. */
+  function renumberCopy(project, node) {
+    const def = Catalog.get(node.type);
+    if (node.nameMode === 'custom' || !def || def.rule.scope === 'none') return;
+    const scope = scopeKey(project, node);
+    const used = new Set(Object.values(project.nodes)
+      .filter((n) => n.id !== node.id && n.type === node.type && scopeKey(project, n) === scope)
+      .map((n) => resolveName(project, n).toLowerCase()));
+    if (!used.has(resolveName(project, node).toLowerCase())) return;
+    const pattern = patternFor(project, node);
+    const tokens = tokensIn(pattern);
+    const token = tokens.includes('instance') ? 'instance' : tokens.includes('name') ? 'name' : null;
+    if (!token) return;
+    const value = tokenValue(project, node, token, 0);
+    const match = value.match(/^(.*?)(\d+)$/);
+    const base = token === 'instance' ? '' : match ? match[1] : value;
+    const start = token === 'instance' ? Number(value) : match ? Number(match[2]) : 1;
+    if (!Number.isSafeInteger(start) || start < 0) return;
+    const candidate = Object.assign({}, node, {
+      naming: { pattern: node.naming.pattern, tokens: Object.assign({}, node.naming.tokens) }
+    });
+    for (let i = 1; i <= used.size + 1; i++) {
+      if (!Number.isSafeInteger(start + i)) return;
+      const suffix = String(start + i).padStart(token === 'instance' ? value.length : match ? match[2].length : 0, '0');
+      let numbered = base + suffix;
+      if (token === 'name' && project.settings.naming.enforce !== false) {
+        const raw = sanitize(applyPattern(project, candidate, pattern, 0, { name: numbered }), Object.assign({}, def.rule, { max: 0 }));
+        const overflow = Math.max(0, raw.length - def.rule.max);
+        numbered = base.slice(0, Math.max(0, base.length - overflow)) + suffix;
+      }
+      if (token === 'name' && !candidate.naming.tokens.name) candidate.label = numbered;
+      else candidate.naming.tokens[token] = numbered;
+      if (!used.has(resolveName(project, candidate).toLowerCase())) {
+        node.label = candidate.label;
+        node.naming = candidate.naming;
+        return;
+      }
+    }
+  }
+
   /**
    * Validate a name against a rule. Returns a list of human readable problems.
    * @param {string} name
@@ -300,6 +340,7 @@
     applyPattern,
     sanitize,
     resolveName,
+    renumberCopy,
     validateName,
     validateProject,
     tokensIn
