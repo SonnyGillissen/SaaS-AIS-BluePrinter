@@ -46,6 +46,14 @@
   function decorateAction(el) {
     const name = el.getAttribute('data-icon');
     if (!Object.prototype.hasOwnProperty.call(ACTION_PATHS, name) || el.querySelector('.action-icon')) return el;
+    const text = el.textContent.trim();
+    if (text && !el.hasAttribute('data-icon-only')) {
+      const label = doc.createElement('span');
+      label.className = 'action-label';
+      while (el.firstChild) label.appendChild(el.firstChild);
+      el.appendChild(label);
+      if (!el.hasAttribute('title')) el.setAttribute('title', el.getAttribute('aria-label') || text);
+    }
     const svg = doc.createElementNS('http://www.w3.org/2000/svg', 'svg');
     const attrs = { class: 'action-icon', viewBox: '0 0 24 24', width: '16', height: '16', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.8', 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'aria-hidden': 'true', focusable: 'false' };
     Object.keys(attrs).forEach((key) => svg.setAttribute(key, attrs[key]));
@@ -54,6 +62,10 @@
     svg.appendChild(path);
     el.insertBefore(svg, el.firstChild);
     return el;
+  }
+
+  function setActionLabels(show) {
+    doc.documentElement.setAttribute('data-action-labels', show === false ? 'hidden' : 'shown');
   }
 
   /**
@@ -226,6 +238,13 @@
     return el;
   }
 
+  let showActionLabels = true;
+  try {
+    showActionLabels = AISBP.Storage.loadPrefs().showActionLabels !== false;
+  } catch (e) {
+    /* storage unavailable: labels remain visible */
+  }
+  setActionLabels(showActionLabels);
   doc.querySelectorAll('[data-icon]').forEach(decorateAction);
-  AISBP.Dom = { h, append, clear, icon, decorateAction, toast, download, readText, readDataUrl, modal, confirm, field, select };
+  AISBP.Dom = { h, append, clear, icon, decorateAction, setActionLabels, toast, download, readText, readDataUrl, modal, confirm, field, select };
 })(typeof globalThis !== 'undefined' ? globalThis : this);

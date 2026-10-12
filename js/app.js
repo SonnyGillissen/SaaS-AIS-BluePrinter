@@ -434,6 +434,17 @@
       }
     });
   }
+  const actionLabelsSelect = doc.getElementById('action-labels-select');
+  actionLabelsSelect.value = doc.documentElement.getAttribute('data-action-labels') === 'hidden' ? 'hide' : 'show';
+  actionLabelsSelect.addEventListener('change', () => {
+    const showActionLabels = actionLabelsSelect.value !== 'hide';
+    AISBP.Dom.setActionLabels(showActionLabels);
+    try {
+      Storage.savePrefs(Object.assign(Storage.loadPrefs(), { showActionLabels }));
+    } catch (e) {
+      toast('Could not save action label preference: ' + e.message, 'error');
+    }
+  });
   projectName.addEventListener('input', () => store.change('rename', (p) => { p.meta.name = projectName.value; }, { merge: 'meta:name' }));
 
   function syncToolbar() {

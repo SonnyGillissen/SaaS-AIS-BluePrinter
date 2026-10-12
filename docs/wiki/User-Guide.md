@@ -217,6 +217,13 @@ patterns. **Exports always use the chosen display style** as-is; pick the *Dark*
 style if you want a dark exported diagram. The browser tab icon (favicon) switches to a light variant in the dark theme
 so it stays visible.
 
+## Action labels
+
+Use **Labels › Show / Hide** in the toolbar to display text next to action icons or use compact
+icon-only actions. The choice is remembered in this browser, independently of the blueprint
+and server settings. Hidden labels remain available to screen readers, and tooltips identify
+the actions. Controls without action icons and the zoom percentage remain visible.
+
 ## Projects
 
 Projects are saved automatically, shortly after every change. **Open** lists your projects, where
