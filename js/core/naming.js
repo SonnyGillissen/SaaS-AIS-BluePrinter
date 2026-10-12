@@ -238,9 +238,12 @@
       const suffix = String(start + i).padStart(token === 'instance' ? value.length : match ? match[2].length : 0, '0');
       let numbered = base + suffix;
       if (token === 'name' && project.settings.naming.enforce !== false) {
-        const raw = sanitize(applyPattern(project, candidate, pattern, 0, { name: numbered }), Object.assign({}, def.rule, { max: 0 }));
-        const overflow = Math.max(0, raw.length - def.rule.max);
-        numbered = base.slice(0, Math.max(0, base.length - overflow)) + suffix;
+        let shortened = base;
+        const rule = Object.assign({}, def.rule, { max: 0 });
+        while (shortened && sanitize(applyPattern(project, candidate, pattern, 0, { name: numbered }), rule).length > def.rule.max) {
+          shortened = shortened.slice(0, -1);
+          numbered = shortened + suffix;
+        }
       }
       if (token === 'name' && !candidate.naming.tokens.name) candidate.label = numbered;
       else candidate.naming.tokens[token] = numbered;

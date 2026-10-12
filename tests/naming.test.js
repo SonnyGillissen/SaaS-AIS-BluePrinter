@@ -130,12 +130,14 @@ test('copying preserves custom names and patterns without numbering tokens', () 
 });
 
 test('numbered child names preserve their suffix at the Azure length limit', () => {
-  const { project, nodes } = smallProject(AISBP, ['storage-account']);
-  const container = Model.addNode(project, 'storage-container', nodes[0].id, { label: 'a'.repeat(63) });
-  const result = Model.paste(project, Model.extract(project, [container.id]), nodes[0].id);
-  const name = Naming.resolveName(project, project.nodes[result.nodeIds[0]]);
-  assert.equal(name, 'a'.repeat(62) + '2');
-  assert.deepEqual(Naming.validateProject(project), {});
+  for (const label of ['a'.repeat(63), 'a'.repeat(63) + '_']) {
+    const { project, nodes } = smallProject(AISBP, ['storage-account']);
+    const container = Model.addNode(project, 'storage-container', nodes[0].id, { label });
+    const result = Model.paste(project, Model.extract(project, [container.id]), nodes[0].id);
+    const name = Naming.resolveName(project, project.nodes[result.nodeIds[0]]);
+    assert.equal(name, 'a'.repeat(62) + '2');
+    assert.deepEqual(Naming.validateProject(project), {});
+  }
 });
 
 test('every catalog type has a naming rule or is explicitly free-form', () => {
