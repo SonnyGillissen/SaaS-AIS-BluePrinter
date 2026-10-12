@@ -315,6 +315,11 @@
         DIAGNOSTICS
       ]
     },
+    'logic-app-automation': {
+      label: 'Logic Apps Automation', category: 'integration', icon: I.logicApps, abbr: 'logic',
+      parents: RG, archimate: 'ApplicationComponent', rule: R.generic80,
+      attributes: [select('sku', 'SKU', ['Automation'], { default: 'Automation', show: true })]
+    },
     'logic-app-workflow': {
       label: 'Workflow (Standard)', category: 'integration', icon: I.workflow, abbr: 'wf',
       provider: 'Microsoft.Web/sites/workflows', parents: ['logic-app-standard'], archimate: 'ApplicationProcess',
@@ -335,7 +340,7 @@
       ]
     },
     'automation-runbook': {
-      label: 'Runbook', category: 'integration', icon: I.workflow, abbr: 'rb',
+      label: 'Automation Runbook', category: 'integration', icon: I.workflow, abbr: 'rb',
       provider: 'Microsoft.Automation/automationAccounts/runbooks', parents: ['automation-account'], archimate: 'ApplicationProcess',
       rule: R.automationRunbook, pattern: '{name}', seed: 'runbook',
       attributes: [

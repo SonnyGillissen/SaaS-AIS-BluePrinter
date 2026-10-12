@@ -16,9 +16,10 @@ The resource types available in the palette, generated from [`js/core/catalog.js
 |---|---|---|---|---|
 | Logic App (Consumption) | `logic` | Resource Group | 1-80 characters; allowed: letters, digits_.()-; unique in the resource group | Location, Description, State, Trigger, Integration account, Managed identity, Diagnostic settings |
 | Logic App (Standard) | `logic` | Resource Group | 2-60 characters; allowed: letters, digits-; must start with a letter or digit; must end with a letter or digit; globally unique | Location, Description, Hosting plan, App Service plan, Storage account, VNet integration, Public network access, Private endpoint, Managed identity, Functions runtime, Diagnostic settings |
+| Logic Apps Automation | `logic` | Resource Group | 1-80 characters; allowed: letters, digits_.()-; unique in the resource group | Location, Description, SKU |
 | Workflow (Standard) | `wf` | Logic App (Standard) | 1-43 characters; allowed: letters, digits_-; must start with a letter; unique in the parent resource | Location, Kind, Trigger, Description |
 | Automation Account | `aa` | Resource Group | 6-50 characters; allowed: letters, digits-; must start and end with a letter or digit; no consecutive hyphens; unique in the resource group | Location, Description, SKU, Public network access, Managed identity, Diagnostic settings |
-| Runbook | `rb` | Automation Account | 1-63 characters; allowed: letters, digits_-; unique in the parent resource | Runbook type, State, Description |
+| Automation Runbook | `rb` | Automation Account | 1-63 characters; allowed: letters, digits_-; unique in the parent resource | Runbook type, State, Description |
 | Integration Account | `ia` | Resource Group | 1-80 characters; allowed: letters, digits_.()-; unique in the resource group | Location, Description, SKU |
 | Map | `map` | Integration Account | 1-80 characters; allowed: letters, digits_.()-; unique in the parent resource | Location, Map type, Description |
 | Schema | `schema` | Integration Account | 1-80 characters; allowed: letters, digits_.()-; unique in the parent resource | Location, Schema type, Description |
