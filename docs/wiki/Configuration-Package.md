@@ -7,6 +7,9 @@ human-readable format. It's easy to diff in Git and to generate or process with 
 - **Export**: *Export › Configuration package* downloads `<name>.aisbp.json`.
 - **Import**: use *Import* in the toolbar, drop the file on the canvas, or paste the JSON
   with Ctrl+V. If a blueprint with the same id already exists, you can replace it or import a copy.
+- **Embedded exports**: by default the same package is embedded in PNG, PDF, SVG, draw.io and
+  ArchiMate downloads. Import or drop these files to restore the blueprint. See
+  [Exports](Exports.md#embedded-blueprints) for limitations and sharing considerations.
 
 ## Format
 
@@ -81,7 +84,8 @@ The resource `type` ids and their attribute keys are listed in the
 
 Imports are validated and repaired, never trusted blindly:
 
-- the file must be JSON with `"format": "ais-blueprinter"` and be at most 20 MB;
+- the package must be JSON with `"format": "ais-blueprinter"` and be at most 20 MB; embedded
+  packages pass through the same validation as standalone JSON;
 - ids must match the id pattern. Unknown resource types and connections to missing objects are
   dropped. Cycles in the hierarchy are broken. Objects in a parent that doesn't accept them are
   kept but flagged, so you can fix them. Each of these produces a warning.

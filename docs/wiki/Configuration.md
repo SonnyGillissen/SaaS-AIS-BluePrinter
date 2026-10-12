@@ -16,7 +16,8 @@ window.AISBP_CONFIG = {
     naming: { tokens: { org: 'fabrikam', workload: 'integration', env: 'dev' } },
     diagram: { style: 'classic', detailLevel: 'selected' },
     icons: { baseUrl: 'icons/msicons/' }
-  }
+  },
+  exports: { embedDiagram: true }    // default for the export popup's embedding checkbox
 };
 ```
 
@@ -24,6 +25,20 @@ window.AISBP_CONFIG = {
 
 The footer always reads **"Community Project by Sonny Gillissen"**. This text is fixed and
 cannot be configured.
+
+## Embedded blueprints
+
+`exports.embedDiagram` defaults to `true` and sets the initial **Embed complete blueprint**
+checkbox in the export popup. Embedded SVG, PNG, PDF, draw.io and ArchiMate downloads carry a
+complete configuration package, allowing **Import** to restore the original blueprint.
+Set it to `false` to default to exports without this additional hidden data. Users can enable
+or disable embedding for each export; this is a default, not a restriction.
+It applies to exports of both existing and new projects; JSON packages remain complete backups.
+
+The embedded package includes data hidden from the diagram. Review this setting before
+sharing files externally. Disabling it does not remove the native attributes exported to
+draw.io or ArchiMate. Background choices in the export popup are per-file overrides and do not
+change project settings. See [Exports](Exports.md#embedded-blueprints).
 
 ## Icons
 

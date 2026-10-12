@@ -51,6 +51,60 @@
     return cb;
   }
 
+  function openExportOptions(format, project) {
+    return new Promise((resolve) => {
+      let result = null;
+      const embed = h('input', { type: 'checkbox', checked: AISBP.Embedded.enabled() });
+      const body = h('div', {},
+        field('Embed complete blueprint', embed, { check: true }),
+        h('p', { class: 'note', text: 'Warning: embedding includes the complete blueprint, including hidden resources, attributes, tags, settings and other data not visible in the diagram. Only share it with trusted recipients. Uncheck to export without this hidden data.' }));
+      let mode;
+      let color;
+      if (['svg', 'png', 'pdf', 'drawio'].includes(format)) {
+        const modes = [{ value: 'style', label: 'Style default' }, { value: 'custom', label: 'Custom solid color' }];
+        if (format !== 'pdf') modes.push({ value: 'transparent', label: 'Transparent' });
+        const initialColor = AISBP.Render.style(project.settings.diagram.style).background;
+        const picker = h('input', { type: 'color', value: initialColor, oninput: () => { color.value = picker.value; } });
+        color = h('input', {
+          type: 'text', value: initialColor, placeholder: '#RRGGBB', pattern: '#[0-9a-fA-F]{6}', maxlength: 7, spellcheck: 'false',
+          oninput: () => { if (/^#[0-9a-fA-F]{6}$/.test(color.value)) picker.value = color.value.toLowerCase(); }
+        });
+        const colorField = h('div', {}, h('div', { class: 'grid-2' }, field('Choose background color', picker), field('Background color (#RRGGBB)', color)));
+        colorField.hidden = true;
+        color.disabled = picker.disabled = true;
+        mode = select(modes, 'style', { onchange: () => {
+          colorField.hidden = mode.value !== 'custom';
+          color.disabled = picker.disabled = mode.value !== 'custom';
+        } });
+        body.appendChild(field('Background', mode));
+        body.appendChild(colorField);
+        if (format === 'pdf') body.appendChild(h('p', { class: 'note', text: 'PDF uses an opaque JPEG image and does not support transparency. The selected background also fills the page margins.' }));
+      }
+      modal({
+        title: 'Export ' + (format === 'archimate' ? 'ArchiMate' : format === 'drawio' ? 'draw.io' : format.toUpperCase()),
+        small: true,
+        body,
+        buttons: [
+          { label: 'Cancel' },
+          { label: 'Export', primary: true, action: () => {
+            const opts = { embedDiagram: embed.checked };
+            if (mode && mode.value !== 'style') {
+              try {
+                opts.background = AISBP.Render.background(mode.value === 'transparent' ? 'transparent' : color.value, undefined, format !== 'pdf');
+              } catch (e) {
+                toast(e.message, 'error');
+                color.focus();
+                return false;
+              }
+            }
+            result = opts;
+          } }
+        ],
+        onClose: () => resolve(result)
+      });
+    });
+  }
+
   // ---------------------------------------------------------------------------
   // Options
   // ---------------------------------------------------------------------------
@@ -131,12 +185,22 @@
       const fakeNode = { id: 'x', type: d.id, naming: { pattern: '', tokens: {} } };
       const defaultPattern = Naming.patternFor(Object.assign({}, preview, { settings: Object.assign({}, s, { naming: Object.assign({}, n, { typePatterns: {} }) }) }), fakeNode);
       const pattern = textInput(n.typePatterns[d.id], (v) => { if (v) n.typePatterns[d.id] = v; else delete n.typePatterns[d.id]; updateExample(); }, { placeholder: defaultPattern, 'aria-label': d.label + ' pattern' });
-      return h('tr', {}, h('td', { class: 'icon' }, icon(project, d.id, 20)), h('td', { title: d.provider || '' , text: d.label }), h('td', {}, abbr), h('td', {}, pattern), h('td', { class: 'rule', text: Naming.describeRule(d.rule) }));
+      const ruleText = Naming.describeRule(d.rule);
+      const rule = h('button', {
+        type: 'button', class: 'btn small naming-rule', text: d.rule.min + '\u2013' + d.rule.max + ' chars \u24d8',
+        title: ruleText, 'aria-label': 'Azure naming rule for ' + d.label, 'aria-haspopup': 'dialog',
+        onclick: () => modal({
+          title: d.label + ' \u2014 Azure naming rule', small: true,
+          body: h('ul', { class: 'naming-rule-details' }, ruleText.split('; ').map((part) => h('li', { text: part })))
+        })
+      });
+      return h('tr', {}, h('td', { class: 'icon' }, icon(project, d.id, 20)), h('td', { title: d.provider || '' , text: d.label }), h('td', {}, abbr), h('td', {}, pattern), h('td', {}, rule));
     });
     const regionRows = Catalog.REGIONS.map((r) => h('tr', {}, h('td', { text: r.label }), h('td', {}, textInput(n.regionAbbreviations[r.id], (v) => { if (v) n.regionAbbreviations[r.id] = v; else delete n.regionAbbreviations[r.id]; updateExample(); }, { placeholder: r.abbr, 'aria-label': r.label + ' abbreviation' }))));
     AISBP.Dom.append(t.panels.types, [
       h('p', { class: 'note', text: 'Override the abbreviation and naming pattern per resource type. Empty fields use the default shown in grey (Cloud Adoption Framework abbreviations). Individual objects can still override the pattern in the properties panel.' }),
-      h('div', { class: 'table-scroll' }, h('table', { class: 'data' },
+      h('div', { class: 'table-scroll' }, h('table', { class: 'data naming-types' },
+        h('colgroup', {}, h('col', { class: 'type-icon' }), h('col', { class: 'type-label' }), h('col', { class: 'type-abbr' }), h('col'), h('col', { class: 'type-rule' })),
         h('thead', {}, h('tr', {}, h('th', {}), h('th', { text: 'Resource type' }), h('th', { text: 'Abbreviation' }), h('th', { text: 'Pattern' }), h('th', { text: 'Azure naming rule' }))),
         h('tbody', {}, typeRows))),
       h('h4', { text: 'Region abbreviations ({region})' }),
@@ -436,5 +500,5 @@
     });
   }
 
-  AISBP.Dialogs = { openOptions, openProjects, openHelp };
+  AISBP.Dialogs = { openOptions, openProjects, openHelp, openExportOptions };
 })(typeof globalThis !== 'undefined' ? globalThis : this);

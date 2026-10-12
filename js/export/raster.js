@@ -12,6 +12,8 @@
   'use strict';
 
   const AISBP = (root.AISBP = root.AISBP || {});
+  const Embedded = AISBP.Embedded || (typeof require === 'function' ? require('./embedded.js') : null);
+  const Render = AISBP.Render || (typeof require === 'function' ? require('../render/svg.js') : null);
 
   /** PDF page sizes in points (1/72 inch), portrait orientation. */
   const PAGE_SIZES = { A4: [595.28, 841.89], A3: [841.89, 1190.55], Letter: [612, 792] };
@@ -40,6 +42,8 @@
    */
   function buildPdf(jpeg, imgW, imgH, opts) {
     const o = opts || {};
+    const bg = Render.background(o.background, '#ffffff', false);
+    const config = o.project && Embedded.enabled(o) ? Embedded.payload(o.project) : null;
     const lw = o.logicalWidth || imgW;
     const lh = o.logicalHeight || imgH;
     let pageW;
@@ -65,7 +69,9 @@
       pageH = drawH = lh * 0.75;
     }
     const f = (n) => (Math.round(n * 100) / 100).toString();
-    const content = 'q ' + f(drawW) + ' 0 0 ' + f(drawH) + ' ' + f(offX) + ' ' + f(offY) + ' cm /Im0 Do Q';
+    const rgb = [1, 3, 5].map((i) => (parseInt(bg.slice(i, i + 2), 16) / 255).toFixed(6)).join(' ');
+    const content = 'q ' + rgb + ' rg 0 0 ' + f(pageW) + ' ' + f(pageH) + ' re f Q\n' +
+      'q ' + f(drawW) + ' 0 0 ' + f(drawH) + ' ' + f(offX) + ' ' + f(offY) + ' cm /Im0 Do Q';
 
     const enc = new TextEncoder();
     const chunks = [];
@@ -84,16 +90,21 @@
     };
 
     push('%PDF-1.4\n%\u00e2\u00e3\u00cf\u00d3\n');
-    obj(1, ['<< /Type /Catalog /Pages 2 0 R >>']);
+    obj(1, ['<< /Type /Catalog /Pages 2 0 R' + (config ? ' /Names << /EmbeddedFiles << /Names [(blueprint.aisbp.json) 8 0 R] >> >>' : '') + ' >>']);
     obj(2, ['<< /Type /Pages /Kids [3 0 R] /Count 1 >>']);
     obj(3, ['<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ' + f(pageW) + ' ' + f(pageH) + '] /Resources << /XObject << /Im0 4 0 R >> /ProcSet [/PDF /ImageC] >> /Contents 5 0 R >>']);
     obj(4, ['<< /Type /XObject /Subtype /Image /Width ' + imgW + ' /Height ' + imgH + ' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ' + jpeg.length + ' >>\nstream\n', jpeg, '\nendstream']);
     obj(5, ['<< /Length ' + enc.encode(content).length + ' >>\nstream\n' + content + '\nendstream']);
     obj(6, ['<< /Title ' + pdfText(o.title || 'AIS BluePrinter diagram') + ' /Author ' + pdfText(o.author || '') + ' /Creator ' + pdfText('AIS BluePrinter') + ' /Producer ' + pdfText('AIS BluePrinter') + ' /CreationDate (' + pdfDate() + ') >>']);
+    if (config) {
+      obj(7, ['<< /Type /EmbeddedFile /Subtype /application#2Fjson /AISBPConfig true /AISBPCRC (' + Embedded.checksum(config) + ') /Length ' + config.length + ' >>\nstream\n', config, '\nendstream']);
+      obj(8, ['<< /Type /Filespec /F (blueprint.aisbp.json) /UF ' + pdfText('blueprint.aisbp.json') + ' /Desc ' + pdfText('Complete AIS BluePrinter configuration') + ' /EF << /F 7 0 R >> >>']);
+    }
+    const count = config ? 9 : 7;
     const xrefOffset = length;
-    let xref = 'xref\n0 7\n0000000000 65535 f \n';
-    for (let i = 1; i <= 6; i++) xref += String(offsets[i]).padStart(10, '0') + ' 00000 n \n';
-    push(xref + 'trailer\n<< /Size 7 /Root 1 0 R /Info 6 0 R >>\nstartxref\n' + xrefOffset + '\n%%EOF\n');
+    let xref = 'xref\n0 ' + count + '\n0000000000 65535 f \n';
+    for (let i = 1; i < count; i++) xref += String(offsets[i]).padStart(10, '0') + ' 00000 n \n';
+    push(xref + 'trailer\n<< /Size ' + count + ' /Root 1 0 R /Info 6 0 R >>\nstartxref\n' + xrefOffset + '\n%%EOF\n');
 
     const out = new Uint8Array(length);
     let pos = 0;
@@ -114,6 +125,7 @@
    */
   function svgToCanvas(svg, width, height, scale, background) {
     return new Promise((resolve, reject) => {
+      const bg = Render.background(background, '#ffffff');
       const s = safeScale(width, height, scale);
       const blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
       const url = URL.createObjectURL(blob);
@@ -124,8 +136,10 @@
           canvas.width = Math.round(width * s);
           canvas.height = Math.round(height * s);
           const ctx = canvas.getContext('2d');
-          ctx.fillStyle = background || '#ffffff';
-          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          if (bg !== 'transparent') {
+            ctx.fillStyle = bg;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+          }
           ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
           URL.revokeObjectURL(url);
           resolve(canvas);
@@ -149,18 +163,21 @@
   }
 
   /** Render an SVG document to a PNG blob. */
-  async function toPng(svg, width, height, background) {
+  async function toPng(svg, width, height, background, opts) {
     const canvas = await svgToCanvas(svg, width, height, 2, background);
-    return canvasToBlob(canvas, 'image/png');
+    const blob = await canvasToBlob(canvas, 'image/png');
+    if (!opts || !opts.project || !Embedded.enabled(opts)) return blob;
+    return new Blob([Embedded.toPng(new Uint8Array(await blob.arrayBuffer()), opts.project, opts)], { type: 'image/png' });
   }
 
   /** Render an SVG document to a PDF blob. */
   async function toPdf(svg, width, height, opts) {
     const o = opts || {};
-    const canvas = await svgToCanvas(svg, width, height, 2, o.background);
+    const background = Render.background(o.background, '#ffffff', false);
+    const canvas = await svgToCanvas(svg, width, height, 2, background);
     const jpegBlob = await canvasToBlob(canvas, 'image/jpeg', 0.92);
     const jpeg = new Uint8Array(await jpegBlob.arrayBuffer());
-    const pdf = buildPdf(jpeg, canvas.width, canvas.height, { pageSize: o.pageSize, logicalWidth: width, logicalHeight: height, title: o.title, author: o.author });
+    const pdf = buildPdf(jpeg, canvas.width, canvas.height, { pageSize: o.pageSize, logicalWidth: width, logicalHeight: height, title: o.title, author: o.author, background, project: o.project, embedDiagram: o.embedDiagram });
     return new Blob([pdf], { type: 'application/pdf' });
   }
 

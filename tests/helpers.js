@@ -8,7 +8,7 @@ const path = require('node:path');
 
 const MODULES = [
   'core/util', 'core/catalog', 'core/tags', 'core/model', 'core/naming', 'core/layout', 'core/store', 'core/storage',
-  'render/svg', 'render/icons', 'export/package', 'export/drawio', 'export/archimate', 'export/raster'
+  'render/svg', 'render/icons', 'export/package', 'export/embedded', 'export/drawio', 'export/archimate', 'export/raster'
 ];
 MODULES.forEach((m) => require(path.join(__dirname, '..', 'js', m + '.js')));
 
