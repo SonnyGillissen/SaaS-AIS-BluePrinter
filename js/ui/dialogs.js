@@ -185,12 +185,22 @@
       const fakeNode = { id: 'x', type: d.id, naming: { pattern: '', tokens: {} } };
       const defaultPattern = Naming.patternFor(Object.assign({}, preview, { settings: Object.assign({}, s, { naming: Object.assign({}, n, { typePatterns: {} }) }) }), fakeNode);
       const pattern = textInput(n.typePatterns[d.id], (v) => { if (v) n.typePatterns[d.id] = v; else delete n.typePatterns[d.id]; updateExample(); }, { placeholder: defaultPattern, 'aria-label': d.label + ' pattern' });
-      return h('tr', {}, h('td', { class: 'icon' }, icon(project, d.id, 20)), h('td', { title: d.provider || '' , text: d.label }), h('td', {}, abbr), h('td', {}, pattern), h('td', { class: 'rule', text: Naming.describeRule(d.rule) }));
+      const ruleText = Naming.describeRule(d.rule);
+      const rule = h('button', {
+        type: 'button', class: 'btn small naming-rule', text: d.rule.min + '\u2013' + d.rule.max + ' chars \u24d8',
+        title: ruleText, 'aria-label': 'Azure naming rule for ' + d.label, 'aria-haspopup': 'dialog',
+        onclick: () => modal({
+          title: d.label + ' \u2014 Azure naming rule', small: true,
+          body: h('ul', { class: 'naming-rule-details' }, ruleText.split('; ').map((part) => h('li', { text: part })))
+        })
+      });
+      return h('tr', {}, h('td', { class: 'icon' }, icon(project, d.id, 20)), h('td', { title: d.provider || '' , text: d.label }), h('td', {}, abbr), h('td', {}, pattern), h('td', {}, rule));
     });
     const regionRows = Catalog.REGIONS.map((r) => h('tr', {}, h('td', { text: r.label }), h('td', {}, textInput(n.regionAbbreviations[r.id], (v) => { if (v) n.regionAbbreviations[r.id] = v; else delete n.regionAbbreviations[r.id]; updateExample(); }, { placeholder: r.abbr, 'aria-label': r.label + ' abbreviation' }))));
     AISBP.Dom.append(t.panels.types, [
       h('p', { class: 'note', text: 'Override the abbreviation and naming pattern per resource type. Empty fields use the default shown in grey (Cloud Adoption Framework abbreviations). Individual objects can still override the pattern in the properties panel.' }),
-      h('div', { class: 'table-scroll' }, h('table', { class: 'data' },
+      h('div', { class: 'table-scroll' }, h('table', { class: 'data naming-types' },
+        h('colgroup', {}, h('col', { class: 'type-icon' }), h('col', { class: 'type-label' }), h('col', { class: 'type-abbr' }), h('col'), h('col', { class: 'type-rule' })),
         h('thead', {}, h('tr', {}, h('th', {}), h('th', { text: 'Resource type' }), h('th', { text: 'Abbreviation' }), h('th', { text: 'Pattern' }), h('th', { text: 'Azure naming rule' }))),
         h('tbody', {}, typeRows))),
       h('h4', { text: 'Region abbreviations ({region})' }),

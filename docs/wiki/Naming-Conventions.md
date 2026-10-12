@@ -44,7 +44,14 @@ The most specific value wins:
 Each resource type has its Azure naming rule built in: length, allowed characters, case, how the
 name must start and end, consecutive hyphens, and the uniqueness scope (global, tenant,
 subscription, resource group or parent). The rules are listed in the
-[Resource catalog](Resource-Catalog.md). Some examples:
+[Resource catalog](Resource-Catalog.md).
+
+In **Options › Per resource type**, the compact **Azure naming rule** button shows the length
+limit. Hover for the full rule, or click (or press Enter/Space) to open a readable details popup.
+The wider **Pattern** column provides more room for editing; on smaller screens, scroll the table
+horizontally.
+
+Some examples:
 
 | Type | Rule |
 |---|---|

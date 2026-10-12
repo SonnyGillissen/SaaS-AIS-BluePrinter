@@ -357,6 +357,15 @@ table.data input[type='text'] { width: 100%; padding: 3px 5px; border: 1px solid
 table.data td.icon { width: 26px; }
 table.data td.icon img, table.data td.icon .ph { width: 20px; height: 20px; }
 .table-scroll { max-height: 52vh; overflow: auto; border: 1px solid var(--c-border); border-radius: var(--radius); }
+table.naming-types { table-layout: fixed; min-width: 800px; }
+.naming-types .type-icon { width: 32px; }
+.naming-types .type-label { width: 180px; }
+.naming-types .type-abbr { width: 96px; }
+.naming-types .type-rule { width: 140px; }
+.naming-types input[type='text'] { min-width: 0; }
+.naming-rule { white-space: nowrap; }
+.naming-rule-details { margin: 0; padding-left: 20px; overflow-wrap: anywhere; }
+.naming-rule-details li + li { margin-top: 8px; }
 
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border: 1px solid var(--c-border); border-radius: 12px; font-size: 12px; cursor: pointer; background: var(--c-input); }
