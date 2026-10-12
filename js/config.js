@@ -31,5 +31,20 @@ window.AISBP_CONFIG = {
    */
   exports: {
     embedDiagram: true
+  },
+
+  /**
+   * "Load from Azure": sign in with a Microsoft Entra app registration (single-page application
+   * platform, delegated Azure Service Management user_impersonation permission) and read an
+   * Azure environment into a new blueprint. Users can also enter their own client id in the
+   * dialog; values below are only the defaults.
+   *  - clientId    : Application (client) ID of the app registration
+   *  - tenantId    : 'organizations' (home tenant of the user), a tenant domain or a tenant id
+   *  - redirectUri : defaults to azure-callback.html next to index.html
+   */
+  azure: {
+    clientId: '',
+    tenantId: 'organizations',
+    redirectUri: ''
   }
 };

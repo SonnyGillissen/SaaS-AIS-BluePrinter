@@ -381,6 +381,21 @@ table.naming-types { table-layout: fixed; min-width: 800px; }
 .note { background: var(--c-note-bg); border: 1px solid var(--c-note-border); border-radius: var(--radius); padding: 8px 10px; font-size: 12px; margin: 0 0 12px; }
 .note.warn { background: var(--c-warn-bg); border-color: var(--c-warn-border); }
 
+/* "Load from Azure" dialog */
+.azure-load .muted { color: var(--c-muted); }
+.azure-account { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 0 0 12px; }
+.azure-account .btn { margin-left: auto; }
+.azure-tree-tools { display: flex; gap: 8px; align-items: flex-start; }
+.azure-tree-tools .search { flex: 1; }
+.azure-tree-scroll { max-height: 42vh; min-height: 120px; overflow: auto; border: 1px solid var(--c-border); border-radius: var(--radius); padding: 6px; }
+.azure-tree .tree-row { cursor: default; }
+.azure-tree .tree-row small { margin-left: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.azure-tree .tree-row input[type="checkbox"] { margin: 0; flex: none; }
+.azure-toggle { width: 18px; flex: none; border: 0; background: transparent; color: inherit; cursor: pointer; padding: 0; font-size: 12px; }
+.azure-summary { font-size: 12px; margin: 6px 0 10px; }
+.azure-status { min-height: 1.2em; margin: 8px 0 0; font-size: 12px; }
+.azure-status.error { color: var(--c-danger); }
+
 /* ---------------------------------------------------------------- footer */
 .app-footer {
   display: flex;

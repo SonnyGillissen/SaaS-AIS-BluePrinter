@@ -79,7 +79,8 @@
     { id: 'networking', label: 'Networking' },
     { id: 'monitoring', label: 'Monitoring' },
     { id: 'ai', label: 'AI' },
-    { id: 'external', label: 'External & On-premises' }
+    { id: 'external', label: 'External & On-premises' },
+    { id: 'other', label: 'Other' }
   ];
 
   // ---------------------------------------------------------------------------
@@ -177,6 +178,7 @@
   // ---------------------------------------------------------------------------
   const I = {
     managementGroup: 'general/10011-icon-service-Management-Groups.svg',
+    allResources: 'general/10001-icon-service-All-Resources.svg',
     subscription: 'general/10002-icon-service-Subscriptions.svg',
     resourceGroup: 'general/10007-icon-service-Resource-Groups.svg',
     logicApps: 'integration/02631-icon-service-Logic-Apps.svg',
@@ -771,6 +773,14 @@
       label: 'Users / Clients', category: 'external', icon: I.users, abbr: 'users', provider: 'Actor',
       parents: ANYWHERE, archimate: 'BusinessActor', rule: R.free, azure: false, nameMode: 'custom', seed: 'Users',
       attributes: [text('channel', 'Channel', { show: true }), area('description', 'Description')]
+    },
+
+    // ----- Other ----------------------------------------------------------------------
+    // Any Azure resource without a dedicated type, e.g. when loading an existing environment.
+    'azure-resource': {
+      label: 'Other Azure Resource', category: 'other', icon: I.allResources, abbr: 'res', provider: 'Any resource type',
+      parents: RG, archimate: 'TechnologyService', rule: R.free, nameMode: 'custom', seed: 'resource',
+      attributes: [text('resourceType', 'Resource type', { show: true }), text('kind', 'Kind'), text('sku', 'SKU')]
     }
   };
 

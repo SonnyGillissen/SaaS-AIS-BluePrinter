@@ -7,8 +7,9 @@
 const path = require('node:path');
 
 const MODULES = [
-  'core/util', 'core/catalog', 'core/tags', 'core/model', 'core/naming', 'core/layout', 'core/store', 'core/storage',
-  'render/svg', 'render/icons', 'export/package', 'export/embedded', 'export/drawio', 'export/archimate', 'export/raster'
+  'core/util', 'core/catalog', 'core/tags', 'core/model', 'core/naming', 'core/layout', 'core/azure', 'core/store', 'core/storage',
+  'render/svg', 'render/icons', 'export/package', 'export/embedded', 'export/drawio', 'export/archimate', 'export/raster',
+  'azure/arm', 'azure/auth'
 ];
 MODULES.forEach((m) => require(path.join(__dirname, '..', 'js', m + '.js')));
 

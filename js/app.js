@@ -320,6 +320,16 @@
       }
     },
 
+    /** Open a blueprint built from an Azure environment (see js/ui/azure.js). */
+    async openAzureProject(project, stats, warnings) {
+      await flushSave();
+      openProject(project);
+      save();
+      const st = stats || { nodes: 0, connections: 0 };
+      toast('Loaded "' + project.meta.name + '": ' + st.nodes + ' item(s), ' + st.connections + ' connection(s).' + (warnings && warnings.length ? ' ' + warnings.length + ' warning(s), see the console.' : ''), warnings && warnings.length ? 'info' : 'success', 6000);
+      if (warnings && warnings.length && root.console) root.console.warn('Azure load warnings:\n' + warnings.join('\n'));
+    },
+
     async exportAs(format) {
       try {
         const project = store.snapshot();
@@ -436,6 +446,7 @@
     new: () => actions.newProject(false),
     projects: () => AISBP.Dialogs.openProjects(app),
     import: () => doc.getElementById('file-input').click(),
+    azure: () => AISBP.AzureUi.open(app),
     'export-menu': () => toggleExportMenu(exportMenu.hidden),
     'export-json': () => actions.exportAs('json'),
     'export-png': () => actions.exportAs('png'),
