@@ -42,8 +42,14 @@
    * Run an export.
    * @param {string} format json | svg | png | pdf | drawio | archimate
    * @param {object} project
+   * @param {object} [opts] { embedDiagram: boolean, background: '#RRGGBB'|'transparent' }
    */
-  async function run(format, project) {
+  async function run(format, project, opts) {
+    const o = opts || {};
+    const embedDiagram = AISBP.Embedded.enabled(o);
+    const background = ['svg', 'png', 'pdf', 'drawio'].includes(format) ?
+      AISBP.Render.background(o.background, AISBP.Render.style(project.settings.diagram.style).background, format !== 'pdf') : undefined;
+    project = Util.clone(project);
     const name = baseName(project);
     switch (format) {
       case 'json':
@@ -51,37 +57,37 @@
         break;
       case 'svg': {
         await prepareIcons(project);
-        const doc = AISBP.Render.renderDocument(project, { iconHref: iconResolver(project, false) });
-        download('<?xml version="1.0" encoding="UTF-8"?>\n' + doc.svg, name + '.svg', MIME.svg);
+        const doc = AISBP.Render.renderDocument(project, { iconHref: iconResolver(project, false), background });
+        download('<?xml version="1.0" encoding="UTF-8"?>\n' + AISBP.Embedded.toSvg(doc.svg, project, { embedDiagram }), name + '.svg', MIME.svg);
         break;
       }
       case 'png': {
         await prepareIcons(project);
-        const doc = AISBP.Render.renderDocument(project, { iconHref: iconResolver(project, true) });
-        const st = AISBP.Render.style(project.settings.diagram.style);
-        download(await AISBP.Raster.toPng(doc.svg, doc.width, doc.height, st.background), name + '.png');
+        const doc = AISBP.Render.renderDocument(project, { iconHref: iconResolver(project, true), background });
+        download(await AISBP.Raster.toPng(doc.svg, doc.width, doc.height, background, { project, embedDiagram }), name + '.png');
         break;
       }
       case 'pdf': {
         await prepareIcons(project);
-        const doc = AISBP.Render.renderDocument(project, { iconHref: iconResolver(project, true) });
-        const st = AISBP.Render.style(project.settings.diagram.style);
+        const doc = AISBP.Render.renderDocument(project, { iconHref: iconResolver(project, true), background });
         const blob = await AISBP.Raster.toPdf(doc.svg, doc.width, doc.height, {
           pageSize: project.settings.diagram.pdfPageSize,
           title: project.meta.name,
           author: project.meta.author,
-          background: st.background
+          background,
+          project,
+          embedDiagram
         });
         download(blob, name + '.pdf');
         break;
       }
       case 'drawio': {
         await prepareIcons(project);
-        download(AISBP.DrawIo.toDrawio(project, { iconHref: iconResolver(project, false) }), name + '.drawio', MIME.drawio);
+        download(AISBP.DrawIo.toDrawio(project, { iconHref: iconResolver(project, false), embedDiagram, background }), name + '.drawio', MIME.drawio);
         break;
       }
       case 'archimate':
-        download(AISBP.ArchiMate.toArchiMate(project), name + '.archimate.xml', MIME.xml);
+        download(AISBP.ArchiMate.toArchiMate(project, { embedDiagram }), name + '.archimate.xml', MIME.xml);
         break;
       default:
         throw new Error('Unknown export format: ' + format);

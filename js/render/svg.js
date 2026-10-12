@@ -369,9 +369,17 @@
    * @param {object} [opts] { iconHref, margin, includeTitle }
    * @returns {{svg: string, width: number, height: number}}
    */
+  function background(value, fallback, allowTransparent) {
+    if (value === undefined) return fallback;
+    if (typeof value === 'string' && /^#[0-9a-fA-F]{6}$/.test(value)) return value;
+    if (value === 'transparent' && allowTransparent !== false) return value;
+    throw new Error('Background must be #RRGGBB' + (allowTransparent === false ? '; transparency is not supported for PDF.' : ' or transparent.'));
+  }
+
   function renderDocument(project, opts) {
     const o = Object.assign({ margin: 40 }, opts || {});
     const st = style(project.settings.diagram.style);
+    const bg = background(o.background, st.background);
     const g = Layout.compute(project);
     const b = g.bounds;
     const showTitle = project.settings.diagram.showTitle !== false;
@@ -383,8 +391,10 @@
     const height = Math.ceil(b.h + o.margin * 2 + titleH + footerH);
     let s = '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="' + width + '" height="' + height + '" viewBox="' + x0 + ' ' + y0 + ' ' + width + ' ' + height + '">';
     s += defs(st, '');
-    s += '<rect x="' + x0 + '" y="' + y0 + '" width="' + width + '" height="' + height + '" fill="' + st.background + '"/>';
-    if (st.grid && project.settings.diagram.style === 'blueprint') s += '<rect x="' + x0 + '" y="' + y0 + '" width="' + width + '" height="' + height + '" fill="url(#grid)"/>';
+    if (bg !== 'transparent') {
+      s += '<rect x="' + x0 + '" y="' + y0 + '" width="' + width + '" height="' + height + '" fill="' + bg + '"/>';
+      if (st.grid && project.settings.diagram.style === 'blueprint') s += '<rect x="' + x0 + '" y="' + y0 + '" width="' + width + '" height="' + height + '" fill="url(#grid)"/>';
+    }
     if (showTitle) {
       s += '<text x="' + (x0 + o.margin) + '" y="' + (y0 + o.margin) + '" font-family="' + esc(st.font) + '" font-size="20" font-weight="700" fill="' + st.text + '">' + esc(project.meta.name) + '</text>';
       const sub = [project.meta.description ? Layout.truncate(project.meta.description, 140) : '', 'Generated ' + new Date(project.meta.modified || Date.now()).toISOString().slice(0, 10)].filter(Boolean).join(' \u2014 ');
@@ -397,7 +407,7 @@
     return { svg: s, width, height };
   }
 
-  AISBP.Render = { STYLES, CONNECTORS, style, editorStyle, center, borderPoint, connectorPath, defs, renderContent, renderDocument };
+  AISBP.Render = { STYLES, CONNECTORS, style, editorStyle, center, borderPoint, connectorPath, defs, renderContent, renderDocument, background };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = AISBP.Render;
 })(typeof globalThis !== 'undefined' ? globalThis : this);
