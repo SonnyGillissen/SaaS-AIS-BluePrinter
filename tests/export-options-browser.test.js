@@ -54,6 +54,14 @@ async function browserChecks() {
   labelsSelect.dispatchEvent(new win.Event('change'));
   check(doc.documentElement.getAttribute('data-action-labels') === 'hidden' && win.getComputedStyle(label).clipPath === 'inset(50%)' && win.getComputedStyle(copyButton.querySelector('svg')).marginRight === '0px', 'Hide labels switches to compact icons without removing their accessible text');
   check(copyButton.textContent === 'Copy' && copyButton.title === 'Copy (Ctrl+C)' && A.Storage.loadPrefs().showActionLabels === false, 'Hidden labels retain names, shortcut tooltips and a persisted preference');
+  const exportMenuButton = doc.querySelector('[data-action="export-menu"]');
+  exportMenuButton.click();
+  const submenuActions = Array.from(doc.querySelectorAll('.menu-list [role="menuitem"]'));
+  check(submenuActions.length === 6 && submenuActions.every((button) => {
+    const labelStyle = win.getComputedStyle(button.querySelector('.action-label'));
+    return labelStyle.position !== 'absolute' && labelStyle.clipPath === 'none' && button.querySelector('.action-label').getBoundingClientRect().width > 1 && win.getComputedStyle(button.querySelector('.action-icon')).marginRight === '6px';
+  }), 'Export submenu retains visible labels and icon spacing while toolbar labels are hidden');
+  exportMenuButton.click();
   check(Object.keys(prefsBeforeLabels).every((key) => A.Storage.loadPrefs()[key] === prefsBeforeLabels[key]) && JSON.stringify(A.app.store.project) === projectBeforeLabels, 'Label preference preserves other preferences and does not modify the blueprint');
   A.Dom.setActionLabels(true);
   await new Promise((resolve, reject) => {

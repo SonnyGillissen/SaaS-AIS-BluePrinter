@@ -98,8 +98,8 @@ input, select, textarea { background-color: var(--c-input); }
   pointer-events: none;
 }
 [data-icon-only] .action-icon { margin-right: 0; }
-:root[data-action-labels='hidden'] .action-icon { margin-right: 0; }
-:root[data-action-labels='hidden'] .action-label {
+:root[data-action-labels='hidden'] button:not([role='menuitem']) > .action-icon { margin-right: 0; }
+:root[data-action-labels='hidden'] button:not([role='menuitem']) > .action-label {
   position: absolute;
   width: 1px;
   height: 1px;

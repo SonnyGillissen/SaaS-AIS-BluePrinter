@@ -222,7 +222,8 @@ so it stays visible.
 Use **Labels › Show / Hide** in the toolbar to display text next to action icons or use compact
 icon-only actions. The choice is remembered in this browser, independently of the blueprint
 and server settings. Hidden labels remain available to screen readers, and tooltips identify
-the actions. Controls without action icons and the zoom percentage remain visible.
+the actions. Submenu labels always stay visible, as do controls without action icons and the
+zoom percentage.
 
 ## Projects
 
