@@ -76,9 +76,10 @@ async function browserChecks() {
   const helpDialog = doc.querySelector('dialog[open]');
   check(!!helpDialog && !!helpDialog.querySelector('.dlg-head button .action-icon') && !!helpDialog.querySelector('.dlg-foot button .action-icon'), 'Clicking SVG content still invokes delegated actions; dialog close actions have icons');
   const closeButton = helpDialog.querySelector('.dlg-foot button');
-  check(win.getComputedStyle(closeButton.querySelector('.action-label')).clipPath === 'inset(50%)' && closeButton.title === 'Close' && closeButton.textContent === 'Close', 'Dynamically created dialog actions hide labels but retain accessible text and tooltips');
+  check(win.getComputedStyle(closeButton.querySelector('.action-label')).clipPath === 'none' && closeButton.querySelector('.action-label').getBoundingClientRect().width > 1 && win.getComputedStyle(closeButton.querySelector('.action-icon')).marginRight === '6px' && closeButton.title === 'Close' && closeButton.textContent === 'Close', 'Dynamically created dialog actions retain visible labels and icon spacing in compact toolbar mode');
   helpDialog.querySelector('.dlg-head button').click();
   check(!doc.querySelector('dialog[open]'), 'Icon-only dialog close remains functional');
+  check(Array.from(doc.querySelectorAll('.canvas-empty button .action-label')).every((text) => win.getComputedStyle(text).clipPath === 'none'), 'Empty-canvas buttons retain visible labels in compact toolbar mode');
   labelsSelect.value = 'show';
   labelsSelect.dispatchEvent(new win.Event('change'));
   check(win.getComputedStyle(label).position !== 'absolute' && A.Storage.loadPrefs().showActionLabels === true, 'Show labels restores visible action text and persists the choice');
@@ -113,6 +114,12 @@ async function browserChecks() {
   A.app.canvas.render();
   check(!doc.getElementById('prop-name-mode') && !doc.getElementById('prop-label'), 'Annotation properties omit Azure naming fields');
   check(Array.from(doc.querySelectorAll('#panel-properties button[data-icon]')).every((button) => !!button.querySelector('.action-icon')), 'Re-rendered Properties actions have icons');
+  labelsSelect.value = 'hide';
+  labelsSelect.dispatchEvent(new win.Event('change'));
+  const propertyLabels = Array.from(doc.querySelectorAll('#panel-properties button .action-label'));
+  check(propertyLabels.length > 0 && propertyLabels.every((text) => win.getComputedStyle(text).clipPath === 'none' && text.getBoundingClientRect().width > 1), 'Properties buttons retain visible labels while toolbar labels are hidden');
+  labelsSelect.value = 'show';
+  labelsSelect.dispatchEvent(new win.Event('change'));
   const annotation = doc.querySelector('#content [data-node-id="' + markdownId + '"]');
   check(annotation && annotation.querySelector('text') && !annotation.querySelector('textarea,input,foreignObject,script'), 'Markdown canvas is safe rendered SVG text, never an input');
   check(!!doc.querySelector('#overlay [data-handle="resize"][data-node-id="' + markdownId + '"]'), 'Annotations expose a canvas resize handle');
