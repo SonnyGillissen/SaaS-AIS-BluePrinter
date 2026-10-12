@@ -12,7 +12,7 @@ architectures. Click your environment together, and get an architecture diagram 
 
 - **Build your environment the Azure way**: management groups › subscriptions › resource groups ›
   resources › child resources, with the hierarchy rules enforced. Includes 70+ resource types:
-  Logic Apps, API Management, Service Bus, Event Grid, Event Hubs, Functions, Container Apps,
+  Logic Apps, Azure Automation, API Management, Service Bus, Event Grid, Event Hubs, Functions, Container Apps,
   Data Factory, Integration Accounts, storage, Key Vault, networking, monitoring, and more. Each
   type comes with the attributes you configure in Azure (SKU, plan, networking, identity, …), plus
   your own custom attributes.
