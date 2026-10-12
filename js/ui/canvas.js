@@ -396,7 +396,7 @@
           if (cancelled) store.rollback(gst.snapshot);
           else store.commit(gst.snapshot);
         }
-        queueRender();
+        if (gst.type === 'resize' || gst.snapshot) queueRender();
       }
       if (gst.type === 'connect' && gst.targetId && !cancelled) app.actions.connect(gst.from, gst.targetId);
       else if (gst.type === 'connect') queueRender();
@@ -425,7 +425,8 @@
     });
 
     svg.addEventListener('dblclick', (e) => {
-      const handle = e.target.closest('[data-handle="route"]');
+      const hit = doc.elementFromPoint(e.clientX, e.clientY);
+      const handle = e.target.closest('[data-handle="route"]') || (hit && hit.closest('[data-handle="route"]'));
       if (handle && handle.getAttribute('data-insert') !== 'true') {
         const id = handle.getAttribute('data-conn-id');
         const index = Number(handle.getAttribute('data-point-index'));

@@ -179,9 +179,21 @@ async function browserChecks() {
   check(JSON.stringify(store.project.connections[conn.id].waypoints) === cancelBefore && store.past.length === 2, 'Escape cancels routing without a history entry');
   dragPoint(true);
   check(store.project.connections[conn.id].waypoints.length === 2, 'Another segment handle adds a second point');
+  // Native capture retargets dblclick to the SVG rather than its handle.
+  delete svgCanvas.setPointerCapture;
+  delete svgCanvas.releasePointerCapture;
+  document.querySelector('iframe').style.cssText = 'width:760px;height:450px';
+  await new Promise((resolve) => win.requestAnimationFrame(resolve));
+  canvas.fit();
+  canvas.render();
+  await new Promise((resolve) => win.requestAnimationFrame(() => win.requestAnimationFrame(resolve)));
   const pointHandle = doc.querySelector('[data-handle="route"][data-insert="false"]');
-  pointHandle.dispatchEvent(new win.MouseEvent('dblclick', { bubbles: true }));
-  check(store.project.connections[conn.id].waypoints.length === 1, 'Double click removes a routing point');
+  const pointRect = pointHandle.getBoundingClientRect();
+  const frameRect = document.querySelector('iframe').getBoundingClientRect();
+  const clickEvents = [];
+  for (const type of ['pointerdown', 'pointerup', 'dblclick']) svgCanvas.addEventListener(type, (e) => clickEvents.push([type, e.target.tagName, e.clientX, e.clientY]));
+  const nativeClick = await fetch('/route-double-click?x=' + (frameRect.left + 2 + pointRect.left + pointRect.width / 2) + '&y=' + (frameRect.top + 2 + pointRect.top + pointRect.height / 2));
+  check(nativeClick.ok && store.project.connections[conn.id].waypoints.length === 1, 'Native double click removes a routing point: ' + JSON.stringify({ clickEvents, pointRect, frameRect, points: store.project.connections[conn.id].waypoints }));
   const reset = Array.from(doc.querySelectorAll('button')).find((b) => b.textContent === 'Reset route');
   check(reset && !reset.disabled, 'Connection properties offer route reset');
   reset.click();
@@ -202,7 +214,7 @@ test('real browser export dialogs, raster alpha and PDF margins', { skip: !brows
   let report;
   const completed = new Promise((resolve) => { report = resolve; });
   const server = http.createServer((req, res) => {
-    if (req.url === '/escape') {
+    if (req.url === '/escape' || req.url.startsWith('/route-double-click?')) {
       (async () => {
         const port = fs.readFileSync(path.join(profile, 'DevToolsActivePort'), 'utf8').split('\n')[0];
         const targets = await (await fetch('http://127.0.0.1:' + port + '/json/list')).json();
@@ -213,14 +225,29 @@ test('real browser export dialogs, raster alpha and PDF margins', { skip: !brows
             socket.addEventListener('open', resolve, { once: true });
             socket.addEventListener('error', reject, { once: true });
           });
-          await new Promise((resolve, reject) => {
-            socket.addEventListener('message', (event) => {
+          const command = (id, method, params) => new Promise((resolve, reject) => {
+            const receive = (event) => {
               const message = JSON.parse(event.data);
-              if (message.id === 1) message.error ? reject(new Error(message.error.message)) : resolve();
-            });
-            socket.send(JSON.stringify({ id: 1, method: 'Input.dispatchKeyEvent', params: { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27, nativeVirtualKeyCode: 27 } }));
+              if (message.id !== id) return;
+              socket.removeEventListener('message', receive);
+              message.error ? reject(new Error(message.error.message)) : resolve();
+            };
+            socket.addEventListener('message', receive);
+            socket.send(JSON.stringify({ id, method, params }));
           });
-          socket.send(JSON.stringify({ id: 2, method: 'Input.dispatchKeyEvent', params: { type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27, nativeVirtualKeyCode: 27 } }));
+          if (req.url !== '/escape') {
+            const query = new URL(req.url, 'http://localhost').searchParams;
+            const x = Number(query.get('x'));
+            const y = Number(query.get('y'));
+            await command(1, 'Input.dispatchMouseEvent', { type: 'mouseMoved', x, y });
+            for (let clickCount = 1; clickCount <= 2; clickCount++) {
+              await command(clickCount * 2, 'Input.dispatchMouseEvent', { type: 'mousePressed', button: 'left', buttons: 1, clickCount, x, y });
+              await command(clickCount * 2 + 1, 'Input.dispatchMouseEvent', { type: 'mouseReleased', button: 'left', buttons: 0, clickCount, x, y });
+            }
+          } else {
+            await command(1, 'Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27, nativeVirtualKeyCode: 27 });
+            await command(2, 'Input.dispatchKeyEvent', { type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27, nativeVirtualKeyCode: 27 });
+          }
           res.end();
         } finally { socket.close(); }
       })().catch((error) => { res.writeHead(500); res.end(error.message); });
