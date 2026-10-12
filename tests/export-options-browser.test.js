@@ -134,6 +134,165 @@ async function browserChecks() {
   }
   await A.app.actions.exportAs('json');
   check(!doc.querySelector('dialog') && downloads.pop().name.endsWith('.aisbp.json'), 'JSON downloads directly');
+
+  // Exercise routing gestures in the real SVG canvas, including zoomed coordinates.
+  const routeProject = A.Model.createProject();
+  const from = A.Model.addNode(routeProject, 'subscription', null, { x: 0, y: 0 });
+  const to = A.Model.addNode(routeProject, 'external-system', null, { x: 500, y: 200 });
+  const conn = A.Model.addConnection(routeProject, from.id, to.id);
+  const store = A.app.store;
+  const canvas = A.app.canvas;
+  store.load(routeProject);
+  store.select([], [conn.id]);
+  canvas.zoomIn();
+  canvas.render();
+  const svgCanvas = doc.getElementById('canvas-svg');
+  // Synthetic PointerEvents do not have an active native pointer to capture.
+  svgCanvas.setPointerCapture = () => {};
+  svgCanvas.releasePointerCapture = () => {};
+  const fire = (target, type, x, y) => target.dispatchEvent(new win.PointerEvent(type, { bubbles: true, pointerId: 1, button: 0, clientX: x, clientY: y }));
+  const currentRoute = () => {
+    const c = store.project.connections[conn.id];
+    const g = store.derived().geometry;
+    return A.Render.connectorPath(g.rects[c.from], g.rects[c.to], store.project.settings.diagram.connector, c.waypoints, c.sourceAnchor, c.targetAnchor);
+  };
+  const automatic = currentRoute();
+  const unedited = JSON.stringify(store.project.connections[conn.id]);
+  const anchorHandle = doc.querySelector('[data-handle="anchor"][data-endpoint="target"]');
+  const untouched = anchorHandle.getBoundingClientRect();
+  fire(anchorHandle, 'pointerdown', untouched.left + untouched.width / 2, untouched.top + untouched.height / 2);
+  fire(svgCanvas, 'pointerup', untouched.left + untouched.width / 2, untouched.top + untouched.height / 2);
+  check(JSON.stringify(store.project.connections[conn.id]) === unedited && store.past.length === 0, 'Selecting endpoint without dragging keeps automatic anchors and history');
+  const dragPoint = (insert, endType = 'pointerup') => {
+    const handle = doc.querySelector('[data-handle="route"][data-insert="' + insert + '"]');
+    check(!!handle, 'Routing handle exists: ' + insert);
+    const r = handle.getBoundingClientRect();
+    const x = r.left + r.width / 2;
+    const y = r.top + r.height / 2;
+    fire(handle, 'pointerdown', x, y);
+    fire(svgCanvas, 'pointermove', x + 72, y + 96);
+    if (endType === 'Escape') doc.getElementById('canvas').dispatchEvent(new win.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    else fire(svgCanvas, endType, x + 72, y + 96);
+    canvas.render();
+  };
+  dragPoint(true);
+  check(store.project.connections[conn.id].waypoints.length === 1 && store.past.length === 1, 'Dragging adds a persisted point in one undo step');
+  check(!!store.project.connections[conn.id].sourceAnchor && !!store.project.connections[conn.id].targetAnchor, 'First route drag captures both attachments');
+  check(JSON.stringify(currentRoute().start) === JSON.stringify(automatic.start) && JSON.stringify(currentRoute().end) === JSON.stringify(automatic.end), 'First waypoint edit fixes existing arrow and source positions');
+  store.undo();
+  check(JSON.stringify(store.project.connections[conn.id]) === unedited, 'First drag undo also restores automatic anchors');
+  store.redo();
+  canvas.render();
+  const routeBefore = JSON.stringify(store.project.connections[conn.id].waypoints);
+  dragPoint(false);
+  check(JSON.stringify(store.project.connections[conn.id].waypoints) !== routeBefore && store.past.length === 2, 'Existing routing point can be redragged');
+  check(JSON.stringify(currentRoute().end) === JSON.stringify(automatic.end), 'Moving a waypoint cannot move the anchored arrow');
+  store.undo();
+  check(JSON.stringify(store.project.connections[conn.id].waypoints) === routeBefore, 'Undo restores routing point');
+  store.redo();
+  canvas.render();
+  const cancelBefore = JSON.stringify(store.project.connections[conn.id].waypoints);
+  dragPoint(false, 'pointercancel');
+  check(JSON.stringify(store.project.connections[conn.id].waypoints) === cancelBefore && store.past.length === 2, 'Pointer cancellation rolls routing back');
+  dragPoint(false, 'Escape');
+  check(JSON.stringify(store.project.connections[conn.id].waypoints) === cancelBefore && store.past.length === 2, 'Escape cancels routing without a history entry');
+  dragPoint(true);
+  check(store.project.connections[conn.id].waypoints.length === 2, 'Another segment handle adds a second point');
+  const dragEndpoint = (endpoint, nodeId, point, endType = 'pointerup') => {
+    canvas.render();
+    const handle = doc.querySelector('[data-handle="anchor"][data-endpoint="' + endpoint + '"]');
+    check(!!handle, endpoint + ' endpoint handle is visible');
+    const box = handle.getBoundingClientRect();
+    const p = svgCanvas.createSVGPoint();
+    p.x = point.x; p.y = point.y;
+    const client = p.matrixTransform(doc.getElementById('viewport').getScreenCTM());
+    fire(handle, 'pointerdown', box.left + box.width / 2, box.top + box.height / 2);
+    fire(svgCanvas, 'pointermove', client.x, client.y);
+    if (endType === 'Escape') doc.getElementById('canvas').dispatchEvent(new win.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    else fire(svgCanvas, endType, client.x, client.y);
+    canvas.render();
+    check(store.project.connections[conn.id][endpoint === 'source' ? 'from' : 'to'] === nodeId, endpoint + ' endpoint never reconnects');
+  };
+  const endpointBefore = JSON.stringify(store.project.connections[conn.id]);
+  const endpointHistory = store.past.length;
+  const targetRect = store.derived().geometry.rects[to.id];
+  const desiredTarget = { x: targetRect.x - 30, y: targetRect.y + targetRect.h * 0.6 };
+  dragEndpoint('target', to.id, desiredTarget);
+  const targetAnchor = store.project.connections[conn.id].targetAnchor;
+  check(targetAnchor.side === 'left' && Math.abs(targetAnchor.offset - 0.6) < 1e-6 && store.past.length === endpointHistory + 1, 'Arrow handle snaps to nearest own edge in one undo step at zoom');
+  check(JSON.stringify(store.project.connections[conn.id].waypoints) === JSON.stringify(JSON.parse(endpointBefore).waypoints), 'Arrow drag preserves routing points');
+  store.undo();
+  check(JSON.stringify(store.project.connections[conn.id]) === endpointBefore, 'Endpoint undo restores entire connection');
+  store.redo();
+  canvas.render();
+  const sourceRect = store.derived().geometry.rects[from.id];
+  const desiredSource = { x: sourceRect.x + sourceRect.w * 0.3, y: sourceRect.y - 40 };
+  dragEndpoint('source', from.id, desiredSource);
+  check(store.project.connections[conn.id].sourceAnchor.side === 'top' && Math.abs(store.project.connections[conn.id].sourceAnchor.offset - 0.3) < 1e-6, 'Source endpoint is draggable too');
+  const stable = JSON.stringify(store.project.connections[conn.id]);
+  const stableHistory = store.past.length;
+  for (const endType of ['pointercancel', 'Escape']) {
+    dragEndpoint('target', to.id, { x: sourceRect.x, y: sourceRect.y }, endType);
+    check(JSON.stringify(store.project.connections[conn.id]) === stable && store.past.length === stableHistory, endType + ' rolls back endpoint anchors with no history entry');
+  }
+  const movedArrow = currentRoute().end;
+  store.change('move node', (p) => A.Model.moveNodes(p, [to.id], 40, 60));
+  check(Math.abs(currentRoute().end.x - movedArrow.x - 40) < 1e-6 && Math.abs(currentRoute().end.y - movedArrow.y - 60) < 1e-6, 'Arrow attachment follows moved node');
+  store.undo();
+  canvas.render();
+  store.select([from.id]);
+  canvas.render();
+  const grip = doc.querySelector('[data-handle="resize"]');
+  check(!!grip, 'Source container has a resize handle');
+  const gripRect = grip.getBoundingClientRect();
+  const gx = gripRect.left + gripRect.width / 2;
+  const gy = gripRect.top + gripRect.height / 2;
+  const resizeHistory = store.past.length;
+  const oldSource = currentRoute().start;
+  fire(grip, 'pointerdown', gx, gy);
+  fire(svgCanvas, 'pointermove', gx + 100, gy + 80);
+  fire(svgCanvas, 'pointerup', gx + 100, gy + 80);
+  canvas.render();
+  const resizedSource = store.derived().geometry.rects[from.id];
+  const expectedSource = A.Render.anchorPoint(resizedSource, store.project.connections[conn.id].sourceAnchor);
+  check(JSON.stringify(currentRoute().start) === JSON.stringify(expectedSource) && currentRoute().start.x !== oldSource.x && store.past.length === resizeHistory + 1, 'Real resize gesture retains relative source attachment in one undo step');
+  store.undo();
+  store.select([], [conn.id]);
+  canvas.render();
+  // Native capture retargets dblclick to the SVG rather than its handle.
+  delete svgCanvas.setPointerCapture;
+  delete svgCanvas.releasePointerCapture;
+  document.querySelector('iframe').style.cssText = 'width:760px;height:450px';
+  await new Promise((resolve) => win.requestAnimationFrame(resolve));
+  canvas.fit();
+  canvas.render();
+  await new Promise((resolve) => win.requestAnimationFrame(() => win.requestAnimationFrame(resolve)));
+  const pointHandle = doc.querySelector('[data-handle="route"][data-insert="false"]');
+  const pointRect = pointHandle.getBoundingClientRect();
+  const frameRect = document.querySelector('iframe').getBoundingClientRect();
+  const clickEvents = [];
+  for (const type of ['pointerdown', 'pointerup', 'dblclick']) svgCanvas.addEventListener(type, (e) => clickEvents.push([type, e.target.tagName, e.clientX, e.clientY]));
+  const nativeClick = await fetch('/route-double-click?x=' + (frameRect.left + 2 + pointRect.left + pointRect.width / 2) + '&y=' + (frameRect.top + 2 + pointRect.top + pointRect.height / 2));
+  check(nativeClick.ok && store.project.connections[conn.id].waypoints.length === 1, 'Native double click removes a routing point: ' + JSON.stringify({ clickEvents, pointRect, frameRect, points: store.project.connections[conn.id].waypoints }));
+  const reset = Array.from(doc.querySelectorAll('button')).find((b) => b.textContent === 'Reset route');
+  check(reset && !reset.disabled, 'Connection properties offer route reset');
+  reset.click();
+  check(store.project.connections[conn.id].waypoints.length === 0 && !!store.project.connections[conn.id].targetAnchor, 'Route reset removes points but preserves anchored arrow');
+  store.undo();
+  check(store.project.connections[conn.id].waypoints.length === 1, 'Route reset can be undone');
+  canvas.render();
+  const beforeReverse = JSON.parse(JSON.stringify(store.project.connections[conn.id]));
+  const reverse = Array.from(doc.querySelectorAll('button')).find((b) => b.textContent === 'Reverse direction');
+  reverse.click();
+  check(store.project.connections[conn.id].from === to.id && JSON.stringify(store.project.connections[conn.id].sourceAnchor) === JSON.stringify(beforeReverse.targetAnchor) && JSON.stringify(store.project.connections[conn.id].targetAnchor) === JSON.stringify(beforeReverse.sourceAnchor), 'Reverse UI swaps endpoints and anchors');
+  store.undo();
+  canvas.render();
+  const resetAnchors = Array.from(doc.querySelectorAll('button')).find((b) => b.textContent === 'Reset anchors');
+  check(resetAnchors && !resetAnchors.disabled, 'Separate anchor reset is available');
+  resetAnchors.click();
+  check(!store.project.connections[conn.id].sourceAnchor && !store.project.connections[conn.id].targetAnchor && store.project.connections[conn.id].waypoints.length === 1, 'Anchor reset restores automatic attachments without deleting route');
+  store.undo();
+  check(JSON.stringify(store.project.connections[conn.id].targetAnchor) === JSON.stringify(beforeReverse.targetAnchor), 'Anchor reset is undoable');
   return results;
 }
 
@@ -148,7 +307,7 @@ test('real browser export dialogs, raster alpha and PDF margins', { skip: !brows
   let report;
   const completed = new Promise((resolve) => { report = resolve; });
   const server = http.createServer((req, res) => {
-    if (req.url === '/escape') {
+    if (req.url === '/escape' || req.url.startsWith('/route-double-click?')) {
       (async () => {
         const port = fs.readFileSync(path.join(profile, 'DevToolsActivePort'), 'utf8').split('\n')[0];
         const targets = await (await fetch('http://127.0.0.1:' + port + '/json/list')).json();
@@ -159,14 +318,29 @@ test('real browser export dialogs, raster alpha and PDF margins', { skip: !brows
             socket.addEventListener('open', resolve, { once: true });
             socket.addEventListener('error', reject, { once: true });
           });
-          await new Promise((resolve, reject) => {
-            socket.addEventListener('message', (event) => {
+          const command = (id, method, params) => new Promise((resolve, reject) => {
+            const receive = (event) => {
               const message = JSON.parse(event.data);
-              if (message.id === 1) message.error ? reject(new Error(message.error.message)) : resolve();
-            });
-            socket.send(JSON.stringify({ id: 1, method: 'Input.dispatchKeyEvent', params: { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27, nativeVirtualKeyCode: 27 } }));
+              if (message.id !== id) return;
+              socket.removeEventListener('message', receive);
+              message.error ? reject(new Error(message.error.message)) : resolve();
+            };
+            socket.addEventListener('message', receive);
+            socket.send(JSON.stringify({ id, method, params }));
           });
-          socket.send(JSON.stringify({ id: 2, method: 'Input.dispatchKeyEvent', params: { type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27, nativeVirtualKeyCode: 27 } }));
+          if (req.url !== '/escape') {
+            const query = new URL(req.url, 'http://localhost').searchParams;
+            const x = Number(query.get('x'));
+            const y = Number(query.get('y'));
+            await command(1, 'Input.dispatchMouseEvent', { type: 'mouseMoved', x, y });
+            for (let clickCount = 1; clickCount <= 2; clickCount++) {
+              await command(clickCount * 2, 'Input.dispatchMouseEvent', { type: 'mousePressed', button: 'left', buttons: 1, clickCount, x, y });
+              await command(clickCount * 2 + 1, 'Input.dispatchMouseEvent', { type: 'mouseReleased', button: 'left', buttons: 0, clickCount, x, y });
+            }
+          } else {
+            await command(1, 'Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27, nativeVirtualKeyCode: 27 });
+            await command(2, 'Input.dispatchKeyEvent', { type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27, nativeVirtualKeyCode: 27 });
+          }
           res.end();
         } finally { socket.close(); }
       })().catch((error) => { res.writeHead(500); res.end(error.message); });

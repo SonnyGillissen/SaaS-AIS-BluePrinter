@@ -137,12 +137,23 @@
       const both = c.direction === 'bidirectional';
       const noArrow = !both && (c.kind === 'network' || c.kind === 'association');
       const edgeStyle = project.settings.diagram.connector === 'straight' ? '' : project.settings.diagram.connector === 'curved' ? 'curved=1;' : 'edgeStyle=orthogonalEdgeStyle;rounded=1;';
-      const style = edgeStyle + 'html=1;strokeColor=' + st.edge + ';fontColor=' + st.edgeText + ';fontSize=10;' + (kind.dashed ? 'dashed=1;' : '') +
+      const attachment = (value, prefix) => {
+        const anchor = Model.cleanAnchor(value);
+        if (!anchor) return '';
+        const horizontal = anchor.side === 'top' || anchor.side === 'bottom';
+        const x = horizontal ? anchor.offset : anchor.side === 'right' ? 1 : 0;
+        const y = horizontal ? anchor.side === 'bottom' ? 1 : 0 : anchor.offset;
+        return prefix + 'X=' + x + ';' + prefix + 'Y=' + y + ';' + prefix + 'Dx=0;' + prefix + 'Dy=0;' + prefix + 'Perimeter=0;';
+      };
+      const style = edgeStyle + attachment(c.sourceAnchor, 'exit') + attachment(c.targetAnchor, 'entry') +
+        'html=1;strokeColor=' + st.edge + ';fontColor=' + st.edgeText + ';fontSize=10;' + (kind.dashed ? 'dashed=1;' : '') +
         (noArrow ? 'endArrow=none;' : c.kind === 'dependency' ? 'endArrow=open;endFill=0;' : 'endArrow=block;endFill=1;') +
         (both ? (c.kind === 'dependency' ? 'startArrow=open;startFill=0;' : 'startArrow=block;startFill=1;') : c.kind === 'trigger' ? 'startArrow=oval;startFill=1;' : '');
       const label = [c.label, c.attributes && c.attributes.protocol && c.attributes.protocol !== c.label ? c.attributes.protocol : ''].filter(Boolean).join(' \u00b7 ');
+      const points = Model.cleanWaypoints(c.waypoints);
+      const routing = points.length ? '<Array as="points">' + points.map((pt) => '<mxPoint x="' + (pt.x - ox) + '" y="' + (pt.y - oy) + '"/>').join('') + '</Array>' : '';
       cells.push('<object label="' + esc(html(label)) + '" id="e-' + esc(c.id) + '" connectionType="' + esc(kind.label) + '" direction="' + (both ? 'bidirectional' : 'forward') + '"' + (c.attributes && c.attributes.protocol ? ' protocol="' + esc(c.attributes.protocol) + '"' : '') + '>' +
-        '<mxCell style="' + esc(style) + '" edge="1" parent="1" source="' + cellId(c.from) + '" target="' + cellId(c.to) + '"><mxGeometry relative="1" as="geometry"/></mxCell></object>');
+        '<mxCell style="' + esc(style) + '" edge="1" parent="1" source="' + cellId(c.from) + '" target="' + cellId(c.to) + '"><mxGeometry relative="1" as="geometry">' + routing + '</mxGeometry></mxCell></object>');
     });
 
     const w = Math.ceil(g.bounds.w + 80);

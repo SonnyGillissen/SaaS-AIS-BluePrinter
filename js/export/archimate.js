@@ -142,7 +142,8 @@
       const a = g.rects[c.from];
       const b = g.rects[c.to];
       if (!relIds[c.id] || !a || !b || a.hidden || b.hidden) return;
-      viewContent += '<connection identifier="id-vc-' + c.id + '" relationshipRef="' + relIds[c.id] + '" xsi:type="Relationship" source="' + viewNodeId(c.from) + '" target="' + viewNodeId(c.to) + '"/>';
+      const routing = Model.cleanWaypoints(c.waypoints).map((pt) => '<bendpoint x="' + Math.round(pt.x + shiftX) + '" y="' + Math.round(pt.y + shiftY) + '"/>').join('');
+      viewContent += '<connection identifier="id-vc-' + c.id + '" relationshipRef="' + relIds[c.id] + '" xsi:type="Relationship" source="' + viewNodeId(c.from) + '" target="' + viewNodeId(c.to) + '">' + routing + '</connection>';
     });
 
     let propertyDefinitions = '';

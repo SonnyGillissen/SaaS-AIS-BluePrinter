@@ -16,7 +16,9 @@
  * Node: { id, type, parentId|null, seq, label, nameMode: 'convention'|'custom', name,
  *         naming: { pattern?, tokens: {} }, attributes: {}, custom: [{key,value}], tags: [{key,value}],
  *         display: { [attributeKey]: boolean }, network: [id], x, y, w?, h? }
- * Connection: { id, from, to, kind, direction: 'forward'|'bidirectional', label, attributes: {} }
+ * Connection: { id, from, to, kind, direction: 'forward'|'bidirectional', label, attributes: {},
+ *               waypoints: [{x,y}], sourceAnchor?, targetAnchor? }
+ * Anchor: { side: 'top'|'right'|'bottom'|'left', offset: 0..1 }; null means automatic.
  *
  * `network` lists the ids of the virtual networks / subnets a resource is attached to (only for
  * types where `Catalog.supportsNetwork` is true).
@@ -379,6 +381,12 @@
         }
       });
     });
+    Object.keys(project.connections).forEach((id) => {
+      const c = project.connections[id];
+      if (moved.has(c.from) && moved.has(c.to) && c.waypoints && c.waypoints.length) {
+        c.waypoints = cleanWaypoints(c.waypoints.map((pt) => ({ x: pt.x + dx, y: pt.y + dy })));
+      }
+    });
     if (moved.size) touch(project);
     return moved.size;
   }
@@ -411,7 +419,10 @@
       kind,
       direction: cleanDirection(p.direction),
       label: p.label ? String(p.label) : '',
-      attributes: Object.assign({ protocol: '' }, p.attributes || {})
+      attributes: Object.assign({ protocol: '' }, p.attributes || {}),
+      waypoints: cleanWaypoints(p.waypoints),
+      sourceAnchor: cleanAnchor(p.sourceAnchor),
+      targetAnchor: cleanAnchor(p.targetAnchor)
     };
     project.connections[conn.id] = conn;
     touch(project);
@@ -424,6 +435,8 @@
     Object.keys(patch || {}).forEach((key) => {
       if (key === 'id' || key === 'from' || key === 'to') return;
       if (key === 'direction') c.direction = cleanDirection(patch.direction);
+      else if (key === 'waypoints') c.waypoints = cleanWaypoints(patch.waypoints);
+      else if (key === 'sourceAnchor' || key === 'targetAnchor') c[key] = cleanAnchor(patch[key]);
       else if (key === 'attributes') c.attributes = Object.assign({}, c.attributes, patch.attributes);
       else c[key] = patch[key];
     });
@@ -530,7 +543,11 @@
       const from = idMap[c.from] || (getNode(project, c.from) ? c.from : null);
       const to = idMap[c.to] || (getNode(project, c.to) ? c.to : null);
       if (!from || !to || (!idMap[c.from] && !idMap[c.to])) return;
-      const conn = addConnection(project, from, to, { kind: c.kind, direction: c.direction, label: c.label, attributes: c.attributes });
+      const waypoints = cleanWaypoints(c.waypoints).map((pt) => ({
+        x: pt.x + (idMap[c.from] && idMap[c.to] ? dx : 0),
+        y: pt.y + (idMap[c.from] && idMap[c.to] ? dy : 0)
+      }));
+      const conn = addConnection(project, from, to, { kind: c.kind, direction: c.direction, label: c.label, attributes: c.attributes, waypoints, sourceAnchor: c.sourceAnchor, targetAnchor: c.targetAnchor });
       if (conn) result.connectionIds.push(conn.id);
     });
     return result;
@@ -577,7 +594,10 @@
         kind: CONNECTION_KINDS.some((k) => k.id === c.kind) ? c.kind : 'flow',
         direction: cleanDirection(c.direction),
         label: str(c.label, 200),
-        attributes: cleanMap(c.attributes)
+        attributes: cleanMap(c.attributes),
+        waypoints: cleanWaypoints(c.waypoints),
+        sourceAnchor: cleanAnchor(c.sourceAnchor),
+        targetAnchor: cleanAnchor(c.targetAnchor)
       })))
     };
   }
@@ -587,6 +607,28 @@
   // ---------------------------------------------------------------------------
 
   const str = (v, max) => (v === undefined || v === null ? '' : String(v)).slice(0, max || 4000);
+
+  /** Sanitize routing coordinates before they enter SVG/XML or interactive geometry. */
+  function cleanWaypoints(points) {
+    if (!Array.isArray(points)) return [];
+    return points.slice(0, 100).filter((pt) => pt && Number.isFinite(pt.x) && Number.isFinite(pt.y))
+      .map((pt) => ({ x: Util.clamp(pt.x, -100000, 100000), y: Util.clamp(pt.y, -100000, 100000) }));
+  }
+
+  function cleanAnchor(anchor) {
+    if (!anchor || !['top', 'right', 'bottom', 'left'].includes(anchor.side) || !Number.isFinite(anchor.offset)) return null;
+    return { side: anchor.side, offset: Util.clamp(anchor.offset, 0, 1) };
+  }
+
+  function reverseConnection(project, id) {
+    const c = project.connections[id];
+    if (!c) return;
+    [c.from, c.to] = [c.to, c.from];
+    [c.sourceAnchor, c.targetAnchor] = [cleanAnchor(c.targetAnchor), cleanAnchor(c.sourceAnchor)];
+    c.waypoints = cleanWaypoints(c.waypoints).reverse();
+    touch(project);
+    return c;
+  }
 
   /** Sanitize a list of node ids (deduplicated, at most 200). */
   function cleanIdList(list) {
@@ -712,7 +754,10 @@
         kind: CONNECTION_KINDS.some((k) => k.id === c.kind) ? c.kind : 'flow',
         direction: cleanDirection(c.direction),
         label: str(c.label, 200),
-        attributes: cleanMap(c.attributes)
+        attributes: cleanMap(c.attributes),
+        waypoints: cleanWaypoints(c.waypoints),
+        sourceAnchor: cleanAnchor(c.sourceAnchor),
+        targetAnchor: cleanAnchor(c.targetAnchor)
       };
     });
     return { project, warnings };
@@ -758,6 +803,9 @@
     CONNECTION_KINDS,
     DIRECTIONS,
     PROTOCOLS,
+    cleanWaypoints,
+    cleanAnchor,
+    reverseConnection,
     defaultSettings,
     deepMerge,
     createProject,
