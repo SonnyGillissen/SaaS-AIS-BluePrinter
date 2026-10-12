@@ -65,6 +65,58 @@ test('routing bounds and diagram exports include edited points, without editor h
   assert.ok(archimate.includes('<bendpoint x="' + Math.round(-200 + 20 - g.bounds.x) + '" y="' + Math.round(900 + 20 - g.bounds.y) + '"/>'));
 });
 
+function assertOrthogonalRoute(route, points) {
+  const vertices = route.vertices;
+  const onSegment = (p, a, b) => (a.x === b.x && p.x === a.x && p.y >= Math.min(a.y, b.y) && p.y <= Math.max(a.y, b.y)) ||
+    (a.y === b.y && p.y === a.y && p.x >= Math.min(a.x, b.x) && p.x <= Math.max(a.x, b.x));
+  for (let i = 1; i < vertices.length; i++) {
+    const p = vertices[i - 1];
+    const q = vertices[i];
+    assert.ok(p.x === q.x || p.y === q.y, 'Every segment is axis aligned');
+    assert.ok(p.x !== q.x || p.y !== q.y, 'No zero-length segment');
+    if (i < 2) continue;
+    const prev = vertices[i - 2];
+    const incoming = { x: p.x - prev.x, y: p.y - prev.y };
+    const outgoing = { x: q.x - p.x, y: q.y - p.y };
+    assert.ok(incoming.x * outgoing.x + incoming.y * outgoing.y >= 0, 'No retraced spur at waypoint or bend');
+  }
+  const onPath = (p) => vertices.slice(1).some((q, i) => onSegment(p, vertices[i], q));
+  for (const point of points) assert.ok(onPath(point), 'Route visits every waypoint');
+  for (const handle of route.handles) assert.ok(onPath(handle), 'Routing handle lies on path');
+  assert.ok(onPath(route.label), 'Label lies on path');
+  assert.ok(!/NaN|Infinity/.test(route.d));
+}
+
+test('orthogonal waypoint turns do not create the overlapping spur shown in the reported diagram', () => {
+  const a = { x: 29, y: 77, w: 367, h: 216 };
+  const b = { x: 223, y: 768, w: 367, h: 216 };
+  const points = [{ x: 1216, y: 380 }, { x: 806, y: 487 }];
+  assertOrthogonalRoute(Render.connectorPath(a, b, 'orthogonal', points), points);
+  // Check all quadrants, not just left-to-right connections.
+  for (const sx of [-1, 1]) for (const sy of [-1, 1]) {
+    const mirrorRect = (r) => ({ x: sx < 0 ? -r.x - r.w : r.x, y: sy < 0 ? -r.y - r.h : r.y, w: r.w, h: r.h });
+    const mirrored = points.map((p) => ({ x: sx * p.x, y: sy * p.y }));
+    assertOrthogonalRoute(Render.connectorPath(mirrorRect(a), mirrorRect(b), 'orthogonal', mirrored), mirrored);
+  }
+});
+
+test('orthogonal routing handles aligned, repeated and single points without artificial midpoint detours', () => {
+  const a = { x: 0, y: 0, w: 100, h: 100 };
+  const b = { x: 500, y: 300, w: 100, h: 100 };
+  for (const points of [
+    [{ x: 300, y: 50 }, { x: 300, y: 200 }],
+    [{ x: 300, y: 200 }, { x: 400, y: 200 }],
+    [{ x: 300, y: 200 }, { x: 300, y: 200 }],
+    [{ x: 300, y: 200 }],
+    [{ x: 50, y: -100 }],
+    [{ x: 300, y: 50 }, { x: 300, y: 200 }, { x: 250, y: 250 }]
+  ]) assertOrthogonalRoute(Render.connectorPath(a, b, 'orthogonal', points), points);
+  const points = [{ x: 300, y: 50 }, { x: 300, y: 200 }];
+  const route = Render.connectorPath(a, b, 'orthogonal', points);
+  const handle = route.handles.find((p) => p.insert && p.index === 1);
+  assert.deepEqual({ x: handle.x, y: handle.y }, { x: 300, y: 125 });
+});
+
 test('routing drags, cancellation, reset and node movement use normal history semantics', () => {
   const { project, connection, nodes, rg } = routedProject();
   const originalPoints = structuredClone(connection.waypoints);

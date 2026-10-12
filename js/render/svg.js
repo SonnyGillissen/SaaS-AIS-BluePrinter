@@ -155,6 +155,7 @@
    */
   function connectorPath(a, b, kind, waypoints) {
     const points = Model.cleanWaypoints(waypoints);
+    if (points.length && kind === 'orthogonal') return orthogonalRoute(a, b, points);
     if (points.length) {
       const rects = [a].concat(points.map((pt) => ({ x: pt.x, y: pt.y, w: 0, h: 0 })), [b]);
       const legs = rects.slice(1).map((r, i) => connectorPath(rects[i], r, kind));
@@ -175,12 +176,14 @@
         const x1 = dx >= 0 ? a.x + a.w : a.x;
         const x2 = dx >= 0 ? b.x : b.x + b.w;
         const mx = Math.round((x1 + x2) / 2);
-        return { d: 'M' + x1 + ' ' + ca.y + ' H' + mx + ' V' + cb.y + ' H' + x2, label: { x: mx, y: (ca.y + cb.y) / 2 } };
+        return { d: 'M' + x1 + ' ' + ca.y + ' H' + mx + ' V' + cb.y + ' H' + x2, label: { x: mx, y: (ca.y + cb.y) / 2 },
+          vertices: [{ x: x1, y: ca.y }, { x: mx, y: ca.y }, { x: mx, y: cb.y }, { x: x2, y: cb.y }] };
       }
       const y1 = dy >= 0 ? a.y + a.h : a.y;
       const y2 = dy >= 0 ? b.y : b.y + b.h;
       const my = Math.round((y1 + y2) / 2);
-      return { d: 'M' + ca.x + ' ' + y1 + ' V' + my + ' H' + cb.x + ' V' + y2, label: { x: (ca.x + cb.x) / 2, y: my } };
+      return { d: 'M' + ca.x + ' ' + y1 + ' V' + my + ' H' + cb.x + ' V' + y2, label: { x: (ca.x + cb.x) / 2, y: my },
+        vertices: [{ x: ca.x, y: y1 }, { x: ca.x, y: my }, { x: cb.x, y: my }, { x: cb.x, y: y2 }] };
     }
     const p1 = borderPoint(a, cb);
     const p2 = borderPoint(b, ca);
@@ -193,6 +196,78 @@
       };
     }
     return { d: 'M' + r1(p1.x) + ' ' + r1(p1.y) + ' L' + r1(p2.x) + ' ' + r1(p2.y), label: { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 } };
+  }
+
+  /** Route waypoint turns together; independently routed legs can double back at their joins. */
+  function orthogonalRoute(a, b, points) {
+    const rect = (pt) => ({ x: pt.x, y: pt.y, w: 0, h: 0 });
+    const direction = (p, q) => q.x > p.x ? 'right' : q.x < p.x ? 'left' : q.y > p.y ? 'down' : 'up';
+    const opposite = { right: 'left', left: 'right', up: 'down', down: 'up' };
+    const turnCost = (incoming, outgoing) => !incoming || !outgoing || incoming === outgoing ? 0 : opposite[incoming] === outgoing ? 10000 : 1;
+    const compact = (vertices) => vertices.filter((p, i) => !i || p.x !== vertices[i - 1].x || p.y !== vertices[i - 1].y);
+    const endpointOptions = (vertices, source) => {
+      const leg = compact(vertices);
+      if (leg.length < 2) return [leg];
+      const start = leg[0];
+      const end = leg[leg.length - 1];
+      const horizontal = source ? start.y === leg[1].y : end.y === leg[leg.length - 2].y;
+      const elbow = source === horizontal ? { x: end.x, y: start.y } : { x: start.x, y: end.y };
+      const direct = compact([start, elbow, end]);
+      const originalDir = source ? direction(start, leg[1]) : direction(leg[leg.length - 2], end);
+      const directDir = direct.length < 2 ? null : source ? direction(start, direct[1]) : direction(direct[direct.length - 2], end);
+      return directDir === originalDir ? [direct, leg] : [leg];
+    };
+    const candidates = [endpointOptions(connectorPath(a, rect(points[0]), 'orthogonal').vertices, true)];
+    points.slice(1).forEach((q, i) => {
+      const p = points[i];
+      const mx = (p.x + q.x) / 2;
+      const my = (p.y + q.y) / 2;
+      candidates.push([
+        [p, { x: q.x, y: p.y }, q],
+        [p, { x: p.x, y: q.y }, q],
+        [p, { x: mx, y: p.y }, { x: mx, y: q.y }, q],
+        [p, { x: p.x, y: my }, { x: q.x, y: my }, q]
+      ]);
+    });
+    candidates.push(endpointOptions(connectorPath(rect(points[points.length - 1]), b, 'orthogonal').vertices, false));
+    let states = [{ cost: 0, end: null, legs: [] }];
+    candidates.forEach((options) => {
+      const next = new Map();
+      options.forEach((vertices) => {
+        const leg = compact(vertices);
+        const dirs = leg.slice(1).map((p, i) => direction(leg[i], p));
+        const internalCost = dirs.slice(1).reduce((sum, d, i) => sum + turnCost(dirs[i], d), 0);
+        states.forEach((state) => {
+          const end = dirs.length ? dirs[dirs.length - 1] : state.end;
+          const cost = state.cost + internalCost + turnCost(state.end, dirs[0]);
+          const best = next.get(end);
+          if (!best || cost < best.cost) next.set(end, { cost, end, legs: state.legs.concat([leg]) });
+        });
+      });
+      states = Array.from(next.values());
+    });
+    const best = states.reduce((p, q) => p.cost <= q.cost ? p : q);
+    const vertices = compact(best.legs.flat());
+    // Arc-length midpoints keep labels and insertion handles on the actual path.
+    const midpoint = (leg) => {
+      const lengths = leg.slice(1).map((p, i) => Math.abs(p.x - leg[i].x) + Math.abs(p.y - leg[i].y));
+      let remaining = lengths.reduce((sum, n) => sum + n, 0) / 2;
+      for (let i = 0; i < lengths.length; i++) {
+        if (remaining <= lengths[i] && lengths[i]) {
+          const t = remaining / lengths[i];
+          return { x: leg[i].x + (leg[i + 1].x - leg[i].x) * t, y: leg[i].y + (leg[i + 1].y - leg[i].y) * t };
+        }
+        remaining -= lengths[i];
+      }
+      return leg[0];
+    };
+    return {
+      d: vertices.map((p, i) => !i ? 'M' + p.x + ' ' + p.y : p.x === vertices[i - 1].x ? 'V' + p.y : 'H' + p.x).join(' '),
+      label: midpoint(vertices),
+      vertices,
+      handles: points.map((p, index) => ({ x: p.x, y: p.y, index, insert: false }))
+        .concat(points.length < 100 ? best.legs.map((leg, index) => Object.assign({}, midpoint(leg), { index, insert: true })) : [])
+    };
   }
 
   /** <defs> with arrow markers, shadow filter and grid pattern. */
