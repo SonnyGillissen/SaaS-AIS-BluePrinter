@@ -55,6 +55,7 @@
     function applyView() {
       viewport.setAttribute('transform', 'translate(' + view.x + ' ' + view.y + ') scale(' + view.k + ')');
       if (zoomLabel) zoomLabel.textContent = Math.round(view.k * 100) + '%';
+      AISBP.AnnotationEditor.reposition(app);
     }
 
     function zoomAt(k, clientX, clientY) {
@@ -164,7 +165,7 @@
         handle.appendChild(svgEl('circle', { cx: r.x + r.w + 12, cy: r.y + Math.min(r.h / 2, 30), r: 8, fill: '#ffffff', stroke: st.selection, 'stroke-width': 2 }));
         handle.appendChild(svgEl('path', { d: 'M' + (r.x + r.w + 8) + ' ' + (r.y + Math.min(r.h / 2, 30)) + ' h8 m-3 -3 l3 3 l-3 3', stroke: st.selection, 'stroke-width': 1.5, fill: 'none' }));
         overlay.appendChild(handle);
-        if (r.container) {
+        if (r.container || r.annotation) {
           // Resize grip (bottom-right corner) for hierarchy objects and other containers.
           const grip = svgEl('g', { class: 'handle resize', 'data-handle': 'resize', 'data-node-id': single.id });
           const gt = svgEl('title', {});
@@ -260,6 +261,7 @@
     }
 
     svg.addEventListener('pointerdown', (e) => {
+      if (AISBP.AnnotationEditor.isOpen(app)) { e.preventDefault(); return; }
       if (e.button !== 0 && e.button !== 1) return;
       lockSelection(true);
       wrap.focus({ preventScroll: true });
@@ -369,9 +371,10 @@
         else points[gesture.index] = point;
         store.live((p) => Model.updateConnection(p, gesture.id, Object.assign({ waypoints: points }, gesture.anchors)));
       } else if (gesture.type === 'resize') {
-        const w = Math.max(Layout.MIN_W, snap(gesture.size.w + pt.x - gesture.start.x));
-        const h = Math.max(Layout.MIN_H, snap(gesture.size.h + pt.y - gesture.start.y));
         const node = store.project.nodes[gesture.id];
+        const annotation = AISBP.Annotations.isAnnotation(node.type);
+        const w = Math.max(annotation ? 60 : Layout.MIN_W, snap(gesture.size.w + pt.x - gesture.start.x));
+        const h = Math.max(annotation ? 30 : Layout.MIN_H, snap(gesture.size.h + pt.y - gesture.start.y));
         if (node.w === w && node.h === h) return;
         if (!gesture.snapshot) gesture.snapshot = store.begin();
         store.live((p) => { p.nodes[gesture.id].w = w; p.nodes[gesture.id].h = h; });
@@ -385,6 +388,13 @@
         gesture.rect = { x: Math.min(s.x, pt.x), y: Math.min(s.y, pt.y), w: Math.abs(pt.x - s.x), h: Math.abs(pt.y - s.y) };
         queueRender();
       }
+    });
+
+    // Selection redraws replace SVG nodes between clicks. Remember the native click
+    // count before pointer capture/redraw can prevent the browser's dblclick event.
+    svg.addEventListener('mousedown', (e) => {
+      if (e.detail === 2 && gesture && gesture.type === 'move' &&
+          AISBP.Annotations.isAnnotation(store.project.nodes[gesture.id].type)) gesture.edit = true;
     });
 
     function endGesture(e, cancelled) {
@@ -436,6 +446,7 @@
         });
         store.select(ids, conns, gst.additive);
       } else if (gst.type === 'marquee') queueRender();
+      if (gst.edit && !gst.moved && !cancelled) AISBP.AnnotationEditor.open(app, gst.id);
     }
 
     svg.addEventListener('pointerup', (e) => endGesture(e, false));
@@ -448,6 +459,7 @@
     });
 
     svg.addEventListener('dblclick', (e) => {
+      if (AISBP.AnnotationEditor.isOpen(app)) return;
       const hit = doc.elementFromPoint(e.clientX, e.clientY);
       const handle = e.target.closest('[data-handle="route"]') || (hit && hit.closest('[data-handle="route"]'));
       if (handle && handle.getAttribute('data-insert') !== 'true') {
@@ -460,8 +472,15 @@
         });
         return;
       }
-      const nodeEl = e.target.closest('[data-node-id]');
+      const nodeEl = e.target.closest('[data-node-id]') || (hit && hit.closest('[data-node-id]'));
       if (!nodeEl) return;
+      const id = nodeEl.getAttribute('data-node-id');
+      const node = store.project.nodes[id];
+      if (node && AISBP.Annotations.isAnnotation(node.type)) {
+        store.select([id]);
+        AISBP.AnnotationEditor.open(app, id);
+        return;
+      }
       const input = doc.getElementById('prop-label') || doc.getElementById('prop-name');
       if (input) {
         input.focus();
@@ -547,6 +566,20 @@
       queueRender,
       fit,
       centerOn,
+      annotationBounds(id) {
+        const rect = store.derived().geometry.rects[id];
+        if (!rect || rect.hidden) return null;
+        const bounds = svg.getBoundingClientRect();
+        const left = Math.max(0, bounds.left), top = Math.max(0, bounds.top);
+        return {
+          left: bounds.left + view.x + rect.x * view.k,
+          top: bounds.top + view.y + rect.y * view.k,
+          width: rect.w * view.k,
+          viewportLeft: left, viewportTop: top,
+          viewportWidth: Math.max(0, Math.min(root.innerWidth, bounds.right) - left),
+          viewportHeight: Math.max(0, Math.min(root.innerHeight, bounds.bottom) - top)
+        };
+      },
       zoomIn: () => zoomAt(view.k * 1.2),
       zoomOut: () => zoomAt(view.k / 1.2),
       zoomReset: () => zoomAt(1),

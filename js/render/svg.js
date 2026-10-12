@@ -442,6 +442,7 @@
   }
 
   function renderLeaf(project, r, st, o) {
+    if (r.annotation) return renderAnnotation(project, r, st, o);
     const node = project.nodes[r.id];
     const selected = o.selection && o.selection.nodes.has(r.id);
     const problems = o.problems && o.problems[r.id];
@@ -470,6 +471,42 @@
     if (selected && !o.forExport) {
       s += '<rect class="selection" x="' + (r.x - 3) + '" y="' + (r.y - 3) + '" width="' + (r.w + 6) + '" height="' + (r.h + 6) + '" rx="' + (st.radius + 2) + '" fill="none" stroke="' + st.selection + '" stroke-width="2"/>';
     }
+    return s + '</g>';
+  }
+
+  function renderAnnotation(project, r, st, o) {
+    const m = r.annotation;
+    const a = m.a;
+    const p = a.padding;
+    const palette = st.containers.default;
+    const stroke = st.leafStroke === 'none' ? st.subtext : st.leafStroke;
+    const fill = st.leafFill === 'none' ? st.background : st.leafFill;
+    const radius = a.theme === 'pill' ? Math.min(r.w, r.h) / 2 : a.theme === 'plain' ? 0 : 8;
+    const shape = (x, y, w, h, color, border, rx) => '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" rx="' + (rx || 0) + '" fill="' + esc(color) + '" stroke="' + esc(border || 'none') + '"/>';
+    let s = '<g class="node annotation ' + a.theme + '" data-node-id="' + esc(r.id) + '"><title>' + esc(project.nodes[r.id].name || r.name) + '</title>';
+    s += shape(r.x, r.y, r.w, r.h, a.theme === 'plain' ? (o.forExport ? 'none' : 'transparent') : fill, a.theme === 'card' || a.theme === 'pill' ? stroke : 'none', radius);
+    if (a.theme === 'callout') s += shape(r.x, r.y, 4, r.h, st.edge, 'none');
+    if (m.layout) s += AISBP.Annotations.svgText(m.layout, r.x + p, r.y + p, r.w - 2 * p, a, st.text);
+    else {
+      const top = r.y + (a.caption ? m.caption.h + 2 * p : 0);
+      if (a.caption) s += AISBP.Annotations.svgText(m.caption, r.x + p, r.y + p, r.w - 2 * p, a, st.text, true);
+      let y = top;
+      m.layouts.forEach((row, ri) => {
+        let x = r.x;
+        row.forEach((layout, ci) => {
+          const header = (a.headerRow && ri === 0) || (a.firstColumnHeader && ci === 0);
+          if (header) s += shape(x, y, m.widths[ci], m.heights[ri], palette.fill === 'none' ? fill : palette.fill, 'none');
+          else if (a.striped && ri % 2 === (a.headerRow ? 0 : 1)) s += '<g opacity="0.06">' + shape(x, y, m.widths[ci], m.heights[ri], st.text, 'none') + '</g>';
+          s += AISBP.Annotations.svgText(layout, x + p, y + p, Math.max(10, m.widths[ci] - 2 * p), a, st.text, header);
+          if (a.grid === 'all') s += shape(x, y, m.widths[ci], m.heights[ri], 'none', stroke);
+          x += m.widths[ci];
+        });
+        y += m.heights[ri];
+        if (a.grid === 'rows' && ri < m.layouts.length - 1) s += '<path d="M' + r.x + ' ' + y + ' h' + r.w + '" stroke="' + esc(stroke) + '"/>';
+      });
+      if (a.grid === 'outer' || a.grid === 'rows') s += shape(r.x, top, r.w, y - top, 'none', stroke);
+    }
+    if (o.selection && o.selection.nodes.has(r.id) && !o.forExport) s += shape(r.x - 3, r.y - 3, r.w + 6, r.h + 6, 'none', st.selection, radius);
     return s + '</g>';
   }
 

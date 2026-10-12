@@ -29,6 +29,8 @@ const conns = (project) => Object.values(project.connections);
 
 test('Azure resource types map to catalog types (including kinds)', () => {
   assert.equal(Azure.mapType({ type: 'Microsoft.Logic/workflows' }), 'logic-app-consumption');
+  assert.equal(Azure.mapType({ type: 'Microsoft.Automation/automationAccounts' }), 'automation-account');
+  assert.equal(Azure.mapType({ type: 'Microsoft.Automation/automationAccounts/runbooks' }), 'automation-runbook');
   assert.equal(Azure.mapType({ type: 'Microsoft.Web/sites', kind: 'functionapp,linux' }), 'function-app');
   assert.equal(Azure.mapType({ type: 'Microsoft.Web/sites', kind: 'functionapp,workflowapp' }), 'logic-app-standard');
   assert.equal(Azure.mapType({ type: 'Microsoft.Web/sites', kind: 'app' }), 'app-service');
@@ -80,6 +82,7 @@ test('selection: management groups include everything below them, resource group
 function inventory() {
   const vnet = RG + '/providers/Microsoft.Network/virtualNetworks/vnet-int';
   const site = RG + '/providers/Microsoft.Web/sites/la-orders';
+  const automation = RG + '/providers/Microsoft.Automation/automationAccounts/aa-int';
   const sb = RG + '/providers/Microsoft.ServiceBus/namespaces/sb-int';
   return {
     managementGroups: [{ name: 'landingzones', displayName: 'Landing zones', parent: 'root' }],
@@ -89,12 +92,14 @@ function inventory() {
       { id: vnet, name: 'vnet-int', type: 'Microsoft.Network/virtualNetworks', location: 'westeurope', properties: { addressSpace: { addressPrefixes: ['10.0.0.0/16'] }, subnets: [{ id: vnet + '/subnets/snet-apps', name: 'snet-apps', properties: { addressPrefix: '10.0.1.0/24' } }, { id: vnet + '/subnets/snet-pe', name: 'snet-pe', properties: { addressPrefix: '10.0.2.0/24' } }] } },
       { id: RG + '/providers/Microsoft.Web/serverfarms/asp-int', name: 'asp-int', type: 'Microsoft.Web/serverfarms', location: 'westeurope', sku: { name: 'WS1' } },
       { id: site, name: 'la-orders', type: 'Microsoft.Web/sites', kind: 'functionapp,workflowapp', location: 'westeurope', tags: { owner: 'team' }, properties: { serverFarmId: RG + '/providers/Microsoft.Web/serverfarms/asp-int', virtualNetworkSubnetId: vnet + '/subnets/snet-apps', defaultHostName: 'la-orders.azurewebsites.net' } },
+      { id: automation, name: 'aa-int', type: 'Microsoft.Automation/automationAccounts', location: 'westeurope', sku: { name: 'Basic' }, properties: { publicNetworkAccess: 'Disabled' } },
       { id: sb, name: 'sb-int', type: 'Microsoft.ServiceBus/namespaces', location: 'westeurope', sku: { name: 'Premium' } },
       { id: RG + '/providers/Microsoft.Network/privateEndpoints/pe-sb', name: 'pe-sb', type: 'Microsoft.Network/privateEndpoints', location: 'westeurope', properties: { subnet: { id: vnet + '/subnets/snet-pe' }, privateLinkServiceConnections: [{ properties: { privateLinkServiceId: sb, groupIds: ['namespace'] } }] } },
       { id: RG + '/providers/Microsoft.Network/networkInterfaces/pe-sb.nic', name: 'pe-sb.nic', type: 'Microsoft.Network/networkInterfaces' },
       { id: RG + '/providers/Microsoft.Contoso/widgets/w1', name: 'w1', type: 'Microsoft.Contoso/widgets', location: 'westeurope' },
       // Children as read by AzureArm.loadInventory.
       { id: site + '/workflows/wf-receive', name: 'la-orders/wf-receive', type: 'Microsoft.Web/sites/workflows', _catalogType: 'logic-app-workflow', _parent: site },
+      { id: automation + '/runbooks/rb-cleanup', name: 'aa-int/rb-cleanup', type: 'Microsoft.Automation/automationAccounts/runbooks', _catalogType: 'automation-runbook', _parent: automation, properties: { runbookType: 'PowerShell', state: 'Published' } },
       { id: sb + '/queues/orders', name: 'orders', type: 'Microsoft.ServiceBus/namespaces/queues', _catalogType: 'service-bus-queue', _parent: sb, properties: { forwardTo: 'archive' } },
       { id: sb + '/queues/archive', name: 'archive', type: 'Microsoft.ServiceBus/namespaces/queues', _catalogType: 'service-bus-queue', _parent: sb }
     ],
@@ -122,6 +127,15 @@ test('buildProject draws the hierarchy, resources, children, network and connect
   const wf = byName(project, 'wf-receive');
   assert.equal(wf.type, 'logic-app-workflow');
   assert.equal(wf.parentId, la.id);
+  const aa = byName(project, 'aa-int');
+  assert.equal(aa.type, 'automation-account');
+  assert.equal(aa.attributes.sku, 'Basic');
+  assert.equal(aa.attributes.publicNetworkAccess, 'Disabled');
+  const runbook = byName(project, 'rb-cleanup');
+  assert.equal(runbook.type, 'automation-runbook');
+  assert.equal(runbook.parentId, aa.id);
+  assert.equal(runbook.attributes.runbookType, 'PowerShell');
+  assert.equal(runbook.attributes.state, 'Published');
 
   const vnet = byName(project, 'vnet-int');
   const snetApps = byName(project, 'snet-apps');
@@ -143,8 +157,8 @@ test('buildProject draws the hierarchy, resources, children, network and connect
   const w = byName(project, 'w1');
   assert.equal(w.type, 'azure-resource');
   assert.equal(stats.generic, 2);
-  assert.equal(stats.resources, 10);
-  assert.equal(stats.drawn, 10);
+  assert.equal(stats.resources, 12);
+  assert.equal(stats.drawn, 12);
   assert.deepEqual(stats.skipped, {});
   assert.equal(stats.connections, all.length);
 
@@ -265,16 +279,24 @@ test('loadTree reads management groups; without permission subscriptions are sho
 test('loadInventory reads resource groups, resources (Resource Graph) and child resources', async () => {
   const log = [];
   const site = RG + '/providers/Microsoft.Web/sites/la-orders';
+  const automation = RG + '/providers/Microsoft.Automation/automationAccounts/aa-int';
   const routes = [
     ['GET', '/resourcegroups?api-version', () => ({ json: { value: [{ id: RG, name: 'rg-int', location: 'westeurope' }, { id: '/subscriptions/' + SUB + '/resourceGroups/rg-other', name: 'rg-other' }] } })],
     ['POST', 'Microsoft.ResourceGraph/resources', (body) => {
       assert.deepEqual(body.subscriptions, [SUB]);
       assert.match(body.query, /resourceGroup in~ \('rg-int'\)/);
-      return { json: { data: [{ id: site, name: 'la-orders', type: 'Microsoft.Web/sites', kind: 'functionapp,workflowapp', resourceGroup: 'rg-int', subscriptionId: SUB, properties: {} }] } };
+      return { json: { data: [
+        { id: site, name: 'la-orders', type: 'Microsoft.Web/sites', kind: 'functionapp,workflowapp', resourceGroup: 'rg-int', subscriptionId: SUB, properties: {} },
+        { id: automation, name: 'aa-int', type: 'Microsoft.Automation/automationAccounts', resourceGroup: 'rg-int', subscriptionId: SUB, properties: {} }
+      ] } };
     }],
     ['GET', site + '/workflows?', () => ({ json: { value: [{ id: site + '/workflows/wf1', name: 'la-orders/wf1', type: 'Microsoft.Web/sites/workflows' }] } })],
+    ['GET', automation + '/runbooks?', () => ({ json: { value: [{ id: automation + '/runbooks/rb1', name: 'aa-int/rb1', type: 'Microsoft.Automation/automationAccounts/runbooks', properties: { runbookType: 'PowerShell' } }] } })],
     // Same resource as Resource Graph, with another id casing.
-    ['GET', '/resourceGroups/rg-int/resources?', () => ({ json: { value: [{ id: site.toLowerCase(), name: 'la-orders', type: 'Microsoft.Web/sites' }] } })]
+    ['GET', '/resourceGroups/rg-int/resources?', () => ({ json: { value: [
+      { id: site.toLowerCase(), name: 'la-orders', type: 'Microsoft.Web/sites' },
+      { id: automation.toLowerCase(), name: 'aa-int', type: 'Microsoft.Automation/automationAccounts' }
+    ] } })]
   ];
   const client = AzureArm.createClient({ getToken: () => 't', fetch: fakeFetch(routes, log) });
   const t = tree();
@@ -282,12 +304,15 @@ test('loadInventory reads resource groups, resources (Resource Graph) and child 
   const progress = [];
   const inv = await AzureArm.loadInventory(client, t, selection, { onProgress: (p) => progress.push(p) });
   assert.deepEqual(inv.resourceGroups.map((g) => g.name), ['rg-int']);
-  assert.deepEqual(inv.resources.map((r) => r.name), ['la-orders', 'la-orders/wf1']);
-  assert.equal(inv.resources[1]._catalogType, 'logic-app-workflow');
+  assert.deepEqual(inv.resources.map((r) => r.name), ['la-orders', 'aa-int', 'la-orders/wf1', 'aa-int/rb1']);
+  assert.equal(inv.resources[2]._catalogType, 'logic-app-workflow');
+  assert.equal(inv.resources[3]._catalogType, 'automation-runbook');
   assert.deepEqual(inv.warnings, []);
   assert.ok(progress.length > 0);
   const { project } = Azure.buildProject(inv, {});
   assert.equal(byName(project, 'wf1').parentId, byName(project, 'la-orders').id);
+  assert.equal(byName(project, 'rb1').parentId, byName(project, 'aa-int').id);
+  assert.ok(log.some((l) => l.url.indexOf(automation + '/runbooks?api-version=2023-11-01') !== -1));
 });
 
 test('loadInventory falls back to the resources API when Resource Graph fails', async () => {

@@ -146,3 +146,12 @@ test('every catalog type has a naming rule or is explicitly free-form', () => {
     assert.ok(t.rule.max >= t.rule.min, t.id + ' has a sane length range');
   });
 });
+
+test('Logic Apps Automation is a distinct SKU from Automation Accounts and Runbooks', () => {
+  const logicAppsAutomation = Catalog.get('logic-app-automation');
+  assert.equal(logicAppsAutomation.label, 'Logic Apps Automation');
+  assert.deepEqual(Catalog.attribute('logic-app-automation', 'sku').options, ['Automation']);
+  assert.equal(Catalog.get('automation-account').label, 'Automation Account');
+  assert.equal(Catalog.get('automation-runbook').label, 'Automation Runbook');
+  assert.deepEqual(Catalog.get('automation-runbook').parents, ['automation-account']);
+});

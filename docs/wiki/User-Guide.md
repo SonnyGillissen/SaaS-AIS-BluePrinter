@@ -5,7 +5,7 @@
 | Area | Purpose |
 |---|---|
 | **Toolbar** (top) | New / Open / Import / Export, undo and redo, copy and paste, delete, display style, detail level, zoom, *Tidy up*, Options and Help |
-| **Palette** (left) | All resource types, grouped by category (Hierarchy, Integration, Messaging & Events, Compute & Hosting, Data & Storage, Security & Identity, Networking, Monitoring, AI, External & On-premises). Use the search box to filter. |
+| **Palette** (left) | Resource types and canvas annotations, grouped by category. Use the search box to filter. |
 | **Explorer** (left, second tab) | The hierarchy as a tree. Drag rows to move objects to another parent; drop palette items on a row to add a child. |
 | **Canvas** (centre) | The live diagram. This *is* the architecture diagram that you export. |
 | **Properties** (right) | Name, naming tokens, placement, attributes and connections of the selected object or connection. |
@@ -42,6 +42,48 @@ corner; it never shrinks below its contents. Drag objects to rearrange them. Whi
 container keeps its current boundary, so an object dropped anywhere inside its own container stays
 there; dropping it on another container moves it there (if allowed). **Tidy up** arranges
 everything automatically and resets manually resized containers to the size they need.
+
+## Text blocks and tables
+
+Use **Text & Tables** at the bottom of the palette to add **Text**, **Markdown** or a **Table**, by clicking
+or dragging it onto the canvas. Annotations can stand alone or sit inside a compatible container;
+they are diagram content, not Azure resources.
+
+**Double-click a text block** to edit it directly on the canvas. Markdown blocks provide a
+formatting toolbar that inserts Markdown into the text field, plus a safe preview. You can also
+edit content in **Properties** or choose **Edit on canvas** there. Outside editing mode, the
+canvas displays rendered text, not an input field.
+Choose **Markdown** for headings, bold, italic, code, lists and quotes;
+**Text** displays literal text. Links are displayed as text; HTML and images are not rendered.
+The default **Plain** theme has no visible box; **Pill**, **Card** and **Callout** provide
+alternative appearances.
+
+**Double-click a table** to open its pop-out editor, or select it and use **Edit Table** in
+**Properties**. Table contents and adjustment controls are in this pop-out rather than crowded
+into the side pane:
+
+- Add, remove and reorder rows and columns.
+- Sort a column ascending or descending, keeping the header row in place.
+- Set a caption, header row, first-column headers and striped rows.
+- Choose borders for all cells, rows and outline, outline only, or none.
+- Adjust column widths, text alignment, font size, padding and theme.
+
+Tables support up to **50 rows and 12 columns**, with up to **1,000 characters per cell**.
+Column widths act as proportions when a table is manually resized.
+
+Both editors keep changes in a draft until you choose **Save**. **Cancel**, closing the editor,
+or **Escape** discards the draft. **Ctrl+Enter** (⌘+Enter on macOS) saves. Saving is a single
+undoable change.
+
+Drag the bottom-right resize handle to change an annotation's width and minimum height; height
+always grows to fit the content. For text, **Reset size** in Properties restores automatic sizing.
+For tables, select **Reset size on save** in the pop-out editor.
+Text blocks and tables can be moved, copied, pasted and deleted like other objects, and edits
+support undo/redo. Their content is saved with the blueprint and included in diagram exports.
+SVG, PNG and PDF use the canvas renderer. Draw.io uses editable text/table labels with
+approximate styling; ArchiMate retains annotation content and options as artifact properties
+and documentation rather than recreating rich-text/table appearance. Embedded blueprints
+preserve all annotation options for reimport.
 
 ## Attributes
 

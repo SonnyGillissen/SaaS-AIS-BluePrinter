@@ -36,6 +36,7 @@
   const Util = AISBP.Util || (typeof require === 'function' ? require('./util.js') : null);
   const Catalog = AISBP.Catalog || (typeof require === 'function' ? require('./catalog.js') : null);
   const Tags = AISBP.Tags || (typeof require === 'function' ? require('./tags.js') : null);
+  const Annotations = AISBP.Annotations || (typeof require === 'function' ? require('./annotations.js') : null);
 
   const FORMAT = 'ais-blueprinter';
   const VERSION = 1;
@@ -209,6 +210,9 @@
   function canContain(project, parentId, childType) {
     if (!parentId) return Catalog.canContain(null, childType);
     const parent = getNode(project, parentId);
+    if (parent && Catalog.get(childType) && Catalog.get(childType).annotation && !Catalog.get(parent.type).annotation) {
+      return Catalog.canContain(parent.type, childType) || children(project, parentId).length > 0;
+    }
     return !!parent && Catalog.canContain(parent.type, childType);
   }
 
@@ -313,6 +317,7 @@
       node.naming.tokens = Object.assign({}, p.naming.tokens || {});
     }
     if (p.attributes) Object.assign(node.attributes, p.attributes);
+    if (def.annotation) node.attributes = Annotations.normalize(type, node.attributes);
     if (Array.isArray(p.custom)) node.custom = p.custom.map((c) => ({ key: String(c.key || ''), value: String(c.value || '') }));
     if (Array.isArray(p.tags)) node.tags = Tags.sanitize(p.tags);
     if (p.display) node.display = Object.assign({}, p.display);
@@ -338,6 +343,7 @@
         node[key] = patch[key];
       }
     });
+    if (Catalog.get(node.type).annotation) node.attributes = Annotations.normalize(node.type, node.attributes);
     touch(project);
     return node;
   }
@@ -688,7 +694,7 @@
         nameMode: n.nameMode === 'custom' ? 'custom' : 'convention',
         name: str(n.name, 260),
         naming: { pattern: str(n.naming && n.naming.pattern, 200), tokens: cleanMap(n.naming && n.naming.tokens, 100) },
-        attributes: cleanMap(n.attributes),
+        attributes: Catalog.get(n.type).annotation ? Annotations.normalize(n.type, n.attributes) : cleanMap(n.attributes),
         custom: Array.isArray(n.custom) ? n.custom.slice(0, 200).map((c) => ({ key: str(c && c.key, 100), value: str(c && c.value, 2000) })) : [],
         tags: Tags.sanitize(n.tags),
         display: cleanMap(n.display),
