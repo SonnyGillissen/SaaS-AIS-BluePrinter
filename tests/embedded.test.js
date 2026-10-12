@@ -196,6 +196,8 @@ test('browser IIFEs work without require, modules, or network access', async () 
   }
   const api = context.AISBP;
   const p = api.Model.createProject({ sample: true, name: '日本語 🏡' });
+  assert.equal(p.settings.diagram.style, 'classic');
+  assert.match(api.Render.renderDocument(p, {}).svg, /fill="#ffffff"/);
   for (const content of [api.Embedded.toSvg(api.Render.renderDocument(p, {}).svg, p),
     api.DrawIo.toDrawio(p), api.ArchiMate.toArchiMate(p), api.Embedded.toPng(PNG, p),
     api.Raster.buildPdf(JPEG, 20, 10, { project: p })]) {
@@ -203,6 +205,24 @@ test('browser IIFEs work without require, modules, or network access', async () 
     assert.equal(parsed.project.meta.name, p.meta.name);
     assert.equal(Object.keys(parsed.project.nodes).length, Object.keys(p.nodes).length);
   }
+});
+
+test('DTDs are rejected before browser DOMParser is constructed', async () => {
+  const saved = globalThis.DOMParser;
+  let parsed = false;
+  globalThis.DOMParser = class {
+    constructor() { parsed = true; throw new Error('DOMParser must not see DTDs'); }
+  };
+  try {
+    const p = Model.createProject();
+    for (const xml of [Embedded.toSvg(Render.renderDocument(p, {}).svg, p), DrawIo.toDrawio(p), ArchiMate.toArchiMate(p)]) {
+      const text = xml.replace(/<\?xml[^>]*\?>\s*/, '');
+      for (const declaration of ['<!DOCTYPE svg>', '<!DOCTYPE svg [<!ENTITY secret SYSTEM "file:///private">]>']) {
+        await assert.rejects(Embedded.fromFile(blob(declaration + text)), /corrupt/);
+      }
+    }
+    assert.equal(parsed, false);
+  } finally { globalThis.DOMParser = saved; }
 });
 
 test('browser export actions pass the complete package and honor the root opt-out for every format', async () => {
