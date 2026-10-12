@@ -340,6 +340,32 @@ dialog {
 }
 dialog::backdrop { background: var(--c-backdrop); }
 dialog.small { width: min(460px, 94vw); }
+dialog.annotation-table-dialog { width: min(1200px, 96vw); }
+.annotation-inline-editor {
+  position: fixed;
+  z-index: 30;
+  box-sizing: border-box;
+  overflow: auto;
+  padding: 12px;
+  border: 2px solid var(--c-primary);
+  border-radius: var(--radius);
+  background: var(--c-panel);
+  box-shadow: 0 8px 30px var(--c-shadow);
+}
+.annotation-inline-editor h2 { font-size: 16px; margin: 0 0 8px; }
+.annotation-inline-editor textarea { width: 100%; min-height: 110px; resize: vertical; }
+.markdown-toolbar { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
+.markdown-preview { padding: 8px; background: var(--c-subtle); overflow-wrap: anywhere; white-space: pre-wrap; max-height: 150px; overflow: auto; }
+.markdown-preview > div { min-height: 1.4em; }
+.annotation-table-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(210px, 100%), 1fr)); gap: 0 16px; }
+.annotation-table-options textarea { width: 100%; }
+.annotation-table-scroll { overflow: auto; max-height: 48vh; margin-bottom: 8px; }
+.annotation-table-scroll table { border-collapse: collapse; }
+.annotation-table-scroll th, .annotation-table-scroll td { padding: 6px; border: 1px solid var(--c-border); vertical-align: top; }
+.annotation-table-scroll th { background: var(--c-subtle); }
+.annotation-table-scroll thead th { position: sticky; top: 0; z-index: 1; }
+.annotation-table-scroll textarea { width: 180px; min-height: 70px; resize: vertical; }
+.annotation-table-scroll input { width: 90px; }
 .dlg { display: flex; flex-direction: column; max-height: 90vh; }
 .dlg-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--c-border); }
 .dlg-head h2 { margin: 0; font-size: 16px; }

@@ -55,6 +55,7 @@
     function applyView() {
       viewport.setAttribute('transform', 'translate(' + view.x + ' ' + view.y + ') scale(' + view.k + ')');
       if (zoomLabel) zoomLabel.textContent = Math.round(view.k * 100) + '%';
+      AISBP.AnnotationEditor.reposition(app);
     }
 
     function zoomAt(k, clientX, clientY) {
@@ -260,6 +261,7 @@
     }
 
     svg.addEventListener('pointerdown', (e) => {
+      if (AISBP.AnnotationEditor.isOpen(app)) { e.preventDefault(); return; }
       if (e.button !== 0 && e.button !== 1) return;
       lockSelection(true);
       wrap.focus({ preventScroll: true });
@@ -461,9 +463,16 @@
         });
         return;
       }
-      const nodeEl = e.target.closest('[data-node-id]');
+      const nodeEl = e.target.closest('[data-node-id]') || (hit && hit.closest('[data-node-id]'));
       if (!nodeEl) return;
-      const input = doc.getElementById('prop-annotation-content') || doc.getElementById('prop-cell-0-0') || doc.getElementById('prop-label') || doc.getElementById('prop-name');
+      const id = nodeEl.getAttribute('data-node-id');
+      const node = store.project.nodes[id];
+      if (node && AISBP.Annotations.isAnnotation(node.type)) {
+        store.select([id]);
+        AISBP.AnnotationEditor.open(app, id);
+        return;
+      }
+      const input = doc.getElementById('prop-label') || doc.getElementById('prop-name');
       if (input) {
         input.focus();
         input.select();
@@ -548,6 +557,20 @@
       queueRender,
       fit,
       centerOn,
+      annotationBounds(id) {
+        const rect = store.derived().geometry.rects[id];
+        if (!rect || rect.hidden) return null;
+        const bounds = svg.getBoundingClientRect();
+        const left = Math.max(0, bounds.left), top = Math.max(0, bounds.top);
+        return {
+          left: bounds.left + view.x + rect.x * view.k,
+          top: bounds.top + view.y + rect.y * view.k,
+          width: rect.w * view.k,
+          viewportLeft: left, viewportTop: top,
+          viewportWidth: Math.max(0, Math.min(root.innerWidth, bounds.right) - left),
+          viewportHeight: Math.max(0, Math.min(root.innerHeight, bounds.bottom) - top)
+        };
+      },
       zoomIn: () => zoomAt(view.k * 1.2),
       zoomOut: () => zoomAt(view.k / 1.2),
       zoomReset: () => zoomAt(1),

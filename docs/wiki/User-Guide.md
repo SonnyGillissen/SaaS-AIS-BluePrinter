@@ -49,13 +49,17 @@ Use the **Text & Tables** palette category to add **Text**, **Markdown** or a **
 or dragging it onto the canvas. Annotations can stand alone or sit inside a compatible container;
 they are diagram content, not Azure resources.
 
-Select a text block and edit its content in **Properties**. On the canvas it is always rendered
-text, not an input field. Choose **Markdown** for headings, bold, italic, code, lists and quotes;
+**Double-click a text block** to edit it directly on the canvas. Markdown blocks provide a
+formatting toolbar that inserts Markdown into the text field. You can also edit content in
+**Properties**. Outside editing mode, the canvas displays rendered text, not an input field.
+Choose **Markdown** for headings, bold, italic, code, lists and quotes;
 **Text** displays literal text. Links are displayed as text; HTML and images are not rendered.
 The default **Plain** theme has no visible box; **Pill**, **Card** and **Callout** provide
 alternative appearances.
 
-Select a table to edit its multiline cells in **Properties**:
+**Double-click a table** to open its pop-out editor, or select it and use the editor button in
+**Properties**. Table contents and adjustment controls are in this pop-out rather than crowded
+into the side pane:
 
 - Add, remove and reorder rows and columns.
 - Sort a column ascending or descending, keeping the header row in place.
@@ -65,6 +69,10 @@ Select a table to edit its multiline cells in **Properties**:
 
 Tables support up to **50 rows and 12 columns**, with up to **1,000 characters per cell**.
 Column widths act as proportions when a table is manually resized.
+
+Both editors keep changes in a draft until you choose **Save**. **Cancel**, closing the editor,
+or **Escape** discards the draft. **Ctrl+Enter** (⌘+Enter on macOS) saves. Saving is a single
+undoable change.
 
 Drag the bottom-right resize handle to change an annotation's width and minimum height; height
 always grows to fit the content. **Reset size** in Properties restores automatic sizing.

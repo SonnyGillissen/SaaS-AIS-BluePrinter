@@ -318,70 +318,23 @@
         const control = h('input', { id: 'prop-annotation-' + key, type: 'number', min, max, value: a[key], onchange: () => set(key, Number(control.value)) });
         return field(label, control);
       };
-      const check = (key, label) => {
-        const control = h('input', { id: 'prop-annotation-' + key, type: 'checkbox', checked: a[key], onchange: () => set(key, control.checked) });
-        return field(label, control, { check: true });
-      };
       const out = [h('h2', { text: def.label }),
         field('Title (explorer / exports)', textInput('prop-name', node.name, (v) => patchNode(node.id, { name: v, nameMode: 'custom' }, node.id + ':name'))),
-        h('h3', { text: 'Placement' }), placementSection(node, def),
-        h('h3', { text: 'Appearance' }),
-        option('theme', 'Theme', Annotations.THEMES),
-        option('align', 'Text alignment', Annotations.ALIGN),
-        numeric('fontSize', 'Font size', 8, 48), numeric('padding', 'Padding', 0, 40),
-        h('p', { class: 'subtitle', text: 'Drag the bottom-right handle to resize. Height always grows to fit content.' }),
-        h('button', { type: 'button', class: 'btn small', text: 'Reset size', onclick: () => store.change('reset annotation size', (p) => { delete p.nodes[node.id].w; delete p.nodes[node.id].h; }) })];
+        h('h3', { text: 'Placement' }), placementSection(node, def)];
       if (node.type !== 'annotation-table') {
+        out.push(h('h3', { text: 'Appearance' }),
+          option('theme', 'Theme', Annotations.THEMES), option('align', 'Text alignment', Annotations.ALIGN),
+          numeric('fontSize', 'Font size', 8, 48), numeric('padding', 'Padding', 0, 40),
+          h('p', { class: 'subtitle', text: 'Drag the bottom-right handle to resize. Height always grows to fit content.' }),
+          h('button', { type: 'button', class: 'btn small', text: 'Reset size', onclick: () => store.change('reset annotation size', (p) => { delete p.nodes[node.id].w; delete p.nodes[node.id].h; }) }));
         out.push(h('h3', { text: 'Content' }), field(node.type === 'annotation-markdown' ? 'Markdown' : 'Text',
-          textArea('prop-annotation-content', a.content, (v) => set('content', v))));
+          textArea('prop-annotation-content', a.content, (v) => set('content', v))),
+          h('button', { id: 'prop-edit-annotation', type: 'button', class: 'btn', text: 'Edit on canvas', onclick: () => { app.canvas.centerOn(node.id); AISBP.AnnotationEditor.open(app, node.id); } }));
         if (node.type === 'annotation-markdown') out.push(h('p', { class: 'subtitle', text: 'Headings, bold, italic, code, lists and quotes. Links render as text; HTML and images are not rendered.' }));
       } else {
-        out.push(h('h3', { text: 'Table options' }),
-          field('Caption', textArea('prop-annotation-caption', a.caption, (v) => set('caption', v))),
-          check('headerRow', 'Header row'), check('firstColumnHeader', 'First column header'), check('striped', 'Striped rows'),
-          option('grid', 'Borders', [{ value: 'all', label: 'All cells' }, { value: 'rows', label: 'Rows + outline' }, { value: 'outer', label: 'Outline only' }, { value: 'none', label: 'None' }]));
-        const data = Annotations.rows(a.rows);
-        const widths = JSON.parse(a.columnWidths);
-        const operation = (op, i, target) => {
-          const next = Annotations.tableOperation(data, op, i, target);
-          const cw = widths.slice();
-          if (op === 'addColumn' && cw.length < Annotations.MAX_COLS) cw.splice(i + 1, 0, 150);
-          if (op === 'removeColumn' && cw.length > 1) cw.splice(i, 1);
-          if (op === 'moveColumn') cw.splice(target, 0, cw.splice(i, 1)[0]);
-          store.change('edit table', (p) => Model.updateNode(p, node.id, { attributes: { rows: JSON.stringify(next), columnWidths: JSON.stringify(cw) } }));
-        };
-        const button = (label, title, action, disabled) => h('button', { type: 'button', class: 'btn small', text: label, title, 'aria-label': title, onclick: action, disabled });
-        const heads = widths.map((width, i) => {
-          const input = h('input', { type: 'number', id: 'prop-column-width-' + i, min: 50, max: 1000, value: width, 'aria-label': 'Column ' + (i + 1) + ' width', style: { width: '70px' },
-            onchange: () => { const cw = widths.slice(); cw[i] = Number(input.value); set('columnWidths', JSON.stringify(cw)); } });
-          return h('th', {}, h('div', { text: 'Column ' + (i + 1) }), input,
-            h('div', { class: 'inline' },
-              button('\u2190', 'Move column ' + (i + 1) + ' left', () => operation('moveColumn', i, i - 1), i === 0),
-              button('\u2192', 'Move column ' + (i + 1) + ' right', () => operation('moveColumn', i, i + 1), i === widths.length - 1),
-              button('\u2212', 'Remove column ' + (i + 1), () => operation('removeColumn', i), widths.length === 1),
-              button('A\u2191', 'Sort column ' + (i + 1) + ' ascending', () => operation('sortAsc', i, a.headerRow)),
-              button('A\u2193', 'Sort column ' + (i + 1) + ' descending', () => operation('sortDesc', i, a.headerRow))));
-        });
-        const body = data.map((row, ri) => h('tr', {}, h('th', {}, h('div', { text: 'Row ' + (ri + 1) }),
-          button('\u2191', 'Move row ' + (ri + 1) + ' up', () => operation('moveRow', ri, ri - 1), ri === 0),
-          button('\u2193', 'Move row ' + (ri + 1) + ' down', () => operation('moveRow', ri, ri + 1), ri === data.length - 1),
-          button('\u2212', 'Remove row ' + (ri + 1), () => operation('removeRow', ri), data.length === 1)),
-        row.map((value, ci) => {
-          const input = textArea('prop-cell-' + ri + '-' + ci, value, (v) => {
-            const next = Annotations.rows(store.project.nodes[node.id].attributes.rows);
-            next[ri][ci] = v;
-            set('rows', JSON.stringify(next));
-          });
-          input.setAttribute('aria-label', 'Row ' + (ri + 1) + ', column ' + (ci + 1));
-          input.setAttribute('maxlength', '1000');
-          input.style.minWidth = '140px';
-          return h('td', {}, input);
-        })));
-        out.push(h('h3', { text: 'Cells' }), h('p', { class: 'subtitle', text: 'Multiline cells; up to 50 rows and 12 columns. Column widths are proportional when manually resized. Sorting preserves the header row.' }),
-          h('div', { style: { overflowX: 'auto' } }, h('table', {}, h('thead', {}, h('tr', {}, h('th', { text: 'Rows' }), heads)), h('tbody', {}, body))),
-          h('div', { class: 'inline' },
-            button('Add row', 'Add row at end', () => operation('addRow', data.length - 1), data.length >= Annotations.MAX_ROWS),
-            button('Add column', 'Add column at end', () => operation('addColumn', widths.length - 1), widths.length >= Annotations.MAX_COLS)));
+        out.push(h('h3', { text: 'Table' }),
+          h('p', { class: 'subtitle', text: 'Edit cells, rows, columns and appearance in the table editor. You can also double-click the table on the canvas.' }),
+          h('button', { id: 'prop-edit-annotation', type: 'button', class: 'btn', text: 'Edit Table', onclick: () => AISBP.AnnotationEditor.open(app, node.id) }));
       }
       out.push(h('h3', { text: 'Actions' }), h('div', { class: 'inline' },
         h('button', { type: 'button', class: 'btn', text: 'Duplicate', onclick: () => app.actions.duplicate() }),
