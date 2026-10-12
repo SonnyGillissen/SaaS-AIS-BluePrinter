@@ -27,6 +27,9 @@ architectures. Click your environment together, and get an architecture diagram 
 - **Naming conventions**: global patterns and tokens (`{abbr}-{workload}-{env}-{region}-{instance}`),
   per-type and per-object overrides, inherited tokens, and the **Azure naming rules** (length,
   characters, case, uniqueness) applied and validated automatically.
+- **Load your own Azure environment**: sign in with your own app registration (in the browser,
+  no backend), tick the management groups, subscriptions and resource groups, and the real
+  environment is drawn with its resources, details, tags, networks and connections.
 - **Copy/paste and drag-and-drop everywhere**: palette › canvas, canvas › container, explorer
   tree, Ctrl+C/V (also between tabs), duplicate, undo/redo.
 - **Configuration package**: export and import the complete setup as an open JSON document.
@@ -73,6 +76,7 @@ The full documentation lives in [`docs/wiki`](docs/wiki/Home.md):
 
 [Getting started](docs/wiki/Getting-Started.md) ·
 [User guide](docs/wiki/User-Guide.md) ·
+[Load from Azure](docs/wiki/Load-from-Azure.md) ·
 [Naming conventions](docs/wiki/Naming-Conventions.md) ·
 [Diagram styles](docs/wiki/Diagram-Styles.md) ·
 [Exports](docs/wiki/Exports.md) ·

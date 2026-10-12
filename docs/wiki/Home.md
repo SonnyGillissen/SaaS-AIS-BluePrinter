@@ -15,6 +15,7 @@ and the whole setup to a JSON **configuration package**.
 |---|---|
 | [Getting started](Getting-Started.md) | Run it locally, on simple hosting, or with Docker |
 | [User guide](User-Guide.md) | Designing, connecting, copy/paste, drag-and-drop, keyboard shortcuts |
+| [Load from Azure](Load-from-Azure.md) | Sign in and draw your real Azure environment as a blueprint |
 | [Naming conventions](Naming-Conventions.md) | Patterns, tokens, per-type and per-object overrides, Azure naming rules |
 | [Diagram styles and detail levels](Diagram-Styles.md) | Display styles, high-level vs. detailed views, attribute selection |
 | [Exports](Exports.md) | PNG, PDF, SVG, draw.io, ArchiMate |

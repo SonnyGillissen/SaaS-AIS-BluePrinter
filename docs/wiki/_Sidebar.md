@@ -3,6 +3,7 @@
 - [Home](Home.md)
 - [Getting started](Getting-Started.md)
 - [User guide](User-Guide.md)
+- [Load from Azure](Load-from-Azure.md)
 - [Naming conventions](Naming-Conventions.md)
 - [Diagram styles](Diagram-Styles.md)
 - [Exports](Exports.md)
