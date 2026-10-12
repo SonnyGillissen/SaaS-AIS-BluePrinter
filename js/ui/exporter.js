@@ -45,6 +45,7 @@
    */
   async function run(format, project) {
     const name = baseName(project);
+    const embedDiagram = AISBP.Embedded.enabled();
     switch (format) {
       case 'json':
         download(AISBP.Package.toJson(project), name + '.aisbp.json', MIME.json);
@@ -52,14 +53,14 @@
       case 'svg': {
         await prepareIcons(project);
         const doc = AISBP.Render.renderDocument(project, { iconHref: iconResolver(project, false) });
-        download('<?xml version="1.0" encoding="UTF-8"?>\n' + doc.svg, name + '.svg', MIME.svg);
+        download('<?xml version="1.0" encoding="UTF-8"?>\n' + AISBP.Embedded.toSvg(doc.svg, project, { embedDiagram }), name + '.svg', MIME.svg);
         break;
       }
       case 'png': {
         await prepareIcons(project);
         const doc = AISBP.Render.renderDocument(project, { iconHref: iconResolver(project, true) });
         const st = AISBP.Render.style(project.settings.diagram.style);
-        download(await AISBP.Raster.toPng(doc.svg, doc.width, doc.height, st.background), name + '.png');
+        download(await AISBP.Raster.toPng(doc.svg, doc.width, doc.height, st.background, { project, embedDiagram }), name + '.png');
         break;
       }
       case 'pdf': {
@@ -70,18 +71,20 @@
           pageSize: project.settings.diagram.pdfPageSize,
           title: project.meta.name,
           author: project.meta.author,
-          background: st.background
+          background: st.background,
+          project,
+          embedDiagram
         });
         download(blob, name + '.pdf');
         break;
       }
       case 'drawio': {
         await prepareIcons(project);
-        download(AISBP.DrawIo.toDrawio(project, { iconHref: iconResolver(project, false) }), name + '.drawio', MIME.drawio);
+        download(AISBP.DrawIo.toDrawio(project, { iconHref: iconResolver(project, false), embedDiagram }), name + '.drawio', MIME.drawio);
         break;
       }
       case 'archimate':
-        download(AISBP.ArchiMate.toArchiMate(project), name + '.archimate.xml', MIME.xml);
+        download(AISBP.ArchiMate.toArchiMate(project, { embedDiagram }), name + '.archimate.xml', MIME.xml);
         break;
       default:
         throw new Error('Unknown export format: ' + format);

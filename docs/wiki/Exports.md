@@ -21,6 +21,28 @@ markers are left out.
 can filter on them with *Edit › Edit Tags*/*Find*. In ArchiMate they are element properties
 named `Tag: <name>`.
 
+## Embedded blueprints
+
+By default, SVG, PNG, PDF, draw.io and ArchiMate exports include the **complete configuration
+package**, not just the visible diagram. Use **Import** or drop the exported file on the canvas
+to recreate the blueprint, including its hierarchy, connections, positions, tags, naming rules
+and display settings. JSON exports already contain the complete package.
+
+The package is stored as inert SVG metadata, PNG text metadata, a PDF JSON attachment, or an
+XML comment in draw.io and ArchiMate. The files still open normally in image viewers and their
+respective diagram tools. This is similar to draw.io's embedded-diagram workflow, but the
+embedded source is AIS BluePrinter JSON, not draw.io's `mxfile` format.
+
+**Sharing warning:** the embedded package contains hidden containers and attributes as well as
+visible data. To omit it, set `exports.embedDiagram` to `false` in
+[`js/config.js`](Configuration.md#embedded-blueprints). JSON exports are always complete
+packages; draw.io and ArchiMate still contain their normal native shape/element data.
+
+Only exports carrying an AIS BluePrinter package can be restored this way. Ordinary images,
+third-party draw.io/ArchiMate files and older flat exports cannot be reconstructed. Editing,
+optimising or converting a file in another application may remove its embedded data; native
+edits do not update the embedded blueprint. Keep a `.aisbp.json` backup for long-term storage.
+
 ## Icons in exports
 
 For PNG, PDF, SVG and draw.io, AIS BluePrinter fetches the icons from MS Icons (or your

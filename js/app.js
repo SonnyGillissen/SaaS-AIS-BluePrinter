@@ -300,8 +300,7 @@
     async importFile(file) {
       if (!file) return;
       try {
-        const text = await AISBP.Dom.readText(file);
-        const result = AISBP.Package.fromJson(text);
+        const result = await AISBP.Embedded.fromFile(file);
         const project = result.project;
         const existing = await storage.list();
         if (existing.some((e) => e.id === project.meta.id)) {

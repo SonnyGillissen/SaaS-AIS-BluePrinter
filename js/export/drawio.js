@@ -21,6 +21,7 @@
   const Model = AISBP.Model || (typeof require === 'function' ? require('../core/model.js') : null);
   const Layout = AISBP.Layout || (typeof require === 'function' ? require('../core/layout.js') : null);
   const Render = AISBP.Render || (typeof require === 'function' ? require('../render/svg.js') : null);
+  const Embedded = AISBP.Embedded || (typeof require === 'function' ? require('./embedded.js') : null);
 
   const esc = Util.escapeXml;
   /** HTML escape (draw.io labels with html=1 are interpreted as HTML). */
@@ -145,11 +146,12 @@
 
     const w = Math.ceil(g.bounds.w + 80);
     const h = Math.ceil(g.bounds.h + 80);
-    return '<?xml version="1.0" encoding="UTF-8"?>\n' +
+    const xml = '<?xml version="1.0" encoding="UTF-8"?>\n' +
       '<mxfile host="AIS BluePrinter" agent="AIS BluePrinter" modified="' + esc(Util.now()) + '" version="24.0.0" type="device">' +
       '<diagram id="' + esc(project.meta.id) + '" name="' + esc(project.meta.name) + '">' +
       '<mxGraphModel dx="' + w + '" dy="' + h + '" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="0" pageScale="1" pageWidth="' + w + '" pageHeight="' + h + '" background="' + st.background + '" math="0" shadow="0">' +
       '<root><mxCell id="0"/><mxCell id="1" parent="0"/>' + cells.join('') + '</root></mxGraphModel></diagram></mxfile>\n';
+    return Embedded.toXml(xml, project, o);
   }
 
   AISBP.DrawIo = { toDrawio, styleImage };

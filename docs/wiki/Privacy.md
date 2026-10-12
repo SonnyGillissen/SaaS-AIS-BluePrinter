@@ -18,6 +18,11 @@ machine.**
   deletes your blueprints. Export a configuration package regularly as a backup.
   *Options › Storage & privacy* shows how much space is used, and can delete all AIS BluePrinter
   data from the browser.
+- Diagram exports embed the complete blueprint by default, including hidden attributes and
+  containers. Anyone receiving the file can recover this data with **Import**. Disable
+  `exports.embedDiagram` in `js/config.js` before exporting for external sharing if this is
+  unwanted. JSON packages remain complete, and draw.io/ArchiMate still include native
+  shape/element data. See [Embedded blueprints](Exports.md#embedded-blueprints).
 
 ## Server mode
 

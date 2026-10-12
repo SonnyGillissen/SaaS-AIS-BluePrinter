@@ -23,5 +23,13 @@ window.AISBP_CONFIG = {
    *   diagram: { style: 'classic' },
    *   icons: { baseUrl: 'icons/msicons/' } }   // self-hosted icon mirror, see tools/mirror-icons.js
    */
-  defaults: {}
+  defaults: {},
+
+  /**
+   * Embed the complete configuration package in diagram exports so Import can restore them.
+   * Set to false for sharing without hidden blueprint data (JSON remains a full package).
+   */
+  exports: {
+    embedDiagram: true
+  }
 };
