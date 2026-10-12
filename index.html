@@ -26,6 +26,7 @@
         <button type="button" data-action="new" title="New blueprint">New</button>
         <button type="button" data-action="projects" title="Open a saved blueprint">Open</button>
         <button type="button" data-action="import" title="Import a configuration package or an export with an embedded blueprint">Import</button>
+        <button type="button" data-action="azure" title="Sign in and load your own Azure environment into a new blueprint">Load from Azure</button>
         <div class="menu">
           <button type="button" data-action="export-menu" aria-haspopup="true" aria-expanded="false" title="Export">Export &#9662;</button>
           <div class="menu-list" role="menu" hidden>
@@ -98,7 +99,7 @@
       <div id="canvas-empty" class="canvas-empty" hidden>
         <h2>Start your blueprint</h2>
         <p>Drag a <strong>management group</strong>, <strong>subscription</strong> or <strong>resource group</strong> from the palette onto the canvas, then drop resources inside it.</p>
-        <p><button type="button" data-action="sample">Load the sample blueprint</button></p>
+        <p><button type="button" data-action="sample">Load the sample blueprint</button> <button type="button" data-action="azure">Load your Azure environment</button></p>
       </div>
       <div class="canvas-hint" id="canvas-hint">Drag empty space to pan &bull; Shift+drag to select &bull; Ctrl+wheel to zoom &bull; Drag the &#9675; handle to connect</div>
     </section>
@@ -115,7 +116,7 @@
     <span class="sep" aria-hidden="true">&bull;</span>
     <span id="storage-note" class="storage-note">&#128274; Your data stays in this browser (localStorage)</span>
     <span class="spacer"></span>
-    <a href="docs/wiki/Home.md" target="_blank" rel="noopener">Documentation</a>
+    <a href="https://github.com/SonnyGillissen/SaaS-AIS-BluePrinter/wiki" target="_blank" rel="noopener">Documentation</a>
   </footer>
 
   <input id="file-input" type="file" accept=".json,.png,.pdf,.svg,.drawio,.xml,application/json,image/png,application/pdf,image/svg+xml,application/xml" hidden>
@@ -130,6 +131,7 @@
   <script src="js/core/model.js"></script>
   <script src="js/core/naming.js"></script>
   <script src="js/core/layout.js"></script>
+  <script src="js/core/azure.js"></script>
   <script src="js/core/store.js"></script>
   <script src="js/core/storage.js"></script>
   <!-- Rendering and exports -->
@@ -141,6 +143,8 @@
   <script src="js/export/archimate.js"></script>
   <script src="js/export/raster.js"></script>
   <!-- User interface -->
+  <script src="js/azure/arm.js"></script>
+  <script src="js/azure/auth.js"></script>
   <script src="js/ui/dom.js"></script>
   <script src="js/ui/palette.js"></script>
   <script src="js/ui/explorer.js"></script>
@@ -148,6 +152,7 @@
   <script src="js/ui/canvas.js"></script>
   <script src="js/ui/dialogs.js"></script>
   <script src="js/ui/exporter.js"></script>
+  <script src="js/ui/azure.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

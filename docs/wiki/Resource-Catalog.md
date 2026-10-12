@@ -125,4 +125,13 @@ The resource types available in the palette, generated from [`js/core/catalog.js
 | On-premises System | `onprem` | *(top level)*, Management Group, Subscription, Resource Group | 1-256 characters | Description, Product, Connectivity, Site / datacenter |
 | Users / Clients | `users` | *(top level)*, Management Group, Subscription, Resource Group | 1-256 characters | Channel, Description |
 
+## Other
+
+| Type | Abbr. | Allowed parents | Naming rule | Attributes |
+|---|---|---|---|---|
+| Other Azure Resource | `res` | Resource Group | 1-256 characters | Location, Description, Resource type, Kind, SKU |
+
+*Other Azure Resource* represents any Azure resource without a dedicated type, for example when
+[loading an environment from Azure](Load-from-Azure.md).
+
 Want another resource type? Add an entry to `TYPES` in `js/core/catalog.js` (see [Architecture](Architecture.md#adding-a-resource-type)).

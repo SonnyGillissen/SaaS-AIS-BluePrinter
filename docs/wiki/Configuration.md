@@ -17,7 +17,12 @@ window.AISBP_CONFIG = {
     diagram: { style: 'classic', detailLevel: 'selected' },
     icons: { baseUrl: 'icons/msicons/' }
   },
-  exports: { embedDiagram: true }    // default for the export popup's embedding checkbox
+  exports: { embedDiagram: true },   // default for the export popup's embedding checkbox
+  azure: {                          // defaults for "Load from Azure"
+    clientId: '',                   // Application (client) ID of your app registration
+    tenantId: 'organizations',      // tenant ID, domain, or 'organizations'
+    redirectUri: ''                 // default: azure-callback.html next to index.html
+  }
 };
 ```
 
@@ -59,9 +64,21 @@ Node.js 18 or later.
 If an icon can't be loaded, the app shows a neutral placeholder with the type's abbreviation, so
 the designer stays fully usable offline.
 
+## Load from Azure
+
+[Load from Azure](Load-from-Azure.md) signs users in with a Microsoft Entra app registration
+(**Single-page application** platform, delegated **Azure Service Management ›
+user_impersonation** permission, no secret). Set `azure.clientId` (and optionally
+`azure.tenantId`) in `js/config.js` to preconfigure it for everyone; users can still enter
+their own values in the dialog, which are remembered in their browser (`aisbp.azure`).
+`azure.redirectUri` is only needed when the redirect page is not `azure-callback.html` next to
+`index.html`. Register that exact URI in the app registration.
+
 ## Content Security Policy
 
 `index.html` ships with a restrictive Content Security Policy: scripts only from the app itself,
-no inline scripts, and images from https/data/blob. If you host the icons on another
+no inline scripts, and images from https/data/blob. Network requests are allowed to https
+(`connect-src`), which *Load from Azure* needs for `login.microsoftonline.com` and
+`management.azure.com`. If you host the icons on another
 domain, they are already allowed (`img-src https:`). If your server sends its own CSP header,
 make sure it permits the same.

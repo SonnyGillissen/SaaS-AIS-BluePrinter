@@ -148,7 +148,11 @@
    *                          objects can be dragged out of a container),
    *   frozen: Object<string,{x,y,w,h}>  minimum rects for containers (used while dragging so a
    *                          container keeps its boundary and the object is not detached while
-   *                          the pointer is still inside it)
+   *                          the pointer is still inside it),
+   *   root: string  only measure this node and its descendants (rects of other nodes are
+   *                 omitted and bounds are not meaningful; used by autoLayout for speed),
+   *   childIndex: object  pre-built child index (from a previous result) when the hierarchy
+   *                 and order did not change
    * }
    * Containers wrap their children and are at least MIN_W x MIN_H. A container with a manual
    * size (node.w / node.h, set by resizing it on the canvas) is at least that size, measured
@@ -165,13 +169,16 @@
     const frozen = (opts && opts.frozen) || {};
     const diagram = project.settings.diagram;
     const hidden = new Set(diagram.hiddenContainers || []);
-    const childIndex = {};
-    Object.keys(project.nodes).forEach((id) => {
-      const n = project.nodes[id];
-      const key = n.parentId && project.nodes[n.parentId] ? n.parentId : '';
-      (childIndex[key] = childIndex[key] || []).push(n);
-    });
-    Object.keys(childIndex).forEach((k) => childIndex[k].sort((a, b) => a.seq - b.seq));
+    let childIndex = opts && opts.childIndex;
+    if (!childIndex) {
+      childIndex = {};
+      Object.keys(project.nodes).forEach((id) => {
+        const n = project.nodes[id];
+        const key = n.parentId && project.nodes[n.parentId] ? n.parentId : '';
+        (childIndex[key] = childIndex[key] || []).push(n);
+      });
+      Object.keys(childIndex).forEach((k) => childIndex[k].sort((a, b) => a.seq - b.seq));
+    }
     const rects = {};
 
     const measure = (node, depth) => {
@@ -234,6 +241,11 @@
       return r;
     };
 
+    const root = opts && opts.root ? project.nodes[opts.root] : null;
+    if (root) {
+      measure(root, 0);
+      return { rects, bounds: boundsOf([]), names: nm, childIndex };
+    }
     (childIndex[''] || []).forEach((n) => measure(n, 0));
     const boundsRects = Object.keys(rects).map((k) => rects[k]).filter((r) => !r.hidden && r.w);
     Object.keys(project.connections).forEach((id) => {
@@ -363,6 +375,10 @@
     const scope = rootId ? [Model.getNode(project, rootId)].concat(Model.descendants(project, rootId)) : Object.keys(project.nodes).map((k) => project.nodes[k]);
     scope.forEach((n) => { if (n) { delete n.w; delete n.h; } });
     const maxRowWidth = 1400;
+    // The hierarchy does not change while arranging, so the child index is built once and only
+    // the subtree of the node being placed is measured (sizes only depend on the subtree).
+    const childIndex = compute(project, names).childIndex;
+    const measure = (node) => compute(project, names, { root: node.id, childIndex }).rects[node.id];
     const layoutChildren = (parentId, originX, originY, headerH) => {
       const kids = Model.children(project, parentId);
       let cx = originX;
@@ -384,11 +400,11 @@
     const place = (node, x, y) => {
       node.x = x;
       node.y = y;
-      const g = compute(project, names);
-      if (g.rects[node.id] && g.rects[node.id].container) {
-        layoutChildren(node.id, x + PAD, y, (g.rects[node.id].hidden ? 0 : g.rects[node.id].headerH) + PAD / 2);
+      const r = measure(node);
+      if (r && r.container) {
+        layoutChildren(node.id, x + PAD, y, (r.hidden ? 0 : r.headerH) + PAD / 2);
       }
-      const after = compute(project, names).rects[node.id];
+      const after = measure(node);
       return { w: after.w, h: after.h };
     };
     if (rootId) {

@@ -134,6 +134,9 @@ attachments in embedded blueprint metadata when embedding is enabled.
   tabs, between projects, or into a text editor.
 - Pasting a full **configuration package** (JSON) from the clipboard imports it as a new project.
 - **Ctrl+D** duplicates the selection.
+- Copies using naming conventions receive an unused number in their destination naming scope.
+  Patterns with `{instance}` advance that number; patterns with `{name}` number the copied
+  label instead. Custom names and patterns without either token are kept unchanged.
 - When you paste, objects go into the selected container if it accepts them. Otherwise they go next
   to the originals.
 - Drag-and-drop is supported everywhere: palette › canvas, palette › explorer, canvas › canvas
