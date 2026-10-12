@@ -153,7 +153,18 @@
    * Compute the SVG path and label position for a connection between two rects.
    * @returns {{d: string, label: {x:number,y:number}}}
    */
-  function connectorPath(a, b, kind) {
+  function connectorPath(a, b, kind, waypoints) {
+    const points = Model.cleanWaypoints(waypoints);
+    if (points.length) {
+      const rects = [a].concat(points.map((pt) => ({ x: pt.x, y: pt.y, w: 0, h: 0 })), [b]);
+      const legs = rects.slice(1).map((r, i) => connectorPath(rects[i], r, kind));
+      return {
+        d: legs.map((leg, i) => i ? leg.d.replace(/^M[^A-Za-z]+/, '') : leg.d).join(' '),
+        label: legs[Math.floor(legs.length / 2)].label,
+        handles: points.map((pt, index) => ({ x: pt.x, y: pt.y, index, insert: false }))
+          .concat(points.length < 100 ? legs.map((leg, index) => ({ x: leg.label.x, y: leg.label.y, index, insert: true })) : [])
+      };
+    }
     const ca = center(a);
     const cb = center(b);
     if (kind === 'orthogonal') {
@@ -317,7 +328,7 @@
     const b = endRect(geometry, c.to);
     if (!a || !b) return '';
     const kind = Model.CONNECTION_KINDS.find((k) => k.id === c.kind) || Model.CONNECTION_KINDS[0];
-    const path = connectorPath(a, b, project.settings.diagram.connector || 'orthogonal');
+    const path = connectorPath(a, b, project.settings.diagram.connector || 'orthogonal', c.waypoints);
     const selected = o.selection && o.selection.conns.has(c.id);
     const color = selected ? st.selection : st.edge;
     const p = o.idPrefix || '';

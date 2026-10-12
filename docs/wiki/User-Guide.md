@@ -108,6 +108,16 @@ connection to set its:
   drawn with an arrow head at both ends). *Reverse direction* swaps source and target.
 - **Protocol** (HTTPS, AMQP, SFTP, AS2, Private Link, …) and a **label**.
 
+Connections start with an automatic route. To adjust a line or arrow afterward, **select it
+and drag one of its routing handles**. Small filled handles add points; larger outlined
+handles move existing points. You can add several points to route around objects, using any
+connector style (orthogonal, straight or curved). Endpoints stay attached to their objects.
+
+**Double-click an outlined point** to remove it, or choose **Reset route** in Properties to
+return to automatic routing. Dragging respects the diagram's grid setting; press **Escape**
+while dragging to cancel. Each completed drag is one undo step. Routes are saved with the
+blueprint and included in exports.
+
 ## Copy, paste and drag-and-drop
 
 - **Ctrl+C / Ctrl+X / Ctrl+V** copy, cut and paste the selection, including children and the

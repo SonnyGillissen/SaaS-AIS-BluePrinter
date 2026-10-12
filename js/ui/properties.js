@@ -317,8 +317,10 @@
       const proto = select(Model.PROTOCOLS, (c.attributes && c.attributes.protocol) || '', { id: 'prop-conn-protocol', onchange: () => patchConn(c.id, { attributes: { protocol: proto.value } }) });
       out.push(field('Protocol', proto));
       out.push(field('Description', textArea('prop-conn-desc', c.attributes && c.attributes.description, (v) => patchConn(c.id, { attributes: { description: v } }, c.id + ':desc'))));
+      out.push(h('p', { class: 'subtitle', text: 'Drag the points on the selected line to adjust its route. Double-click a routing point to remove it.' }));
       out.push(h('div', { class: 'inline' },
-        h('button', { type: 'button', class: 'btn', text: 'Reverse direction', onclick: () => store.change('reverse', (p) => { const x = p.connections[c.id]; const f = x.from; x.from = x.to; x.to = f; }) }),
+        h('button', { type: 'button', class: 'btn', text: 'Reset route', disabled: !(c.waypoints && c.waypoints.length), onclick: () => patchConn(c.id, { waypoints: [] }) }),
+        h('button', { type: 'button', class: 'btn', text: 'Reverse direction', onclick: () => store.change('reverse', (p) => { const x = p.connections[c.id]; const f = x.from; x.from = x.to; x.to = f; if (x.waypoints) x.waypoints.reverse(); }) }),
         h('button', { type: 'button', class: 'btn danger', text: 'Delete', onclick: () => app.actions.remove() })));
       return out;
     }

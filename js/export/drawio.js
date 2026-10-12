@@ -141,8 +141,10 @@
         (noArrow ? 'endArrow=none;' : c.kind === 'dependency' ? 'endArrow=open;endFill=0;' : 'endArrow=block;endFill=1;') +
         (both ? (c.kind === 'dependency' ? 'startArrow=open;startFill=0;' : 'startArrow=block;startFill=1;') : c.kind === 'trigger' ? 'startArrow=oval;startFill=1;' : '');
       const label = [c.label, c.attributes && c.attributes.protocol && c.attributes.protocol !== c.label ? c.attributes.protocol : ''].filter(Boolean).join(' \u00b7 ');
+      const points = Model.cleanWaypoints(c.waypoints);
+      const routing = points.length ? '<Array as="points">' + points.map((pt) => '<mxPoint x="' + (pt.x - ox) + '" y="' + (pt.y - oy) + '"/>').join('') + '</Array>' : '';
       cells.push('<object label="' + esc(html(label)) + '" id="e-' + esc(c.id) + '" connectionType="' + esc(kind.label) + '" direction="' + (both ? 'bidirectional' : 'forward') + '"' + (c.attributes && c.attributes.protocol ? ' protocol="' + esc(c.attributes.protocol) + '"' : '') + '>' +
-        '<mxCell style="' + esc(style) + '" edge="1" parent="1" source="' + cellId(c.from) + '" target="' + cellId(c.to) + '"><mxGeometry relative="1" as="geometry"/></mxCell></object>');
+        '<mxCell style="' + esc(style) + '" edge="1" parent="1" source="' + cellId(c.from) + '" target="' + cellId(c.to) + '"><mxGeometry relative="1" as="geometry">' + routing + '</mxGeometry></mxCell></object>');
     });
 
     const w = Math.ceil(g.bounds.w + 80);

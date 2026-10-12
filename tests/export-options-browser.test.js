@@ -134,6 +134,60 @@ async function browserChecks() {
   }
   await A.app.actions.exportAs('json');
   check(!doc.querySelector('dialog') && downloads.pop().name.endsWith('.aisbp.json'), 'JSON downloads directly');
+
+  // Exercise routing gestures in the real SVG canvas, including zoomed coordinates.
+  const routeProject = A.Model.createProject();
+  const from = A.Model.addNode(routeProject, 'external-system', null, { x: 0, y: 0 });
+  const to = A.Model.addNode(routeProject, 'external-system', null, { x: 500, y: 200 });
+  const conn = A.Model.addConnection(routeProject, from.id, to.id);
+  const store = A.app.store;
+  const canvas = A.app.canvas;
+  store.load(routeProject);
+  store.select([], [conn.id]);
+  canvas.zoomIn();
+  canvas.render();
+  const svgCanvas = doc.getElementById('canvas-svg');
+  // Synthetic PointerEvents do not have an active native pointer to capture.
+  svgCanvas.setPointerCapture = () => {};
+  svgCanvas.releasePointerCapture = () => {};
+  const fire = (target, type, x, y) => target.dispatchEvent(new win.PointerEvent(type, { bubbles: true, pointerId: 1, button: 0, clientX: x, clientY: y }));
+  const dragPoint = (insert, endType = 'pointerup') => {
+    const handle = doc.querySelector('[data-handle="route"][data-insert="' + insert + '"]');
+    check(!!handle, 'Routing handle exists: ' + insert);
+    const r = handle.getBoundingClientRect();
+    const x = r.left + r.width / 2;
+    const y = r.top + r.height / 2;
+    fire(handle, 'pointerdown', x, y);
+    fire(svgCanvas, 'pointermove', x + 72, y + 96);
+    if (endType === 'Escape') doc.getElementById('canvas').dispatchEvent(new win.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    else fire(svgCanvas, endType, x + 72, y + 96);
+    canvas.render();
+  };
+  dragPoint(true);
+  check(store.project.connections[conn.id].waypoints.length === 1 && store.past.length === 1, 'Dragging adds a persisted point in one undo step');
+  const routeBefore = JSON.stringify(store.project.connections[conn.id].waypoints);
+  dragPoint(false);
+  check(JSON.stringify(store.project.connections[conn.id].waypoints) !== routeBefore && store.past.length === 2, 'Existing routing point can be redragged');
+  store.undo();
+  check(JSON.stringify(store.project.connections[conn.id].waypoints) === routeBefore, 'Undo restores routing point');
+  store.redo();
+  canvas.render();
+  const cancelBefore = JSON.stringify(store.project.connections[conn.id].waypoints);
+  dragPoint(false, 'pointercancel');
+  check(JSON.stringify(store.project.connections[conn.id].waypoints) === cancelBefore && store.past.length === 2, 'Pointer cancellation rolls routing back');
+  dragPoint(false, 'Escape');
+  check(JSON.stringify(store.project.connections[conn.id].waypoints) === cancelBefore && store.past.length === 2, 'Escape cancels routing without a history entry');
+  dragPoint(true);
+  check(store.project.connections[conn.id].waypoints.length === 2, 'Another segment handle adds a second point');
+  const pointHandle = doc.querySelector('[data-handle="route"][data-insert="false"]');
+  pointHandle.dispatchEvent(new win.MouseEvent('dblclick', { bubbles: true }));
+  check(store.project.connections[conn.id].waypoints.length === 1, 'Double click removes a routing point');
+  const reset = Array.from(doc.querySelectorAll('button')).find((b) => b.textContent === 'Reset route');
+  check(reset && !reset.disabled, 'Connection properties offer route reset');
+  reset.click();
+  check(store.project.connections[conn.id].waypoints.length === 0, 'Reset restores automatic routing');
+  store.undo();
+  check(store.project.connections[conn.id].waypoints.length === 1, 'Route reset can be undone');
   return results;
 }
 

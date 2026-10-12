@@ -180,6 +180,22 @@
         const r = g.rects[gesture.id];
         if (r) overlay.appendChild(svgEl('rect', { x: r.x, y: r.y, width: r.w, height: r.h, fill: 'none', stroke: st.selection, 'stroke-dasharray': '4 3', 'stroke-width': 1.5 / view.k }));
       }
+      store.selectedConns().forEach((id) => {
+        const c = store.project.connections[id];
+        const a = g.rects[c.from];
+        const b = g.rects[c.to];
+        if (!a || !b || a.hidden || b.hidden || !a.w || !b.w) return;
+        const path = Render.connectorPath(a, b, store.project.settings.diagram.connector, c.waypoints);
+        const handles = path.handles || [{ x: path.label.x, y: path.label.y, index: 0, insert: true }];
+        handles.forEach((pt) => {
+          const handle = svgEl('g', { class: 'handle route', 'data-handle': 'route', 'data-conn-id': id, 'data-point-index': pt.index, 'data-insert': pt.insert });
+          const title = svgEl('title', {});
+          title.textContent = pt.insert ? 'Drag to add a routing point' : 'Drag to move routing point; double-click to remove';
+          handle.appendChild(title);
+          handle.appendChild(svgEl('circle', { cx: pt.x, cy: pt.y, r: (pt.insert ? 5 : 7) / view.k, fill: pt.insert ? st.selection : '#ffffff', stroke: st.selection, 'stroke-width': 2 / view.k }));
+          overlay.appendChild(handle);
+        });
+      });
       if (gesture && gesture.type === 'marquee' && gesture.rect) {
         const m = gesture.rect;
         overlay.appendChild(svgEl('rect', { x: m.x, y: m.y, width: m.w, height: m.h, fill: 'rgba(10,99,201,0.08)', stroke: '#0a63c9', 'stroke-dasharray': '4 3', 'stroke-width': 1 / view.k }));
@@ -248,6 +264,14 @@
       if (e.button === 1) {
         gesture = { type: 'pan', sx: e.clientX, sy: e.clientY, vx: view.x, vy: view.y };
         svg.classList.add('panning');
+      } else if (handleEl && handleEl.getAttribute('data-handle') === 'route') {
+        const id = handleEl.getAttribute('data-conn-id');
+        gesture = {
+          type: 'route', id, index: Number(handleEl.getAttribute('data-point-index')),
+          insert: handleEl.getAttribute('data-insert') === 'true',
+          start: pt, points: Model.cleanWaypoints(store.project.connections[id].waypoints),
+          snapshot: null, pointerId: e.pointerId
+        };
       } else if (handleEl && handleEl.getAttribute('data-handle') === 'resize') {
         const id = handleEl.getAttribute('data-node-id');
         const r = store.derived().geometry.rects[id];
@@ -310,6 +334,17 @@
         gesture.target = target;
         if (dx || dy) store.live((p) => Model.moveNodes(p, gesture.ids, dx, dy));
         else queueRender();
+      } else if (gesture.type === 'route') {
+        const dx = pt.x - gesture.start.x;
+        const dy = pt.y - gesture.start.y;
+        if (!gesture.snapshot && Math.abs(dx) + Math.abs(dy) < 4 / view.k) return;
+        if (!gesture.snapshot) gesture.snapshot = store.begin();
+        const points = gesture.points.map((p) => ({ x: p.x, y: p.y }));
+        const origin = gesture.insert ? gesture.start : gesture.points[gesture.index];
+        const point = { x: snap(origin.x + dx), y: snap(origin.y + dy) };
+        if (gesture.insert) points.splice(gesture.index, 0, point);
+        else points[gesture.index] = point;
+        store.live((p) => Model.updateConnection(p, gesture.id, { waypoints: points }));
       } else if (gesture.type === 'resize') {
         const w = Math.max(Layout.MIN_W, snap(gesture.size.w + pt.x - gesture.start.x));
         const h = Math.max(Layout.MIN_H, snap(gesture.size.h + pt.y - gesture.start.y));
@@ -356,7 +391,7 @@
         // A plain click (no drag): make sure the selection handles are drawn.
         queueRender();
       }
-      if (gst.type === 'resize') {
+      if (gst.type === 'resize' || gst.type === 'route') {
         if (gst.snapshot) {
           if (cancelled) store.rollback(gst.snapshot);
           else store.commit(gst.snapshot);
@@ -382,8 +417,25 @@
 
     svg.addEventListener('pointerup', (e) => endGesture(e, false));
     svg.addEventListener('pointercancel', (e) => endGesture(e, true));
+    wrap.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape' || !gesture || gesture.type !== 'route') return;
+      e.preventDefault();
+      e.stopPropagation();
+      endGesture({ pointerId: gesture.pointerId }, true);
+    });
 
     svg.addEventListener('dblclick', (e) => {
+      const handle = e.target.closest('[data-handle="route"]');
+      if (handle && handle.getAttribute('data-insert') !== 'true') {
+        const id = handle.getAttribute('data-conn-id');
+        const index = Number(handle.getAttribute('data-point-index'));
+        store.change('remove routing point', (p) => {
+          const points = Model.cleanWaypoints(p.connections[id].waypoints);
+          points.splice(index, 1);
+          Model.updateConnection(p, id, { waypoints: points });
+        });
+        return;
+      }
       const nodeEl = e.target.closest('[data-node-id]');
       if (!nodeEl) return;
       const input = doc.getElementById('prop-label') || doc.getElementById('prop-name');
