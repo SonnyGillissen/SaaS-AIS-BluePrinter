@@ -25,6 +25,64 @@ async function browserChecks() {
     if (!condition) throw new Error(label);
     results.push(label);
   };
+  const actionButtons = Array.from(doc.querySelectorAll('button[data-icon]'));
+  check(actionButtons.length >= 20 && actionButtons.every((button) => button.querySelectorAll('.action-icon').length === 1), 'Static toolbar and export actions have one local SVG icon each');
+  check(actionButtons.every((button) => {
+    const svg = button.querySelector('.action-icon');
+    return svg.namespaceURI === 'http://www.w3.org/2000/svg' && svg.getAttribute('aria-hidden') === 'true' && svg.getAttribute('focusable') === 'false' && (button.textContent.trim() || button.getAttribute('aria-label'));
+  }), 'Action icons are decorative and all controls retain accessible labels');
+  const copyButton = doc.querySelector('[data-action="copy"]');
+  A.Dom.decorateAction(copyButton);
+  check(copyButton.textContent === 'Copy' && copyButton.querySelectorAll('.action-icon').length === 1, 'Decoration is idempotent and preserves button text');
+  const dynamicButton = A.Dom.h('button', { text: '<unsafe>', 'data-icon': 'save', disabled: true });
+  check(dynamicButton.textContent === '<unsafe>' && dynamicButton.disabled && !dynamicButton.querySelector('unsafe') && !!dynamicButton.querySelector('.action-icon'), 'Dynamic buttons preserve safe text and disabled state');
+  check(!A.Dom.h('button', { text: 'Unknown', 'data-icon': '__proto__' }).querySelector('svg'), 'Unknown icon names do not produce SVG markup');
+  const themeBefore = doc.documentElement.getAttribute('data-theme');
+  for (const theme of ['light', 'dark']) {
+    doc.documentElement.setAttribute('data-theme', theme);
+    const svg = copyButton.querySelector('.action-icon');
+    check(win.getComputedStyle(svg).stroke === win.getComputedStyle(copyButton).color && win.getComputedStyle(svg).pointerEvents === 'none' && svg.getBoundingClientRect().width === 16, 'Action icons inherit theme colour and do not intercept clicks: ' + theme);
+  }
+  if (themeBefore === null) doc.documentElement.removeAttribute('data-theme');
+  else doc.documentElement.setAttribute('data-theme', themeBefore);
+  const labelsSelect = doc.getElementById('action-labels-select');
+  const label = copyButton.querySelector('.action-label');
+  check(labelsSelect.value === 'show' && win.getComputedStyle(label).position !== 'absolute', 'Action labels are shown by default');
+  const projectBeforeLabels = JSON.stringify(A.app.store.project);
+  const prefsBeforeLabels = A.Storage.loadPrefs();
+  labelsSelect.value = 'hide';
+  labelsSelect.dispatchEvent(new win.Event('change'));
+  check(doc.documentElement.getAttribute('data-action-labels') === 'hidden' && win.getComputedStyle(label).clipPath === 'inset(50%)' && win.getComputedStyle(copyButton.querySelector('svg')).marginRight === '0px', 'Hide labels switches to compact icons without removing their accessible text');
+  check(copyButton.textContent === 'Copy' && copyButton.title === 'Copy (Ctrl+C)' && A.Storage.loadPrefs().showActionLabels === false, 'Hidden labels retain names, shortcut tooltips and a persisted preference');
+  const exportMenuButton = doc.querySelector('[data-action="export-menu"]');
+  exportMenuButton.click();
+  const submenuActions = Array.from(doc.querySelectorAll('.menu-list [role="menuitem"]'));
+  check(submenuActions.length === 6 && submenuActions.every((button) => {
+    const labelStyle = win.getComputedStyle(button.querySelector('.action-label'));
+    return labelStyle.position !== 'absolute' && labelStyle.clipPath === 'none' && button.querySelector('.action-label').getBoundingClientRect().width > 1 && win.getComputedStyle(button.querySelector('.action-icon')).marginRight === '6px';
+  }), 'Export submenu retains visible labels and icon spacing while toolbar labels are hidden');
+  exportMenuButton.click();
+  check(Object.keys(prefsBeforeLabels).every((key) => A.Storage.loadPrefs()[key] === prefsBeforeLabels[key]) && JSON.stringify(A.app.store.project) === projectBeforeLabels, 'Label preference preserves other preferences and does not modify the blueprint');
+  A.Dom.setActionLabels(true);
+  await new Promise((resolve, reject) => {
+    const script = doc.createElement('script');
+    script.src = '/js/ui/dom.js';
+    script.onload = resolve;
+    script.onerror = reject;
+    doc.head.appendChild(script);
+  });
+  check(doc.documentElement.getAttribute('data-action-labels') === 'hidden' && copyButton.querySelectorAll('.action-icon').length === 1, 'DOM initialization restores the cached hidden-label preference without duplicating icons');
+  doc.querySelector('[data-action="help"] .action-icon path').dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+  const helpDialog = doc.querySelector('dialog[open]');
+  check(!!helpDialog && !!helpDialog.querySelector('.dlg-head button .action-icon') && !!helpDialog.querySelector('.dlg-foot button .action-icon'), 'Clicking SVG content still invokes delegated actions; dialog close actions have icons');
+  const closeButton = helpDialog.querySelector('.dlg-foot button');
+  check(win.getComputedStyle(closeButton.querySelector('.action-label')).clipPath === 'none' && closeButton.querySelector('.action-label').getBoundingClientRect().width > 1 && win.getComputedStyle(closeButton.querySelector('.action-icon')).marginRight === '6px' && closeButton.title === 'Close' && closeButton.textContent === 'Close', 'Dynamically created dialog actions retain visible labels and icon spacing in compact toolbar mode');
+  helpDialog.querySelector('.dlg-head button').click();
+  check(!doc.querySelector('dialog[open]'), 'Icon-only dialog close remains functional');
+  check(Array.from(doc.querySelectorAll('.canvas-empty button .action-label')).every((text) => win.getComputedStyle(text).clipPath === 'none'), 'Empty-canvas buttons retain visible labels in compact toolbar mode');
+  labelsSelect.value = 'show';
+  labelsSelect.dispatchEvent(new win.Event('change'));
+  check(win.getComputedStyle(label).position !== 'absolute' && A.Storage.loadPrefs().showActionLabels === true, 'Show labels restores visible action text and persists the choice');
   const annotationsBefore = A.Util.clone(A.app.store.project);
   const clickText = (text) => {
     const button = Array.from(doc.querySelectorAll('dialog[open] button, .annotation-inline-editor button, #panel-properties button')).find((b) => b.textContent === text);
@@ -55,6 +113,13 @@ async function browserChecks() {
   change('prop-annotation-theme', 'callout');
   A.app.canvas.render();
   check(!doc.getElementById('prop-name-mode') && !doc.getElementById('prop-label'), 'Annotation properties omit Azure naming fields');
+  check(Array.from(doc.querySelectorAll('#panel-properties button[data-icon]')).every((button) => !!button.querySelector('.action-icon')), 'Re-rendered Properties actions have icons');
+  labelsSelect.value = 'hide';
+  labelsSelect.dispatchEvent(new win.Event('change'));
+  const propertyLabels = Array.from(doc.querySelectorAll('#panel-properties button .action-label'));
+  check(propertyLabels.length > 0 && propertyLabels.every((text) => win.getComputedStyle(text).clipPath === 'none' && text.getBoundingClientRect().width > 1), 'Properties buttons retain visible labels while toolbar labels are hidden');
+  labelsSelect.value = 'show';
+  labelsSelect.dispatchEvent(new win.Event('change'));
   const annotation = doc.querySelector('#content [data-node-id="' + markdownId + '"]');
   check(annotation && annotation.querySelector('text') && !annotation.querySelector('textarea,input,foreignObject,script'), 'Markdown canvas is safe rendered SVG text, never an input');
   check(!!doc.querySelector('#overlay [data-handle="resize"][data-node-id="' + markdownId + '"]'), 'Annotations expose a canvas resize handle');

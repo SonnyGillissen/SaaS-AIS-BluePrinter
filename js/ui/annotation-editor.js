@@ -126,8 +126,8 @@
         field(markdown ? 'Markdown' : 'Text', input),
         markdown ? h('details', { open: true }, h('summary', { text: 'Safe preview' }), preview, h('p', { class: 'subtitle', text: 'Links render as text; HTML and images are not rendered.' })) : null,
         error, help, h('div', { class: 'inline' },
-          h('button', { type: 'button', class: 'btn primary', text: 'Save', onclick: save }),
-          h('button', { type: 'button', class: 'btn', text: 'Cancel', onclick: close })));
+          h('button', { type: 'button', class: 'btn primary', text: 'Save', 'data-icon': 'save', onclick: save }),
+          h('button', { type: 'button', class: 'btn', text: 'Cancel', 'data-icon': 'close', onclick: close })));
       doc.body.appendChild(shell);
       update();
       position();

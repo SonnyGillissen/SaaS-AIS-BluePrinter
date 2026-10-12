@@ -88,6 +88,28 @@ body {
 button, input, select, textarea { font: inherit; color: inherit; }
 input, select, textarea { background-color: var(--c-input); }
 
+.action-icon {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  margin-right: 6px;
+  vertical-align: -3px;
+  flex: none;
+  pointer-events: none;
+}
+[data-icon-only] .action-icon { margin-right: 0; }
+:root[data-action-labels='hidden'] .toolbar button:not([role='menuitem']) > .action-icon { margin-right: 0; }
+:root[data-action-labels='hidden'] .toolbar button:not([role='menuitem']) > .action-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 a { color: var(--c-primary); }
 
 .skip-link { position: absolute; left: -9999px; }

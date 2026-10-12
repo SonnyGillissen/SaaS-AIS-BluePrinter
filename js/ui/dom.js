@@ -11,6 +11,63 @@
   const AISBP = (root.AISBP = root.AISBP || {});
   const doc = root.document;
 
+  const ACTION_PATHS = {
+    new: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6Z M14 2v6h6 M12 12v6 M9 15h6',
+    open: 'M3 7V5a2 2 0 0 1 2-2h5l2 3h7a2 2 0 0 1 2 2v2 M3 7h5l2 3h11l-3 10H3L1 7Z',
+    import: 'M12 3v12 M7 10l5 5 5-5 M4 15v5a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-5',
+    export: 'M12 15V3 M7 8l5-5 5 5 M4 15v5a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-5',
+    cloud: 'M7 18H6a4 4 0 0 1-1-8 7 7 0 0 1 13-2 5 5 0 0 1 0 10h-1 M12 11v10 M9 18l3 3 3-3',
+    undo: 'M3 10h11a6 6 0 0 1 0 12 M7 6l-4 4 4 4',
+    redo: 'M21 10H10a6 6 0 0 0 0 12 M17 6l4 4-4 4',
+    copy: 'M9 9h12v12H9Z M15 5V3H3v12h2',
+    paste: 'M9 3h6v4H9Z M9 5H5v16h14V5h-4',
+    delete: 'M3 6h18 M9 6V3h6v3 M5 6l1 15h12l1-15 M10 10v7 M14 10v7',
+    'zoom-out': 'M21 21l-5-5 M11 3a8 8 0 1 0 0 16 8 8 0 0 0 0-16 M7 11h8',
+    'zoom-in': 'M21 21l-5-5 M11 3a8 8 0 1 0 0 16 8 8 0 0 0 0-16 M7 11h8 M11 7v8',
+    fit: 'M8 3H3v5 M16 3h5v5 M21 16v5h-5 M8 21H3v-5',
+    tidy: 'M3 3h7v7H3Z M14 3h7v7h-7Z M3 14h7v7H3Z M14 14h7v7h-7Z',
+    settings: 'M4 7h16 M4 17h16 M8 4v6 M16 14v6',
+    help: 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20 M9 9a3 3 0 0 1 6 0c0 2-3 2-3 5 M12 17h.01',
+    code: 'M8 5l-6 7 6 7 M16 5l6 7-6 7 M14 3l-4 18',
+    image: 'M3 3h18v18H3Z M3 17l6-6 4 4 3-3 5 5 M15 7h.01',
+    document: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6Z M14 2v6h6 M8 13h8 M8 17h6',
+    diagram: 'M9 3h6v6H9Z M3 15h6v6H3Z M15 15h6v6h-6Z M12 9v3 M6 15v-3h12v3',
+    close: 'M6 6l12 12 M18 6 6 18',
+    check: 'M4 12l5 5L20 6',
+    save: 'M3 3h15l3 3v15H3Z M7 3v6h10V3 M7 21v-8h10v8',
+    edit: 'M15 5l4 4 M4 20l4-1L21 6l-3-3L5 16l-1 4Z',
+    reset: 'M3 10a9 9 0 1 1 2 8 M3 4v6h6',
+    reverse: 'M4 7h16 M16 3l4 4-4 4 M20 17H4 M8 13l-4 4 4 4',
+    eye: 'M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7Z M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6',
+    'eye-off': 'M3 3l18 18 M9 5a12 12 0 0 1 3 0c6 0 10 7 10 7a20 20 0 0 1-3 4 M6 6a20 20 0 0 0-4 6s4 7 10 7a12 12 0 0 0 5-1 M10 10a3 3 0 0 0 4 4'
+  };
+
+  /** Decorative, local SVGs inherit the control colour in both themes. */
+  function decorateAction(el) {
+    const name = el.getAttribute('data-icon');
+    if (!Object.prototype.hasOwnProperty.call(ACTION_PATHS, name) || el.querySelector('.action-icon')) return el;
+    const text = el.textContent.trim();
+    if (text && !el.hasAttribute('data-icon-only')) {
+      const label = doc.createElement('span');
+      label.className = 'action-label';
+      while (el.firstChild) label.appendChild(el.firstChild);
+      el.appendChild(label);
+      if (!el.hasAttribute('title')) el.setAttribute('title', el.getAttribute('aria-label') || text);
+    }
+    const svg = doc.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    const attrs = { class: 'action-icon', viewBox: '0 0 24 24', width: '16', height: '16', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.8', 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'aria-hidden': 'true', focusable: 'false' };
+    Object.keys(attrs).forEach((key) => svg.setAttribute(key, attrs[key]));
+    const path = doc.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', ACTION_PATHS[name]);
+    svg.appendChild(path);
+    el.insertBefore(svg, el.firstChild);
+    return el;
+  }
+
+  function setActionLabels(show) {
+    doc.documentElement.setAttribute('data-action-labels', show === false ? 'hidden' : 'shown');
+  }
+
   /**
    * Create an element.
    * @param {string} tag
@@ -32,6 +89,7 @@
       else el.setAttribute(key, v === true ? '' : String(v));
     });
     for (let i = 2; i < arguments.length; i++) append(el, arguments[i]);
+    if (a['data-icon']) decorateAction(el);
     return el;
   }
 
@@ -102,7 +160,7 @@
 
   /**
    * Open a modal dialog.
-   * @param {object} o { title, body: Node, buttons: [{label, primary, danger, action(close) -> false keeps open}], small, onClose }
+   * @param {object} o { title, body: Node, buttons: [{label, icon, primary, danger, action(close) -> false keeps open}], small, onClose }
    * @returns {{dialog: HTMLDialogElement, close: function}}
    */
   function modal(o) {
@@ -116,6 +174,7 @@
         type: 'button',
         class: 'btn' + (b.primary ? ' primary' : '') + (b.danger ? ' danger' : ''),
         text: b.label,
+        'data-icon': b.icon || ({ Save: 'save', Cancel: 'close', Close: 'close', OK: 'check', Delete: 'delete', Export: 'export' })[b.label],
         onclick: async () => {
           const keep = b.action ? await b.action(close) : undefined;
           if (keep !== false) close();
@@ -123,7 +182,7 @@
       }));
     });
     dlg.appendChild(h('div', { class: 'dlg' },
-      h('div', { class: 'dlg-head' }, h('h2', { text: o.title }), h('button', { type: 'button', class: 'btn small', 'aria-label': 'Close', text: '\u2715', onclick: close })),
+      h('div', { class: 'dlg-head' }, h('h2', { text: o.title }), h('button', { type: 'button', class: 'btn small', 'aria-label': 'Close', 'data-icon': 'close', 'data-icon-only': true, onclick: close })),
       h('div', { class: 'dlg-body' }, o.body),
       foot));
     dlg.addEventListener('close', () => {
@@ -179,5 +238,13 @@
     return el;
   }
 
-  AISBP.Dom = { h, append, clear, icon, toast, download, readText, readDataUrl, modal, confirm, field, select };
+  let showActionLabels = true;
+  try {
+    showActionLabels = AISBP.Storage.loadPrefs().showActionLabels !== false;
+  } catch (e) {
+    /* storage unavailable: labels remain visible */
+  }
+  setActionLabels(showActionLabels);
+  doc.querySelectorAll('[data-icon]').forEach(decorateAction);
+  AISBP.Dom = { h, append, clear, icon, decorateAction, setActionLabels, toast, download, readText, readDataUrl, modal, confirm, field, select };
 })(typeof globalThis !== 'undefined' ? globalThis : this);
