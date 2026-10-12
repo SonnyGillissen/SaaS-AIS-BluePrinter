@@ -3,6 +3,10 @@
 Use the **Export** menu in the toolbar. Exports are created in your browser and downloaded
 directly; nothing is sent to a server.
 
+Selecting a diagram format opens **Export options** before downloading. Choose whether to
+embed the complete blueprint, then confirm **Export**, or cancel without creating a file.
+Configuration package (JSON) exports download directly and always contain the full blueprint.
+
 | Format | File | Use it for |
 |---|---|---|
 | **Configuration package** | `*.aisbp.json` | Backups, sharing, version control, re-importing (see [Configuration package](Configuration-Package.md)) |
@@ -15,6 +19,21 @@ directly; nothing is sent to a server.
 Exports use the current display style, detail level and attribute selection, except draw.io and
 ArchiMate, which always include *all* attributes as data. Selection handles and validation
 markers are left out.
+
+## Background options
+
+The export popup offers **Style default**, **Custom color**, and, where supported,
+**Transparent** backgrounds:
+
+| Format | Custom color | Transparent |
+|---|---|---|
+| SVG, PNG, draw.io | Yes | Yes |
+| PDF | Yes, including page margins | No; the diagram is encoded as an opaque JPEG |
+| ArchiMate, JSON | Not applicable | Not applicable |
+
+Background overrides apply only to the downloaded file, not to the saved blueprint or its
+embedded configuration. They change the canvas/page background, not resource/container fills
+or text colors. Transparent SVG/PNG exports omit the background grid.
 
 **Tags** appear as coloured chips in PNG, PDF and SVG. In draw.io they become shape data
 (`tag_<name>` properties) and native draw.io tags (`Name:Value`, spaces replaced by `_`), so you
@@ -34,8 +53,9 @@ respective diagram tools. This is similar to draw.io's embedded-diagram workflow
 embedded source is AIS BluePrinter JSON, not draw.io's `mxfile` format.
 
 **Sharing warning:** the embedded package contains hidden containers and attributes as well as
-visible data. To omit it, set `exports.embedDiagram` to `false` in
-[`js/config.js`](Configuration.md#embedded-blueprints). JSON exports are always complete
+visible data. To omit it, uncheck **Embed complete blueprint** in the export popup. Set
+`exports.embedDiagram` to `false` in [`js/config.js`](Configuration.md#embedded-blueprints)
+to make unchecked the default; users can enable it for individual files. JSON exports are always complete
 packages; draw.io and ArchiMate still contain their normal native shape/element data.
 
 Only exports carrying an AIS BluePrinter package can be restored this way. Ordinary images,

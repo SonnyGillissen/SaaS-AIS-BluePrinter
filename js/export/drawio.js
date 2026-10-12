@@ -86,6 +86,7 @@
   function toDrawio(project, opts) {
     const o = opts || {};
     const st = Render.style(project.settings.diagram.style);
+    const bg = Render.background(o.background, st.background);
     const g = Layout.compute(project);
     const ox = g.bounds.x - 40;
     const oy = g.bounds.y - 40;
@@ -149,7 +150,7 @@
     const xml = '<?xml version="1.0" encoding="UTF-8"?>\n' +
       '<mxfile host="AIS BluePrinter" agent="AIS BluePrinter" modified="' + esc(Util.now()) + '" version="24.0.0" type="device">' +
       '<diagram id="' + esc(project.meta.id) + '" name="' + esc(project.meta.name) + '">' +
-      '<mxGraphModel dx="' + w + '" dy="' + h + '" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="0" pageScale="1" pageWidth="' + w + '" pageHeight="' + h + '" background="' + st.background + '" math="0" shadow="0">' +
+      '<mxGraphModel dx="' + w + '" dy="' + h + '" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="0" pageScale="1" pageWidth="' + w + '" pageHeight="' + h + '" background="' + (bg === 'transparent' ? 'none' : bg) + '" math="0" shadow="0">' +
       '<root><mxCell id="0"/><mxCell id="1" parent="0"/>' + cells.join('') + '</root></mxGraphModel></diagram></mxfile>\n';
     return Embedded.toXml(xml, project, o);
   }

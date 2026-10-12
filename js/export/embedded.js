@@ -18,8 +18,8 @@
   const tooLarge = () => new Error('The file or embedded configuration is too large to import.');
 
   function enabled(opts) {
-    return (!opts || opts.embedDiagram !== false) &&
-      !(root.AISBP_CONFIG && root.AISBP_CONFIG.exports && root.AISBP_CONFIG.exports.embedDiagram === false);
+    if (opts && typeof opts.embedDiagram === 'boolean') return opts.embedDiagram;
+    return !(root.AISBP_CONFIG && root.AISBP_CONFIG.exports && root.AISBP_CONFIG.exports.embedDiagram === false);
   }
 
   function crc32(bytes) {

@@ -322,7 +322,10 @@
 
     async exportAs(format) {
       try {
-        await AISBP.Exporter.run(format, store.snapshot());
+        const project = store.snapshot();
+        const opts = format === 'json' ? {} : await AISBP.Dialogs.openExportOptions(format, project);
+        if (opts === null) return;
+        await AISBP.Exporter.run(format, project, opts);
       } catch (e) {
         toast('Export failed: ' + e.message, 'error');
       }

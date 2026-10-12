@@ -42,36 +42,39 @@
    * Run an export.
    * @param {string} format json | svg | png | pdf | drawio | archimate
    * @param {object} project
+   * @param {object} [opts] { embedDiagram: boolean, background: '#RRGGBB'|'transparent' }
    */
-  async function run(format, project) {
+  async function run(format, project, opts) {
+    const o = opts || {};
+    const embedDiagram = AISBP.Embedded.enabled(o);
+    const background = ['svg', 'png', 'pdf', 'drawio'].includes(format) ?
+      AISBP.Render.background(o.background, AISBP.Render.style(project.settings.diagram.style).background, format !== 'pdf') : undefined;
+    project = Util.clone(project);
     const name = baseName(project);
-    const embedDiagram = AISBP.Embedded.enabled();
     switch (format) {
       case 'json':
         download(AISBP.Package.toJson(project), name + '.aisbp.json', MIME.json);
         break;
       case 'svg': {
         await prepareIcons(project);
-        const doc = AISBP.Render.renderDocument(project, { iconHref: iconResolver(project, false) });
+        const doc = AISBP.Render.renderDocument(project, { iconHref: iconResolver(project, false), background });
         download('<?xml version="1.0" encoding="UTF-8"?>\n' + AISBP.Embedded.toSvg(doc.svg, project, { embedDiagram }), name + '.svg', MIME.svg);
         break;
       }
       case 'png': {
         await prepareIcons(project);
-        const doc = AISBP.Render.renderDocument(project, { iconHref: iconResolver(project, true) });
-        const st = AISBP.Render.style(project.settings.diagram.style);
-        download(await AISBP.Raster.toPng(doc.svg, doc.width, doc.height, st.background, { project, embedDiagram }), name + '.png');
+        const doc = AISBP.Render.renderDocument(project, { iconHref: iconResolver(project, true), background });
+        download(await AISBP.Raster.toPng(doc.svg, doc.width, doc.height, background, { project, embedDiagram }), name + '.png');
         break;
       }
       case 'pdf': {
         await prepareIcons(project);
-        const doc = AISBP.Render.renderDocument(project, { iconHref: iconResolver(project, true) });
-        const st = AISBP.Render.style(project.settings.diagram.style);
+        const doc = AISBP.Render.renderDocument(project, { iconHref: iconResolver(project, true), background });
         const blob = await AISBP.Raster.toPdf(doc.svg, doc.width, doc.height, {
           pageSize: project.settings.diagram.pdfPageSize,
           title: project.meta.name,
           author: project.meta.author,
-          background: st.background,
+          background,
           project,
           embedDiagram
         });
@@ -80,7 +83,7 @@
       }
       case 'drawio': {
         await prepareIcons(project);
-        download(AISBP.DrawIo.toDrawio(project, { iconHref: iconResolver(project, false), embedDiagram }), name + '.drawio', MIME.drawio);
+        download(AISBP.DrawIo.toDrawio(project, { iconHref: iconResolver(project, false), embedDiagram, background }), name + '.drawio', MIME.drawio);
         break;
       }
       case 'archimate':

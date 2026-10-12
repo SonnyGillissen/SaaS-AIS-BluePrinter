@@ -26,8 +26,8 @@ window.AISBP_CONFIG = {
   defaults: {},
 
   /**
-   * Embed the complete configuration package in diagram exports so Import can restore them.
-   * Set to false for sharing without hidden blueprint data (JSON remains a full package).
+   * Default for the export popup's embedded-blueprint checkbox; users can override per file.
+   * Set to false to default to sharing without hidden data (JSON remains a full package).
    */
   exports: {
     embedDiagram: true

@@ -13,6 +13,7 @@
 
   const AISBP = (root.AISBP = root.AISBP || {});
   const Embedded = AISBP.Embedded || (typeof require === 'function' ? require('./embedded.js') : null);
+  const Render = AISBP.Render || (typeof require === 'function' ? require('../render/svg.js') : null);
 
   /** PDF page sizes in points (1/72 inch), portrait orientation. */
   const PAGE_SIZES = { A4: [595.28, 841.89], A3: [841.89, 1190.55], Letter: [612, 792] };
@@ -41,6 +42,7 @@
    */
   function buildPdf(jpeg, imgW, imgH, opts) {
     const o = opts || {};
+    const bg = Render.background(o.background, '#ffffff', false);
     const config = o.project && Embedded.enabled(o) ? Embedded.payload(o.project) : null;
     const lw = o.logicalWidth || imgW;
     const lh = o.logicalHeight || imgH;
@@ -67,7 +69,9 @@
       pageH = drawH = lh * 0.75;
     }
     const f = (n) => (Math.round(n * 100) / 100).toString();
-    const content = 'q ' + f(drawW) + ' 0 0 ' + f(drawH) + ' ' + f(offX) + ' ' + f(offY) + ' cm /Im0 Do Q';
+    const rgb = [1, 3, 5].map((i) => (parseInt(bg.slice(i, i + 2), 16) / 255).toFixed(6)).join(' ');
+    const content = 'q ' + rgb + ' rg 0 0 ' + f(pageW) + ' ' + f(pageH) + ' re f Q\n' +
+      'q ' + f(drawW) + ' 0 0 ' + f(drawH) + ' ' + f(offX) + ' ' + f(offY) + ' cm /Im0 Do Q';
 
     const enc = new TextEncoder();
     const chunks = [];
@@ -121,6 +125,7 @@
    */
   function svgToCanvas(svg, width, height, scale, background) {
     return new Promise((resolve, reject) => {
+      const bg = Render.background(background, '#ffffff');
       const s = safeScale(width, height, scale);
       const blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
       const url = URL.createObjectURL(blob);
@@ -131,8 +136,10 @@
           canvas.width = Math.round(width * s);
           canvas.height = Math.round(height * s);
           const ctx = canvas.getContext('2d');
-          ctx.fillStyle = background || '#ffffff';
-          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          if (bg !== 'transparent') {
+            ctx.fillStyle = bg;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+          }
           ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
           URL.revokeObjectURL(url);
           resolve(canvas);
@@ -166,10 +173,11 @@
   /** Render an SVG document to a PDF blob. */
   async function toPdf(svg, width, height, opts) {
     const o = opts || {};
-    const canvas = await svgToCanvas(svg, width, height, 2, o.background);
+    const background = Render.background(o.background, '#ffffff', false);
+    const canvas = await svgToCanvas(svg, width, height, 2, background);
     const jpegBlob = await canvasToBlob(canvas, 'image/jpeg', 0.92);
     const jpeg = new Uint8Array(await jpegBlob.arrayBuffer());
-    const pdf = buildPdf(jpeg, canvas.width, canvas.height, { pageSize: o.pageSize, logicalWidth: width, logicalHeight: height, title: o.title, author: o.author, project: o.project, embedDiagram: o.embedDiagram });
+    const pdf = buildPdf(jpeg, canvas.width, canvas.height, { pageSize: o.pageSize, logicalWidth: width, logicalHeight: height, title: o.title, author: o.author, background, project: o.project, embedDiagram: o.embedDiagram });
     return new Blob([pdf], { type: 'application/pdf' });
   }
 
