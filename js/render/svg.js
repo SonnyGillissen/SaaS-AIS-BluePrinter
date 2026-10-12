@@ -149,16 +149,50 @@
     return { x: c.x + dx * s, y: c.y + dy * s };
   }
 
-  /**
-   * Compute the SVG path and label position for a connection between two rects.
-   * @returns {{d: string, label: {x:number,y:number}}}
-   */
-  function connectorPath(a, b, kind, waypoints) {
+  function anchorPoint(r, anchor) {
+    const horizontal = anchor.side === 'top' || anchor.side === 'bottom';
+    return {
+      x: horizontal ? r.x + r.w * anchor.offset : r.x + (anchor.side === 'right' ? r.w : 0),
+      y: horizontal ? r.y + (anchor.side === 'bottom' ? r.h : 0) : r.y + r.h * anchor.offset
+    };
+  }
+
+  /** Project onto the nearest edge of this node, never onto another node. */
+  function nearestAnchor(r, point) {
+    const clamp = (v) => Math.max(0, Math.min(1, v));
+    return ['top', 'right', 'bottom', 'left'].map((side) => {
+      const offset = side === 'top' || side === 'bottom' ? clamp((point.x - r.x) / r.w) : clamp((point.y - r.y) / r.h);
+      const anchor = { side, offset };
+      const p = anchorPoint(r, anchor);
+      return { anchor, distance: Math.hypot(point.x - p.x, point.y - p.y) };
+    }).reduce((a, b) => a.distance <= b.distance ? a : b).anchor;
+  }
+
+  /** Compute a connection path, its label, editing handles and attachment positions. */
+  function connectorPath(a, b, kind, waypoints, sourceAnchor, targetAnchor) {
+    const source = Model.cleanAnchor(sourceAnchor);
+    const target = Model.cleanAnchor(targetAnchor);
+    let path;
+    if ((source || target) && kind === 'orthogonal') {
+      const vertices = source && target ? null : baseConnectorPath(a, b, kind, waypoints).vertices;
+      path = orthogonalRoute(a, b, Model.cleanWaypoints(waypoints),
+        source || nearestAnchor(a, vertices[0]), target || nearestAnchor(b, vertices[vertices.length - 1]));
+    } else {
+      const pointRect = (r, anchor) => anchor ? Object.assign(anchorPoint(r, anchor), { w: 0, h: 0 }) : r;
+      path = baseConnectorPath(pointRect(a, source), pointRect(b, target), kind, waypoints, !!(source || target));
+    }
+    const numbers = path.d.match(/-?\d+(?:\.\d+)?(?:e[+-]?\d+)?/gi).map(Number);
+    path.start = path.vertices ? path.vertices[0] : { x: numbers[0], y: numbers[1] };
+    path.end = path.vertices ? path.vertices[path.vertices.length - 1] : { x: numbers[numbers.length - 2], y: numbers[numbers.length - 1] };
+    return path;
+  }
+
+  function baseConnectorPath(a, b, kind, waypoints, precise) {
     const points = Model.cleanWaypoints(waypoints);
     if (points.length && kind === 'orthogonal') return orthogonalRoute(a, b, points);
     if (points.length) {
       const rects = [a].concat(points.map((pt) => ({ x: pt.x, y: pt.y, w: 0, h: 0 })), [b]);
-      const legs = rects.slice(1).map((r, i) => connectorPath(rects[i], r, kind));
+      const legs = rects.slice(1).map((r, i) => baseConnectorPath(rects[i], r, kind, undefined, precise));
       return {
         d: legs.map((leg, i) => i ? leg.d.replace(/^M[^A-Za-z]+/, '') : leg.d).join(' '),
         label: legs[Math.floor(legs.length / 2)].label,
@@ -187,7 +221,7 @@
     }
     const p1 = borderPoint(a, cb);
     const p2 = borderPoint(b, ca);
-    const r1 = (n) => Math.round(n * 10) / 10;
+    const r1 = (n) => precise ? n : Math.round(n * 10) / 10;
     if (kind === 'curved') {
       const mx = (p1.x + p2.x) / 2;
       return {
@@ -199,7 +233,7 @@
   }
 
   /** Route waypoint turns together; independently routed legs can double back at their joins. */
-  function orthogonalRoute(a, b, points) {
+  function orthogonalRoute(a, b, points, source, target) {
     const rect = (pt) => ({ x: pt.x, y: pt.y, w: 0, h: 0 });
     const direction = (p, q) => q.x > p.x ? 'right' : q.x < p.x ? 'left' : q.y > p.y ? 'down' : 'up';
     const opposite = { right: 'left', left: 'right', up: 'down', down: 'up' };
@@ -217,26 +251,58 @@
       const directDir = direct.length < 2 ? null : source ? direction(start, direct[1]) : direction(direct[direct.length - 2], end);
       return directDir === originalDir ? [direct, leg] : [leg];
     };
-    const candidates = [endpointOptions(connectorPath(a, rect(points[0]), 'orthogonal').vertices, true)];
-    points.slice(1).forEach((q, i) => {
-      const p = points[i];
+    const legOptions = (p, q) => {
       const mx = (p.x + q.x) / 2;
       const my = (p.y + q.y) / 2;
-      candidates.push([
+      const options = [
         [p, { x: q.x, y: p.y }, q],
         [p, { x: p.x, y: q.y }, q],
         [p, { x: mx, y: p.y }, { x: mx, y: q.y }, q],
         [p, { x: p.x, y: my }, { x: q.x, y: my }, q]
-      ]);
-    });
-    candidates.push(endpointOptions(connectorPath(rect(points[points.length - 1]), b, 'orthogonal').vertices, false));
+      ];
+      if (source || target) {
+        const xs = [Math.min(p.x, q.x, a.x, b.x) - 24, Math.max(p.x, q.x, a.x + a.w, b.x + b.w) + 24];
+        const ys = [Math.min(p.y, q.y, a.y, b.y) - 24, Math.max(p.y, q.y, a.y + a.h, b.y + b.h) + 24];
+        xs.forEach((x) => options.push([p, { x, y: p.y }, { x, y: q.y }, q]));
+        ys.forEach((y) => options.push([p, { x: p.x, y }, { x: q.x, y }, q]));
+        xs.forEach((x) => ys.forEach((y) => {
+          options.push([p, { x, y: p.y }, { x, y }, { x: q.x, y }, q]);
+          options.push([p, { x: p.x, y }, { x, y }, { x, y: q.y }, q]);
+        }));
+      }
+      return options;
+    };
+    const crossesInterior = (p, q, r) => p.x === q.x ?
+      p.x > r.x && p.x < r.x + r.w && Math.max(p.y, q.y) > r.y && Math.min(p.y, q.y) < r.y + r.h :
+      p.y > r.y && p.y < r.y + r.h && Math.max(p.x, q.x) > r.x && Math.min(p.x, q.x) < r.x + r.w;
+    let candidates;
+    if (source || target) {
+      const start = anchorPoint(a, source);
+      const end = anchorPoint(b, target);
+      const stub = (p, anchor) => ({
+        x: p.x + (anchor.side === 'right' ? 24 : anchor.side === 'left' ? -24 : 0),
+        y: p.y + (anchor.side === 'bottom' ? 24 : anchor.side === 'top' ? -24 : 0)
+      });
+      const first = stub(start, source);
+      const last = stub(end, target);
+      const stops = [first].concat(points, [last]);
+      candidates = stops.slice(1).map((q, i) => legOptions(stops[i], q).map((leg) =>
+        (i === 0 ? [start] : []).concat(leg, i === stops.length - 2 ? [end] : [])));
+    } else {
+      candidates = [endpointOptions(baseConnectorPath(a, rect(points[0]), 'orthogonal').vertices, true)];
+      points.slice(1).forEach((q, i) => candidates.push(legOptions(points[i], q)));
+      candidates.push(endpointOptions(baseConnectorPath(rect(points[points.length - 1]), b, 'orthogonal').vertices, false));
+    }
     let states = [{ cost: 0, end: null, legs: [] }];
     candidates.forEach((options) => {
       const next = new Map();
       options.forEach((vertices) => {
         const leg = compact(vertices);
         const dirs = leg.slice(1).map((p, i) => direction(leg[i], p));
-        const internalCost = dirs.slice(1).reduce((sum, d, i) => sum + turnCost(dirs[i], d), 0);
+        // Penalize rather than discard crossings: explicit waypoints may lie inside nodes.
+        const crossingCost = source || target ? leg.slice(1).reduce((sum, p, i) =>
+          sum + [a, b].filter((r) => crossesInterior(leg[i], p, r)).length * 1000, 0) : 0;
+        const internalCost = crossingCost + dirs.slice(1).reduce((sum, d, i) => sum + turnCost(dirs[i], d), 0);
         states.forEach((state) => {
           const end = dirs.length ? dirs[dirs.length - 1] : state.end;
           const cost = state.cost + internalCost + turnCost(state.end, dirs[0]);
@@ -403,7 +469,7 @@
     const b = endRect(geometry, c.to);
     if (!a || !b) return '';
     const kind = Model.CONNECTION_KINDS.find((k) => k.id === c.kind) || Model.CONNECTION_KINDS[0];
-    const path = connectorPath(a, b, project.settings.diagram.connector || 'orthogonal', c.waypoints);
+    const path = connectorPath(a, b, project.settings.diagram.connector || 'orthogonal', c.waypoints, c.sourceAnchor, c.targetAnchor);
     const selected = o.selection && o.selection.conns.has(c.id);
     const color = selected ? st.selection : st.edge;
     const p = o.idPrefix || '';
@@ -493,7 +559,7 @@
     return { svg: s, width, height };
   }
 
-  AISBP.Render = { STYLES, CONNECTORS, style, editorStyle, center, borderPoint, connectorPath, defs, renderContent, renderDocument, background };
+  AISBP.Render = { STYLES, CONNECTORS, style, editorStyle, center, borderPoint, anchorPoint, nearestAnchor, connectorPath, defs, renderContent, renderDocument, background };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = AISBP.Render;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

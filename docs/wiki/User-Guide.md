@@ -111,12 +111,21 @@ connection to set its:
 Connections start with an automatic route. To adjust a line or arrow afterward, **select it
 and drag one of its routing handles**. Small filled handles add points; larger outlined
 handles move existing points. You can add several points to route around objects, using any
-connector style (orthogonal, straight or curved). Endpoints stay attached to their objects.
+connector style (orthogonal, straight or curved).
+
+**Drag a square endpoint handle** (source or arrow end) to snap it to the nearest edge of
+its own object, without reconnecting to another object. The attachment is saved as an edge
+and relative position, so it follows the object when moved or resized. The first routing or
+endpoint drag fixes both current attachments; later routing edits no longer move the arrow.
+Unedited connections continue to choose their attachments automatically.
 
 **Double-click an outlined point** to remove it, or choose **Reset route** in Properties to
-return to automatic routing. Dragging respects the diagram's grid setting; press **Escape**
+remove routing points without changing attachments. **Reset anchors** separately restores
+automatic attachments without removing routing points. *Reverse direction* swaps attachments
+and reverses routing points. Routing-point dragging respects the diagram's grid setting; press **Escape**
 while dragging to cancel. Each completed drag is one undo step. Routes are saved with the
-blueprint and included in exports.
+blueprint and included in exports. Draw.io uses fixed entry/exit positions; ArchiMate retains
+attachments in embedded blueprint metadata when embedding is enabled.
 
 ## Copy, paste and drag-and-drop
 

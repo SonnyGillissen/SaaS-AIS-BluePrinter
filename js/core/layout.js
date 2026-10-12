@@ -240,6 +240,11 @@
       const c = project.connections[id];
       if (!rects[c.from] || !rects[c.to] || rects[c.from].hidden || rects[c.to].hidden) return;
       Model.cleanWaypoints(c.waypoints).forEach((pt) => boundsRects.push({ x: pt.x, y: pt.y, w: 0, h: 0 }));
+      // Fixed edge normals may require detours outside the node/waypoint bounds.
+      if (diagram.connector === 'orthogonal' && (c.sourceAnchor || c.targetAnchor) && AISBP.Render) {
+        const path = AISBP.Render.connectorPath(rects[c.from], rects[c.to], diagram.connector, c.waypoints, c.sourceAnchor, c.targetAnchor);
+        path.vertices.forEach((pt) => boundsRects.push({ x: pt.x, y: pt.y, w: 0, h: 0 }));
+      }
     });
     return { rects, bounds: boundsOf(boundsRects), names: nm, childIndex };
   }
