@@ -297,6 +297,54 @@ test('outward-facing anchored routes detour outside endpoint interiors, includin
   }
 });
 
+test('close facing anchors share directional clearance without crossing endpoint interiors', () => {
+  const a = { x: 0, y: 0, w: 100, h: 100 };
+  for (const gap of [0, 1, 20, 47, 48]) {
+    const b = { x: 100 + gap, y: 0, w: 100, h: 100 };
+    for (const vertical of [false, true]) for (const sx of [-1, 1]) for (const sy of [-1, 1]) {
+      const transform = (r) => {
+        const mirrored = { x: sx < 0 ? -r.x - r.w : r.x, y: sy < 0 ? -r.y - r.h : r.y, w: r.w, h: r.h };
+        return vertical ? { x: mirrored.y, y: mirrored.x, w: mirrored.h, h: mirrored.w } : mirrored;
+      };
+      const sourceSide = sx < 0 ? (vertical ? 'top' : 'left') : (vertical ? 'bottom' : 'right');
+      const targetSide = sx < 0 ? (vertical ? 'bottom' : 'right') : (vertical ? 'top' : 'left');
+      const rects = [transform(a), transform(b)];
+      for (const offsets of [[0.5, 0.5], [0.3, 0.7], [0, 1]]) {
+        const source = { side: sourceSide, offset: sy < 0 ? 1 - offsets[0] : offsets[0] };
+        const target = { side: targetSide, offset: sy < 0 ? 1 - offsets[1] : offsets[1] };
+        const route = Render.connectorPath(rects[0], rects[1], 'orthogonal', [], source, target);
+        assert.deepEqual(route.start, Render.anchorPoint(rects[0], source));
+        assert.deepEqual(route.end, Render.anchorPoint(rects[1], target));
+        if (gap === 0 && offsets[0] === offsets[1]) {
+          assert.deepEqual(route.vertices, [route.start]);
+          assert.deepEqual(route.label, route.start);
+          assert.ok(route.handles.every((h) => h.x === route.start.x && h.y === route.start.y));
+          assert.ok(!/NaN|Infinity/.test(route.d));
+        } else {
+          assertOrthogonalRoute(route, []);
+        }
+        const axis = vertical ? 'y' : 'x';
+        if (gap > 0) {
+          const first = route.vertices[1];
+          const last = route.vertices[route.vertices.length - 2];
+          assert.equal((first[axis] - route.start[axis]) * sx, gap / 2);
+          assert.equal((last[axis] - route.end[axis]) * -sx, gap / 2);
+        }
+        for (let i = 1; i < route.vertices.length; i++) {
+          const p = route.vertices[i - 1];
+          const q = route.vertices[i];
+          for (const r of rects) {
+            const crosses = p.x === q.x ?
+              p.x > r.x && p.x < r.x + r.w && Math.max(p.y, q.y) > r.y && Math.min(p.y, q.y) < r.y + r.h :
+              p.y > r.y && p.y < r.y + r.h && Math.max(p.x, q.x) > r.x && Math.min(p.x, q.x) < r.x + r.w;
+            assert.ok(!crosses, 'No segment crosses a close or touching endpoint interior');
+          }
+        }
+      }
+    }
+  }
+});
+
 test('anchored routes retain explicit waypoints inside both endpoint nodes', () => {
   const a = { x: 0, y: 0, w: 100, h: 100 };
   const b = { x: 400, y: 0, w: 100, h: 100 };

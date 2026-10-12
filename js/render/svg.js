@@ -279,12 +279,27 @@
     if (source || target) {
       const start = anchorPoint(a, source);
       const end = anchorPoint(b, target);
-      const stub = (p, anchor) => ({
-        x: p.x + (anchor.side === 'right' ? 24 : anchor.side === 'left' ? -24 : 0),
-        y: p.y + (anchor.side === 'bottom' ? 24 : anchor.side === 'top' ? -24 : 0)
-      });
-      const first = stub(start, source);
-      const last = stub(end, target);
+      const stub = (p, anchor, other) => {
+        const horizontal = anchor.side === 'left' || anchor.side === 'right';
+        const positive = anchor.side === 'right' || anchor.side === 'bottom';
+        const axis = horizontal ? 'x' : 'y';
+        const crossAxis = horizontal ? 'y' : 'x';
+        const size = horizontal ? 'w' : 'h';
+        const crossSize = horizontal ? 'h' : 'w';
+        let length = 24;
+        if (p[crossAxis] >= other[crossAxis] && p[crossAxis] <= other[crossAxis] + other[crossSize] &&
+            (positive ? other[axis] + other[size] >= p[axis] : other[axis] <= p[axis])) {
+          const gap = positive ? other[axis] - p[axis] : p[axis] - other[axis] - other[size];
+          // Share narrow gaps so opposing stubs cannot overlap, including touching nodes.
+          length = Math.min(length, Math.max(0, gap / 2));
+        }
+        return {
+          x: p.x + (horizontal ? (positive ? length : -length) : 0),
+          y: p.y + (!horizontal ? (positive ? length : -length) : 0)
+        };
+      };
+      const first = stub(start, source, b);
+      const last = stub(end, target, a);
       const stops = [first].concat(points, [last]);
       candidates = stops.slice(1).map((q, i) => legOptions(stops[i], q).map((leg) =>
         (i === 0 ? [start] : []).concat(leg, i === stops.length - 2 ? [end] : [])));
