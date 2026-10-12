@@ -38,6 +38,24 @@
 
   /** Build the HTML label of a node. */
   function labelOf(r) {
+    if (r.annotation) {
+      const m = r.annotation;
+      if (m.layouts) {
+        const a = m.a;
+        return (a.caption ? '<b>' + html(a.caption) + '</b><br>' : '') + '<table border="' + (a.grid === 'none' ? 0 : 1) + '" cellpadding="' + a.padding + '">' +
+          AISBP.Annotations.rows(a.rows).map((row, ri) => '<tr>' + row.map((c, ci) => {
+            const tag = (a.headerRow && ri === 0) || (a.firstColumnHeader && ci === 0) ? 'th' : 'td';
+            return '<' + tag + '>' + html(c).replace(/\n/g, '<br>') + '</' + tag + '>';
+          }).join('') + '</tr>').join('') + '</table>';
+      }
+      return m.layout.lines.map((l) => l.runs.map((run) => {
+        let t = html(run.text);
+        if (run.code) t = '<code>' + t + '</code>';
+        if (run.bold || l.bold) t = '<b>' + t + '</b>';
+        if (run.italic || l.italic) t = '<i>' + t + '</i>';
+        return t;
+      }).join('')).join('<br>');
+    }
     let s = '<b>' + html(r.name) + '</b>';
     if (r.typeLabel) s += '<br><font style="font-size:10px" color="#5d6670">' + html(r.typeLabel) + '</font>';
     r.attrs.forEach((a) => { s += '<br><font style="font-size:10px">' + html(a.label) + ': ' + html(a.value) + '</font>'; });
@@ -109,7 +127,13 @@
       const pr = parent ? g.rects[parent.id] : { x: ox, y: oy };
       const parentCell = parent ? cellId(parent.id) : '1';
       const img = styleImage(o.iconHref ? o.iconHref(node.type) : null);
-      if (r.container) {
+      if (r.annotation) {
+        const a = r.annotation.a;
+        const style = 'whiteSpace=wrap;html=1;align=' + a.align + ';verticalAlign=top;spacing=' + a.padding + ';fontSize=' + a.fontSize + ';fontColor=' + st.text +
+          ';fillColor=' + (a.theme === 'plain' ? 'none' : st.background) + ';strokeColor=' + (a.theme === 'plain' ? 'none' : st.subtext) + ';rounded=' + (a.theme === 'pill' || a.theme === 'card' ? 1 : 0) + ';';
+        cells.push('<object label="' + esc(labelOf(r)) + '" id="' + cellId(r.id) + '"' + dataAttributes(project, node) + '><mxCell style="' + esc(style) + '" vertex="1" parent="' + parentCell + '">' +
+          '<mxGeometry x="' + (r.x - pr.x) + '" y="' + (r.y - pr.y) + '" width="' + r.w + '" height="' + r.h + '" as="geometry"/></mxCell></object>');
+      } else if (r.container) {
         const pal = st.containers[node.type] || st.containers.default;
         const style = 'rounded=1;arcSize=' + Math.min(10, st.radius) + ';absoluteArcSize=1;whiteSpace=wrap;html=1;container=1;collapsible=0;recursiveResize=0;' +
           'verticalAlign=top;align=left;spacingLeft=44;spacingTop=4;fontSize=12;' +

@@ -136,6 +136,7 @@
   /** Whether a node is drawn as a container. */
   function isContainer(project, node, childIndex) {
     const def = Catalog.get(node.type);
+    if (def && def.annotation) return false;
     return !!(def && def.container) || !!(childIndex[node.id] && childIndex[node.id].length);
   }
 
@@ -190,7 +191,16 @@
       const tagList = Tags.visible(project, node);
       const r = { id: node.id, type: node.type, container, hidden: isHidden, depth, name: nm[node.id] || '', typeLabel, attrs, tags: { rows: [], height: 0 } };
       const kids = (childIndex[node.id] || []).map((c) => measure(c, isHidden ? depth : depth + 1));
-      if (!container) {
+      if (def && def.annotation) {
+        r.annotation = AISBP.Annotations.measure(node);
+        r.w = r.annotation.w;
+        r.h = r.annotation.h;
+        r.x = node.x;
+        r.y = node.y;
+        r.nameLines = [r.name];
+        r.attrs = [];
+        r.typeLabel = '';
+      } else if (!container) {
         r.nameLines = wrapName(r.name, LEAF_CHARS, 2);
         r.w = LEAF_W;
         r.tags = Tags.chipRows(tagList, LEAF_W - 16);
@@ -327,6 +337,10 @@
   /** Default size used when placing a new node of a type. */
   function defaultSize(typeId) {
     const def = Catalog.get(typeId);
+    if (def && def.annotation) {
+      const size = AISBP.Annotations.measure({ type: typeId, attributes: {} });
+      return { w: size.w, h: size.h };
+    }
     return def && def.container ? { w: MIN_W, h: MIN_H } : { w: LEAF_W, h: 110 };
   }
 

@@ -164,7 +164,7 @@
         handle.appendChild(svgEl('circle', { cx: r.x + r.w + 12, cy: r.y + Math.min(r.h / 2, 30), r: 8, fill: '#ffffff', stroke: st.selection, 'stroke-width': 2 }));
         handle.appendChild(svgEl('path', { d: 'M' + (r.x + r.w + 8) + ' ' + (r.y + Math.min(r.h / 2, 30)) + ' h8 m-3 -3 l3 3 l-3 3', stroke: st.selection, 'stroke-width': 1.5, fill: 'none' }));
         overlay.appendChild(handle);
-        if (r.container) {
+        if (r.container || r.annotation) {
           // Resize grip (bottom-right corner) for hierarchy objects and other containers.
           const grip = svgEl('g', { class: 'handle resize', 'data-handle': 'resize', 'data-node-id': single.id });
           const gt = svgEl('title', {});
@@ -369,9 +369,10 @@
         else points[gesture.index] = point;
         store.live((p) => Model.updateConnection(p, gesture.id, Object.assign({ waypoints: points }, gesture.anchors)));
       } else if (gesture.type === 'resize') {
-        const w = Math.max(Layout.MIN_W, snap(gesture.size.w + pt.x - gesture.start.x));
-        const h = Math.max(Layout.MIN_H, snap(gesture.size.h + pt.y - gesture.start.y));
         const node = store.project.nodes[gesture.id];
+        const annotation = AISBP.Annotations.isAnnotation(node.type);
+        const w = Math.max(annotation ? 60 : Layout.MIN_W, snap(gesture.size.w + pt.x - gesture.start.x));
+        const h = Math.max(annotation ? 30 : Layout.MIN_H, snap(gesture.size.h + pt.y - gesture.start.y));
         if (node.w === w && node.h === h) return;
         if (!gesture.snapshot) gesture.snapshot = store.begin();
         store.live((p) => { p.nodes[gesture.id].w = w; p.nodes[gesture.id].h = h; });

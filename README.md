@@ -18,6 +18,9 @@ architectures. Click your environment together, and get an architecture diagram 
   your own custom attributes.
 - **Diagram = design**: the canvas *is* the diagram. Choose from 5 **display styles** (Azure
   classic, Blueprint, Minimal, Dark, Whiteboard) and 3 connector styles.
+- **Canvas annotations**: add Markdown text blocks and tables from the palette. Text is rendered
+  directly on the diagram, with plain, pill, card and callout themes; edit content and table
+  formatting in Properties.
 - **High-level or detailed**: choose which attributes appear on the diagram, per resource type or
   per object (eye toggle), switch between names-only, selected attributes or all attributes, and
   hide whole container levels for management views.

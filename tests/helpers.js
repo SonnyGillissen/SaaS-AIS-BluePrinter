@@ -7,7 +7,7 @@
 const path = require('node:path');
 
 const MODULES = [
-  'core/util', 'core/catalog', 'core/tags', 'core/model', 'core/naming', 'core/layout', 'core/azure', 'core/store', 'core/storage',
+  'core/util', 'core/catalog', 'core/tags', 'core/annotations', 'core/model', 'core/naming', 'core/layout', 'core/azure', 'core/store', 'core/storage',
   'render/svg', 'render/icons', 'export/package', 'export/embedded', 'export/drawio', 'export/archimate', 'export/raster',
   'azure/arm', 'azure/auth'
 ];
