@@ -146,7 +146,7 @@
    * the user is still signing in. The callback page then reports back via BroadcastChannel.
    * Cancel with `signal` (AbortSignal) instead.
    */
-  function waitForCallback(popup, redirectUri, signal) {
+  function waitForCallback(popup, redirectUri, state, signal) {
     return new Promise((resolve, reject) => {
       let finished = false;
       let channel = null;
@@ -162,8 +162,11 @@
         try { if (!popup.closed) popup.close(); } catch (e) { /* ignore */ }
         fn(value);
       };
+      // Only the response to this request counts; ignore stale or concurrent ones (other tabs).
       const accept = (data) => {
-        if (data && data.type === CHANNEL) finish(resolve, parseCallback(data.search, data.hash));
+        if (!data || data.type !== CHANNEL) return;
+        const params = parseCallback(data.search, data.hash);
+        if (params.state === state) finish(resolve, params);
       };
       const onMessage = (e) => { if (e.origin === root.location.origin) accept(e.data); };
       root.addEventListener('message', onMessage);
@@ -175,7 +178,7 @@
         try {
           const href = popup.location.href;
           if (href && href.indexOf(redirectUri) === 0 && /[#?&](code|error)=/.test(href)) {
-            finish(resolve, parseCallback(popup.location.search, popup.location.hash));
+            accept({ type: CHANNEL, search: popup.location.search, hash: popup.location.hash });
             return;
           }
         } catch (e) {
@@ -213,7 +216,7 @@
       const nonce = randomString(16);
       const challenge = await codeChallenge(verifier);
       popup.location.href = authorizeUrl({ clientId: o.clientId, tenantId, redirectUri, state, nonce, challenge, loginHint: o.loginHint });
-      const params = await waitForCallback(popup, redirectUri, o.signal);
+      const params = await waitForCallback(popup, redirectUri, state, o.signal);
       if (params.state !== state) throw new Error('Sign-in failed: the response did not match the request (state).');
       if (params.error) throw new Error('Sign-in failed: ' + String(params.error_description || params.error).split(/\r?\n/)[0]);
       if (!params.code) throw new Error('Sign-in failed: no authorization code was returned.');

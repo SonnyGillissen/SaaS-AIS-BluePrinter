@@ -46,7 +46,18 @@
     rg: (subId, name) => 'rg:' + lower(subId) + '/' + lower(name)
   };
 
+  const indexCache = new WeakMap();
   function indexTree(tree) {
+    // Cached per tree object and its management group / subscription arrays (the dialog asks
+    // for every row on every render); resource groups are not part of the index.
+    const cached = tree && typeof tree === 'object' ? indexCache.get(tree) : null;
+    if (cached && cached.m === tree.managementGroups && cached.s === tree.subscriptions) return cached.idx;
+    const idx = buildIndex(tree);
+    if (tree && typeof tree === 'object') indexCache.set(tree, { m: tree.managementGroups, s: tree.subscriptions, idx });
+    return idx;
+  }
+
+  function buildIndex(tree) {
     const mgs = new Map();
     arr(tree && tree.managementGroups).forEach((m) => mgs.set(lower(m.name), m));
     const subs = new Map();
@@ -305,8 +316,8 @@
   // Attributes
   // ---------------------------------------------------------------------------
 
-  const IDENTITY = { systemassigned: 'System assigned', userassigned: 'User assigned', 'systemassigned,userassigned': 'System + User assigned', 'systemassigned, userassigned': 'System + User assigned', none: 'None' };
-  const identity = (r) => (r.identity && r.identity.type ? IDENTITY[lower(r.identity.type)] || String(r.identity.type) : undefined);
+  const IDENTITY = { systemassigned: 'System assigned', userassigned: 'User assigned', 'systemassigned,userassigned': 'System + User assigned', none: 'None' };
+  const identity = (r) => (r.identity && r.identity.type ? IDENTITY[lower(r.identity.type).replace(/\s+/g, '')] || String(r.identity.type) : undefined);
   const tls = (v) => (v ? String(v).replace(/^tls/i, '').replace('_', '.') : undefined);
   const bool = (v) => (typeof v === 'boolean' ? v : undefined);
   const join = (list) => arr(list).filter((x) => x !== undefined && x !== null && x !== '').join(', ') || undefined;

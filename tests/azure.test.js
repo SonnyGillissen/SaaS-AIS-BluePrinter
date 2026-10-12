@@ -325,15 +325,14 @@ test('sign-in waits for the callback (also when the popup looks closed), exchang
     assert.equal(await AzureAuth.codeChallenge(requests[0].body.get('code_verifier')), sent.searchParams.get('code_challenge'));
     assert.equal(requests[0].body.get('client_secret'), null);
 
-    // A response with another state is rejected, and cancelling stops waiting.
-    const wrong = AzureAuth.signIn({ clientId: '00000000-0000-0000-0000-0000000000aa', redirectUri });
+    // A response with another state is ignored; cancelling stops waiting.
+    const controller = new AbortController();
+    const cancelled = AzureAuth.signIn({ clientId: '00000000-0000-0000-0000-0000000000aa', redirectUri, signal: controller.signal });
     while (popups[1].location.href === 'about:blank') await new Promise((r) => setTimeout(r, 10));
     const c2 = new BroadcastChannel(AzureAuth.CHANNEL);
     c2.postMessage({ type: AzureAuth.CHANNEL, search: '', hash: '#code=x&state=forged' });
     c2.close();
-    await assert.rejects(wrong, /state/);
-    const controller = new AbortController();
-    const cancelled = AzureAuth.signIn({ clientId: '00000000-0000-0000-0000-0000000000aa', redirectUri, signal: controller.signal });
+    await new Promise((r) => setTimeout(r, 100));
     controller.abort();
     await assert.rejects(cancelled, /cancelled/);
     assert.equal(requests.length, 1);

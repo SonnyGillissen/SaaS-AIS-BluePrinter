@@ -258,7 +258,7 @@
         const { parent, spec } = job;
         let items;
         try {
-          items = await client.list(parent.id + spec.path + '?api-version=' + spec.api);
+          items = await client.list(String(parent.id).split('/').map((s) => encodeURIComponent(s)).join('/') + spec.path + '?api-version=' + spec.api);
         } catch (e) {
           // Some services (or a stopped app) do not support a child collection; that is fine.
           if (e.status !== 404 && e.status !== 400 && e.status !== 409) failed++;
