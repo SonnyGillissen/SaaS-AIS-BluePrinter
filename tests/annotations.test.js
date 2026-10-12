@@ -58,6 +58,48 @@ test('table operations edit structure immutably, preserve rectangular cells and 
   assert.deepEqual(data[1], ['B', '10']);
 });
 
+test('maximum escape-heavy tables survive normalization, import and paste without JSON truncation', () => {
+  ['"\\'.repeat(500), '\u0000'.repeat(1000)].forEach((cell) => {
+    const data = Array.from({ length: A.MAX_ROWS }, () => Array(A.MAX_COLS).fill(cell));
+    const serialized = JSON.stringify(data);
+    assert.ok(serialized.length > 700000);
+    assert.ok(serialized.length < A.MAX_TABLE_JSON);
+    assert.deepEqual(A.rows(serialized), data);
+    const p = Model.createProject();
+    const n = Model.addNode(p, 'annotation-table', null, { attributes: { rows: serialized } });
+    assert.equal(n.attributes.rows, serialized);
+    const imported = Package.fromJson(Package.toJson(p)).project;
+    assert.equal(imported.nodes[n.id].attributes.rows, serialized);
+    const pasted = Model.paste(imported, Model.extract(imported, [n.id], []), null);
+    assert.equal(pasted.nodeIds.length, 1);
+    assert.equal(imported.nodes[pasted.nodeIds[0]].attributes.rows, serialized);
+  });
+  assert.deepEqual(A.rows(' '.repeat(A.MAX_TABLE_JSON + 1)), [['Name', 'Value'], ['Item', 'Details']]);
+});
+
+test('Blueprint wrapping measures the monospace font used for text, Markdown and tables', () => {
+  const content = 'ill '.repeat(15);
+  const p = Model.createProject();
+  const text = Model.addNode(p, 'annotation-text', null, { w: 300, attributes: { content } });
+  const markdown = Model.addNode(p, 'annotation-markdown', null, { w: 300, attributes: { content } });
+  const table = Model.addNode(p, 'annotation-table', null, { attributes: { rows: JSON.stringify([[content]]), columnWidths: '[300]', caption: content } });
+  const proportional = Layout.compute(p).rects[text.id].annotation.layout.lines.length;
+  p.settings.diagram.style = 'blueprint';
+  const geometry = Layout.compute(p);
+  const layouts = [geometry.rects[text.id].annotation.layout, geometry.rects[markdown.id].annotation.layout,
+    geometry.rects[table.id].annotation.layouts[0][0], geometry.rects[table.id].annotation.caption];
+  layouts.forEach((layout) => {
+    assert.equal(layout.monospace, true);
+    assert.ok(layout.lines.length > proportional);
+    assert.equal(layout.lines.flatMap((line) => line.runs.map((run) => run.text)).join(''), content);
+    layout.lines.forEach((line) => {
+      const length = line.runs.reduce((sum, run) => sum + Array.from(run.text).length, 0);
+      assert.ok(length * line.size * 0.62 <= 276);
+    });
+  });
+  assert.ok(Render.renderDocument(p).svg.includes('<text xml:space="preserve" font-family="monospace"'));
+});
+
 test('annotations persist long content, all options, manual sizing and paste normally', () => {
   const p = Model.createProject();
   const n = Model.addNode(p, 'annotation-markdown', null, { attributes: { content: 'long text '.repeat(1700), theme: 'callout' }, w: 410, h: 200 });
@@ -154,6 +196,9 @@ test('table grid choices render without altering contents; manual width has read
     assert.ok(r.w >= 280);
     assert.ok(r.h > 30);
     assert.ok(r.annotation.widths.every((w) => w >= 140));
-    assert.ok(Render.renderDocument(p).svg.replace(/<[^>]*>/g, '').includes('value'));
+    const runs = r.annotation.layouts[1][1].lines.flatMap((line) => line.runs);
+    assert.equal(runs.map((run) => run.text).join(''), 'value');
+    const svg = Render.renderDocument(p).svg;
+    runs.forEach((run) => assert.ok(svg.includes('<tspan>' + AISBP.Util.escapeXml(run.text) + '</tspan>')));
   });
 });

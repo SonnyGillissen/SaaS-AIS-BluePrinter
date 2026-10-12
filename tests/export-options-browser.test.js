@@ -4,6 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const os = require('node:os');
 const http = require('node:http');
 const { spawn } = require('node:child_process');
 
@@ -32,7 +33,7 @@ async function browserChecks() {
   check(doc.querySelectorAll('[data-type^="annotation-"]').length === 3, 'Palette exposes Text, Markdown and Table annotations');
   A.app.actions.addAuto('annotation-markdown');
   const markdownId = A.app.store.singleNode().id;
-  change('prop-annotation-content', '# Browser heading\n**Bold** and *italic*\n<script>unsafe</script>', 'input');
+  change('prop-annotation-content', '# Browser heading\n**Bold** and *italic*\n<script>unsafe<' + '/script>', 'input');
   change('prop-annotation-theme', 'callout');
   A.app.canvas.render();
   check(!doc.getElementById('prop-name-mode') && !doc.getElementById('prop-label'), 'Annotation properties omit Azure naming fields');
@@ -59,6 +60,18 @@ async function browserChecks() {
   check(A.Annotations.rows(A.app.store.project.nodes[tableId].attributes.rows)[0].length === 2, 'Columns can be removed');
   A.app.store.undo();
   check(A.Annotations.rows(A.app.store.project.nodes[tableId].attributes.rows).length === 3, 'Table operations support undo');
+  A.app.store.change('check Blueprint wrapping', (p) => {
+    p.settings.diagram.style = 'blueprint';
+    A.Model.updateNode(p, markdownId, { attributes: { content: 'ill '.repeat(15) } });
+  });
+  A.app.canvas.render();
+  const blueprintText = Array.from(doc.querySelectorAll('#content [data-node-id="' + markdownId + '"] text'));
+  check(blueprintText.length > 1 && blueprintText.every((text) => text.getComputedTextLength() <= 276), 'Blueprint annotation wrapping fits actual monospace glyph widths');
+  const annotationSvg = A.Render.renderDocument(A.app.store.project);
+  const annotationPng = await A.Raster.toPng(annotationSvg.svg, annotationSvg.width, annotationSvg.height, '#ffffff');
+  const annotationPdf = await A.Raster.toPdf(annotationSvg.svg, annotationSvg.width, annotationSvg.height, { pageSize: 'A4' });
+  check(annotationPng.type === 'image/png' && annotationPng.size > 100, 'Rendered annotations export to PNG');
+  check(annotationPdf.type === 'application/pdf' && annotationPdf.size > 100, 'Rendered annotations export to PDF');
   A.app.store.load(annotationsBefore);
   const namingBefore = JSON.stringify(A.app.store.project);
   A.Dialogs.openOptions(A.app, 'types');
@@ -370,8 +383,7 @@ async function browserChecks() {
 
 test('real browser export dialogs, raster alpha and PDF margins', { skip: !browser || typeof WebSocket === 'undefined', timeout: 45000 }, async () => {
   const root = path.join(__dirname, '..');
-  const profile = path.join(root, '.export-options-browser-profile-' + process.pid);
-  fs.mkdirSync(profile);
+  const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'aisbp-export-options-browser-profile-'));
   const html = '<!doctype html><body><pre id="result">pending</pre><iframe src="/index.html"></iframe><script>' +
     'document.querySelector("iframe").onload = async () => { try { const results = await (' + browserChecks.toString() +
     ')(); document.getElementById("result").textContent = "PASS " + JSON.stringify(results); } catch (e) { document.getElementById("result").textContent = "FAIL " + e.stack; }' +

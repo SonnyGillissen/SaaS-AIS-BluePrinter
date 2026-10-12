@@ -192,7 +192,7 @@
       const r = { id: node.id, type: node.type, container, hidden: isHidden, depth, name: nm[node.id] || '', typeLabel, attrs, tags: { rows: [], height: 0 } };
       const kids = (childIndex[node.id] || []).map((c) => measure(c, isHidden ? depth : depth + 1));
       if (def && def.annotation) {
-        r.annotation = AISBP.Annotations.measure(node);
+        r.annotation = AISBP.Annotations.measure(node, diagram.style);
         r.w = r.annotation.w;
         r.h = r.annotation.h;
         r.x = node.x;

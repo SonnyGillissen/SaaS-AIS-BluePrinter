@@ -463,7 +463,7 @@
       }
       const nodeEl = e.target.closest('[data-node-id]');
       if (!nodeEl) return;
-      const input = doc.getElementById('prop-label') || doc.getElementById('prop-name');
+      const input = doc.getElementById('prop-annotation-content') || doc.getElementById('prop-cell-0-0') || doc.getElementById('prop-label') || doc.getElementById('prop-name');
       if (input) {
         input.focus();
         input.select();

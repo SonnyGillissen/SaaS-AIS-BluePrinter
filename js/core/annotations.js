@@ -5,11 +5,14 @@
 (function (root) {
   'use strict';
   const AISBP = (root.AISBP = root.AISBP || {});
-  const esc = AISBP.Util.escapeXml;
+  const Util = AISBP.Util || (typeof require === 'function' ? require('./util.js') : null);
+  const esc = Util.escapeXml;
   const THEMES = ['plain', 'pill', 'card', 'callout'];
   const ALIGN = ['left', 'center', 'right'];
   const MAX_ROWS = 50;
   const MAX_COLS = 12;
+  // JSON may use six characters for each supported UTF-16 code unit.
+  const MAX_TABLE_JSON = 4000000;
   const DEFAULT_ROWS = [['Name', 'Value'], ['Item', 'Details']];
   const isAnnotation = (type) => ['annotation-text', 'annotation-markdown', 'annotation-table'].includes(type);
   const text = (v, max) => typeof v === 'string' ? v.slice(0, max) : '';
@@ -19,7 +22,8 @@
   function rows(value) {
     let data = value;
     if (typeof data === 'string') {
-      try { data = JSON.parse(data.slice(0, 700000)); } catch (_) { data = DEFAULT_ROWS; }
+      if (data.length > MAX_TABLE_JSON) data = DEFAULT_ROWS;
+      else { try { data = JSON.parse(data); } catch (_) { data = DEFAULT_ROWS; } }
     }
     if (!Array.isArray(data) || !data.length) data = DEFAULT_ROWS;
     data = data.slice(0, MAX_ROWS).map((r) => Array.isArray(r) ? r.slice(0, MAX_COLS).map((c) => text(c, 1000)) : ['']);
@@ -114,14 +118,14 @@
     });
   }
 
-  function advance(ch, run, size) {
-    return size * (run.code ? 0.62 : /[ilI.,'!| ]/.test(ch) ? 0.32 : /[MW@#]/.test(ch) ? 0.85 : 0.57) * (run.bold ? 1.04 : 1);
+  function advance(ch, run, size, monospace) {
+    return size * (monospace || run.code ? 0.62 : /[ilI.,'!| ]/.test(ch) ? 0.32 : /[MW@#]/.test(ch) ? 0.85 : 0.57) * (run.bold ? 1.04 : 1);
   }
 
   /** Wrap styled characters at words, splitting long unbroken words when necessary. */
-  function wrap(runs, width, size) {
+  function wrap(runs, width, size, monospace) {
     const chars = [];
-    runs.forEach((run) => Array.from(run.text).forEach((ch) => chars.push({ ch, run, w: advance(ch, run, size) })));
+    runs.forEach((run) => Array.from(run.text).forEach((ch) => chars.push({ ch, run, w: advance(ch, run, size, monospace) })));
     const out = [];
     let start = 0;
     while (start < chars.length) {
@@ -144,25 +148,26 @@
     return out.length ? out : [[]];
   }
 
-  function textLayout(content, width, size, markdown) {
+  function textLayout(content, width, size, markdown, monospace) {
     const lines = [];
     let h = 0;
     blocks(content, markdown).forEach((b) => {
       const fs = size * b.scale;
-      wrap(b.runs, Math.max(10, width), fs).forEach((runs) => {
+      wrap(b.runs, Math.max(10, width), fs, monospace).forEach((runs) => {
         h += fs * 1.45;
         lines.push({ runs, size: fs, y: h - fs * 0.28, bold: b.bold, italic: b.italic });
       });
     });
-    return { lines, h };
+    return { lines, h, monospace: !!monospace };
   }
 
-  function measure(node) {
+  function measure(node, style) {
     const a = normalize(node.type, node.attributes);
     const p = a.padding;
+    const monospace = style === 'blueprint';
     if (node.type !== 'annotation-table') {
       const w = Math.max(2 * p + a.fontSize * 2, number(node.w, 300, 60, 100000));
-      const layout = textLayout(a.content, w - p * 2, a.fontSize, node.type === 'annotation-markdown');
+      const layout = textLayout(a.content, w - p * 2, a.fontSize, node.type === 'annotation-markdown', monospace);
       return { a, w, h: Math.max(number(node.h, 0, 0, 100000), layout.h + 2 * p, 30), layout };
     }
     const data = rows(a.rows);
@@ -174,8 +179,8 @@
     const remaining = w - minimumCellW * widths.length;
     const naturalExtra = naturalW - minimumCellW * widths.length;
     widths = widths.map((cw) => minimumCellW + remaining * (naturalExtra ? (cw - minimumCellW) / naturalExtra : 1 / widths.length));
-    const caption = a.caption ? textLayout(a.caption, w - 2 * p, a.fontSize, false) : { lines: [], h: 0 };
-    const layouts = data.map((r) => r.map((c, i) => textLayout(c, widths[i] - 2 * p, a.fontSize, false)));
+    const caption = a.caption ? textLayout(a.caption, w - 2 * p, a.fontSize, false, monospace) : { lines: [], h: 0 };
+    const layouts = data.map((r) => r.map((c, i) => textLayout(c, widths[i] - 2 * p, a.fontSize, false, monospace)));
     const heights = layouts.map((r) => Math.max(...r.map((l) => l.h)) + p * 2);
     return { a, w, h: Math.max(number(node.h, 0, 0, 100000), heights.reduce((s, v) => s + v, 0) + (a.caption ? caption.h + p * 2 : 0)), widths, heights, layouts, caption };
   }
@@ -183,7 +188,7 @@
   function svgText(layout, x, y, width, a, color, bold) {
     const align = a.align;
     const tx = x + (align === 'center' ? width / 2 : align === 'right' ? width : 0);
-    return layout.lines.map((line) => '<text xml:space="preserve" x="' + tx + '" y="' + (y + line.y) + '" text-anchor="' + (align === 'center' ? 'middle' : align === 'right' ? 'end' : 'start') + '" font-size="' + line.size + '" fill="' + esc(color) + '">' +
+    return layout.lines.map((line) => '<text xml:space="preserve"' + (layout.monospace ? ' font-family="monospace"' : '') + ' x="' + tx + '" y="' + (y + line.y) + '" text-anchor="' + (align === 'center' ? 'middle' : align === 'right' ? 'end' : 'start') + '" font-size="' + line.size + '" fill="' + esc(color) + '">' +
       line.runs.map((r) => '<tspan' + (r.bold || line.bold || bold ? ' font-weight="700"' : '') + (r.italic || line.italic ? ' font-style="italic"' : '') + (r.code ? ' font-family="monospace"' : '') + '>' + esc(r.text) + '</tspan>').join('') + '</text>').join('');
   }
 
@@ -193,5 +198,6 @@
       blocks(a.content, node.type === 'annotation-markdown').map((b) => b.runs.map((r) => r.text).join('')).join('\n');
   }
 
-  AISBP.Annotations = { THEMES, ALIGN, MAX_ROWS, MAX_COLS, isAnnotation, normalize, rows, tableOperation, inline, wrap, textLayout, measure, svgText, plainText };
+  AISBP.Annotations = { THEMES, ALIGN, MAX_ROWS, MAX_COLS, MAX_TABLE_JSON, isAnnotation, normalize, rows, tableOperation, inline, wrap, textLayout, measure, svgText, plainText };
+  if (typeof module !== 'undefined' && module.exports) module.exports = AISBP.Annotations;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

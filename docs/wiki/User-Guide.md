@@ -45,7 +45,7 @@ everything automatically and resets manually resized containers to the size they
 
 ## Text blocks and tables
 
-Use the **Annotations** palette category to add **Text**, **Markdown** or a **Table**, by clicking
+Use the **Text & Tables** palette category to add **Text**, **Markdown** or a **Table**, by clicking
 or dragging it onto the canvas. Annotations can stand alone or sit inside a compatible container;
 they are diagram content, not Azure resources.
 
@@ -70,6 +70,10 @@ Drag the bottom-right resize handle to change an annotation's width and minimum 
 always grows to fit the content. **Reset size** in Properties restores automatic sizing.
 Text blocks and tables can be moved, copied, pasted and deleted like other objects, and edits
 support undo/redo. Their content is saved with the blueprint and included in diagram exports.
+SVG, PNG and PDF use the canvas renderer. Draw.io uses editable text/table labels with
+approximate styling; ArchiMate retains annotation content and options as artifact properties
+and documentation rather than recreating rich-text/table appearance. Embedded blueprints
+preserve all annotation options for reimport.
 
 ## Attributes
 

@@ -1,4 +1,5 @@
 node_modules/
+/.export-options-browser-profile-*/
 /icons/msicons/
 server/php/config.php
 server/php/install.lock
