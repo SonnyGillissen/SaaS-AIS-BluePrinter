@@ -35,6 +35,7 @@ test('Azure resource types map to catalog types (including kinds)', () => {
   assert.equal(Azure.mapType({ type: 'Microsoft.Web/sites', kind: 'functionapp,workflowapp' }), 'logic-app-standard');
   assert.equal(Azure.mapType({ type: 'Microsoft.Web/sites', kind: 'app' }), 'app-service');
   assert.equal(Azure.mapType({ type: 'Microsoft.CognitiveServices/accounts', kind: 'OpenAI' }), 'azure-openai');
+  assert.equal(Azure.mapType({ type: 'Microsoft.Network/expressRouteCircuits' }), 'expressroute-circuit');
   assert.equal(Azure.mapType({ type: 'Microsoft.Contoso/widgets' }), null);
   assert.ok(Azure.isSupporting({ type: 'Microsoft.Network/networkInterfaces' }));
   assert.ok(!Azure.isSkipped({ type: 'Microsoft.Network/networkInterfaces' }));
@@ -90,6 +91,7 @@ function inventory() {
     resourceGroups: [{ id: RG, name: 'rg-int', location: 'westeurope', subscriptionId: SUB, tags: { env: 'prd' } }],
     resources: [
       { id: vnet, name: 'vnet-int', type: 'Microsoft.Network/virtualNetworks', location: 'westeurope', properties: { addressSpace: { addressPrefixes: ['10.0.0.0/16'] }, subnets: [{ id: vnet + '/subnets/snet-apps', name: 'snet-apps', properties: { addressPrefix: '10.0.1.0/24' } }, { id: vnet + '/subnets/snet-pe', name: 'snet-pe', properties: { addressPrefix: '10.0.2.0/24' } }] } },
+      { id: RG + '/providers/Microsoft.Network/expressRouteCircuits/erc-int', name: 'erc-int', type: 'Microsoft.Network/expressRouteCircuits', location: 'westeurope', sku: { tier: 'Standard', family: 'MeteredData' }, properties: { serviceProviderProperties: { bandwidthInMbps: 1000, peeringLocation: 'Amsterdam', serviceProviderName: 'Example Provider' } } },
       { id: RG + '/providers/Microsoft.Web/serverfarms/asp-int', name: 'asp-int', type: 'Microsoft.Web/serverfarms', location: 'westeurope', sku: { name: 'WS1' } },
       { id: site, name: 'la-orders', type: 'Microsoft.Web/sites', kind: 'functionapp,workflowapp', location: 'westeurope', tags: { owner: 'team' }, properties: { serverFarmId: RG + '/providers/Microsoft.Web/serverfarms/asp-int', virtualNetworkSubnetId: vnet + '/subnets/snet-apps', defaultHostName: 'la-orders.azurewebsites.net' } },
       { id: automation, name: 'aa-int', type: 'Microsoft.Automation/automationAccounts', location: 'westeurope', sku: { name: 'Basic' }, properties: { publicNetworkAccess: 'Disabled' } },
@@ -138,6 +140,13 @@ test('buildProject draws the hierarchy, resources, children, network and connect
   assert.equal(runbook.attributes.state, 'Published');
 
   const vnet = byName(project, 'vnet-int');
+  const erc = byName(project, 'erc-int');
+  assert.equal(erc.type, 'expressroute-circuit');
+  assert.equal(erc.attributes.tier, 'Standard');
+  assert.equal(erc.attributes.billingModel, 'MeteredData');
+  assert.equal(erc.attributes.bandwidth, 1000);
+  assert.equal(erc.attributes.peeringLocation, 'Amsterdam');
+  assert.equal(erc.attributes.serviceProvider, 'Example Provider');
   const snetApps = byName(project, 'snet-apps');
   assert.equal(snetApps.type, 'subnet');
   assert.equal(snetApps.parentId, vnet.id);
@@ -157,8 +166,8 @@ test('buildProject draws the hierarchy, resources, children, network and connect
   const w = byName(project, 'w1');
   assert.equal(w.type, 'azure-resource');
   assert.equal(stats.generic, 2);
-  assert.equal(stats.resources, 12);
-  assert.equal(stats.drawn, 12);
+  assert.equal(stats.resources, 13);
+  assert.equal(stats.drawn, 13);
   assert.deepEqual(stats.skipped, {});
   assert.equal(stats.connections, all.length);
 

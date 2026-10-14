@@ -233,6 +233,7 @@
     frontDoor: 'networking/10073-icon-service-Front-Door-and-CDN-Profiles.svg',
     publicIp: 'networking/10069-icon-service-Public-IP-Addresses.svg',
     vnetGateway: 'networking/10063-icon-service-Virtual-Network-Gateways.svg',
+    expressRouteCircuit: 'networking/10079-icon-service-ExpressRoute-Circuits.svg',
     firewall: 'networking/10084-icon-service-Firewalls.svg',
     dataGateway: 'networking/10070-icon-service-On-Premises-Data-Gateways.svg',
     appInsights: 'management-governance/00012-icon-service-Application-Insights.svg',
@@ -750,6 +751,15 @@
       label: 'Virtual Network Gateway', category: 'networking', icon: I.vnetGateway, abbr: 'vgw', provider: 'Microsoft.Network/virtualNetworkGateways',
       parents: RG, archimate: 'TechnologyService', rule: R.network80, network: true,
       attributes: [select('gatewayType', 'Gateway type', ['VPN', 'ExpressRoute'], { default: 'VPN', show: true }), text('sku', 'SKU', { default: 'VpnGw1AZ' }), bool('activeActive', 'Active-active')]
+    },
+    'expressroute-circuit': {
+      label: 'ExpressRoute Circuit', category: 'networking', icon: I.expressRouteCircuit, abbr: 'erc', provider: 'Microsoft.Network/expressRouteCircuits',
+      parents: RG, archimate: 'TechnologyService', rule: R.network80, network: true,
+      attributes: [
+        select('tier', 'Tier', ['Standard', 'Premium', 'Local'], { show: true }),
+        select('billingModel', 'Billing model', ['MeteredData', 'UnlimitedData'], { show: true }),
+        num('bandwidth', 'Bandwidth (Mbps)'), text('peeringLocation', 'Peering location'), text('serviceProvider', 'Service provider')
+      ]
     },
     firewall: {
       label: 'Azure Firewall', category: 'networking', icon: I.firewall, abbr: 'afw', provider: 'Microsoft.Network/azureFirewalls',
