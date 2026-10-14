@@ -219,6 +219,7 @@
     'microsoft.network/applicationgateways': 'application-gateway',
     'microsoft.network/publicipaddresses': 'public-ip',
     'microsoft.network/virtualnetworkgateways': 'virtual-network-gateway',
+    'microsoft.network/expressroutecircuits': 'expressroute-circuit',
     'microsoft.network/azurefirewalls': 'firewall',
     'microsoft.insights/components': 'application-insights',
     'microsoft.operationalinsights/workspaces': 'log-analytics',
@@ -514,6 +515,12 @@
     'front-door': (r) => ({ sku: r.sku && /premium/i.test(r.sku.name) ? 'Premium' : 'Standard' }),
     'public-ip': (r, p) => ({ sku: r.sku && r.sku.name, allocation: p.publicIPAllocationMethod, dnsLabel: p.dnsSettings && p.dnsSettings.domainNameLabel }),
     'virtual-network-gateway': (r, p) => ({ gatewayType: lower(p.gatewayType) === 'vpn' ? 'VPN' : p.gatewayType, sku: p.sku && p.sku.name, activeActive: bool(p.activeActive) }),
+    'expressroute-circuit': (r, p) => ({
+      tier: r.sku && r.sku.tier, billingModel: r.sku && r.sku.family,
+      bandwidth: p.serviceProviderProperties && p.serviceProviderProperties.bandwidthInMbps,
+      peeringLocation: p.serviceProviderProperties && p.serviceProviderProperties.peeringLocation,
+      serviceProvider: p.serviceProviderProperties && p.serviceProviderProperties.serviceProviderName
+    }),
     firewall: (r, p) => ({ tier: p.sku && p.sku.tier, policy: p.firewallPolicy && leaf(p.firewallPolicy.id) }),
     'application-insights': (r, p) => ({ workspace: leaf(p.WorkspaceResourceId || p.workspaceResourceId) || undefined, samplingPercentage: p.SamplingPercentage, disableLocalAuth: bool(p.DisableLocalAuth) }),
     'log-analytics': (r, p) => ({ sku: p.sku && p.sku.name, retentionDays: p.retentionInDays }),
