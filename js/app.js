@@ -81,6 +81,7 @@
 
   /** Make sure a node is visible on screen and select it. */
   function focusNode(id) {
+    if (compactLayout.matches) showPanel('canvas');
     store.select([id]);
     root.requestAnimationFrame(() => {
       const r = store.derived().geometry.rects[id];
@@ -415,6 +416,45 @@
   const styleSelect = doc.getElementById('style-select');
   const detailSelect = doc.getElementById('detail-select');
   const projectName = doc.getElementById('project-name');
+  const compactLayout = root.matchMedia('(max-width: 1100px)');
+  const workspace = doc.querySelector('.workspace');
+  const panelButtons = Array.from(doc.querySelectorAll('.workspace-nav [data-panel]'));
+  const toolbarToggle = doc.getElementById('toolbar-toggle');
+  const header = doc.querySelector('.app-header');
+
+  function showPanel(panel) {
+    workspace.dataset.panel = panel;
+    panelButtons.forEach((button) => {
+      const active = button.dataset.panel === panel;
+      button.setAttribute(button.dataset.panel === 'canvas' ? 'aria-pressed' : 'aria-expanded', String(active));
+    });
+  }
+
+  function showTools(open) {
+    header.classList.toggle('tools-open', open);
+    toolbarToggle.setAttribute('aria-expanded', String(open));
+    if (!open) toggleExportMenu(false);
+  }
+
+  panelButtons.forEach((button) => button.addEventListener('click', () => {
+    showPanel(workspace.dataset.panel === button.dataset.panel ? 'canvas' : button.dataset.panel);
+    showTools(false);
+  }));
+  toolbarToggle.addEventListener('click', () => showTools(toolbarToggle.getAttribute('aria-expanded') !== 'true'));
+  compactLayout.addEventListener('change', () => { showPanel('canvas'); showTools(false); });
+  doc.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape' || doc.querySelector('dialog[open]') || AISBP.AnnotationEditor.isOpen(app)) return;
+    if (header.classList.contains('tools-open')) {
+      showTools(false);
+      toolbarToggle.focus();
+    } else if (compactLayout.matches && workspace.dataset.panel !== 'canvas') {
+      showPanel('canvas');
+      panelButtons[1].focus();
+    }
+  });
+  doc.getElementById('canvas').addEventListener('pointerdown', () => {
+    if (compactLayout.matches) { showPanel('canvas'); showTools(false); }
+  });
 
   Object.keys(AISBP.Render.STYLES).forEach((k) => styleSelect.appendChild(AISBP.Dom.h('option', { value: k, text: AISBP.Render.STYLES[k].label })));
   Layout.DETAIL_LEVELS.forEach((d) => detailSelect.appendChild(AISBP.Dom.h('option', { value: d.id, text: d.label })));
@@ -503,6 +543,7 @@
     const action = btn.getAttribute('data-action');
     if (action !== 'export-menu') toggleExportMenu(false);
     commands[action]();
+    if (compactLayout.matches && action !== 'export-menu') showTools(false);
   });
 
   doc.getElementById('file-input').addEventListener('change', (e) => {

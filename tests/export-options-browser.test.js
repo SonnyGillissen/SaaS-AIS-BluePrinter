@@ -15,7 +15,7 @@ async function browserChecks() {
   const A = win.AISBP;
   const doc = win.document;
   const annotationFrame = document.querySelector('iframe');
-  annotationFrame.style.cssText = 'width:760px;height:550px';
+  annotationFrame.style.cssText = 'width:1440px;height:550px';
   const pause = () => new Promise((resolve) => win.setTimeout(resolve, 30));
   const annotationEvents = [];
   win.addEventListener('error', (e) => annotationEvents.push(e.message));
@@ -83,8 +83,11 @@ async function browserChecks() {
   labelsSelect.value = 'show';
   labelsSelect.dispatchEvent(new win.Event('change'));
   check(win.getComputedStyle(label).position !== 'absolute' && A.Storage.loadPrefs().showActionLabels === true, 'Show labels restores visible action text and persists the choice');
+  annotationFrame.style.cssText = 'width:760px;height:550px';
+  await pause();
   const annotationsBefore = A.Util.clone(A.app.store.project);
   const clickText = (text) => {
+    if (['Edit on canvas', 'Edit Table'].includes(text) && doc.querySelector('.workspace').dataset.panel !== 'properties') doc.querySelector('.workspace-nav [data-panel="properties"]').click();
     const button = Array.from(doc.querySelectorAll('dialog[open] button, .annotation-inline-editor button, #panel-properties button')).find((b) => b.textContent === text);
     check(!!button, 'Annotation control exists: ' + text);
     button.click();
@@ -96,6 +99,7 @@ async function browserChecks() {
   };
   const key = (target, name, modifiers) => target.dispatchEvent(new win.KeyboardEvent('keydown', Object.assign({ key: name, bubbles: true, cancelable: true }, modifiers)));
   async function doubleClickAnnotation(id) {
+    doc.querySelector('.workspace-nav [data-panel="canvas"]').click();
     A.app.canvas.fit();
     A.app.canvas.render();
     await pause();
@@ -117,7 +121,9 @@ async function browserChecks() {
   labelsSelect.value = 'hide';
   labelsSelect.dispatchEvent(new win.Event('change'));
   const propertyLabels = Array.from(doc.querySelectorAll('#panel-properties button .action-label'));
+  doc.querySelector('.workspace-nav [data-panel="properties"]').click();
   check(propertyLabels.length > 0 && propertyLabels.every((text) => win.getComputedStyle(text).clipPath === 'none' && text.getBoundingClientRect().width > 1), 'Properties buttons retain visible labels while toolbar labels are hidden');
+  doc.querySelector('.workspace-nav [data-panel="canvas"]').click();
   labelsSelect.value = 'show';
   labelsSelect.dispatchEvent(new win.Event('change'));
   const annotation = doc.querySelector('#content [data-node-id="' + markdownId + '"]');
@@ -180,6 +186,7 @@ async function browserChecks() {
   check(zoomedEditor.left >= canvasBox.left && zoomedEditor.right <= canvasBox.right + 1, 'Inline overlay tracks view changes');
   key(editor, 'Escape');
   check(!doc.querySelector('.annotation-inline-editor') && A.app.store.project.nodes[markdownId].attributes.content === originalMarkdown && A.app.store.selection.nodes.has(markdownId), 'Inline Escape cancels without changing content or selection');
+  if (doc.querySelector('.workspace').dataset.panel !== 'properties') doc.querySelector('.workspace-nav [data-panel="properties"]').click();
   doc.getElementById('prop-edit-annotation').focus();
   clickText('Edit on canvas');
   editor = doc.getElementById('annotation-editor-content');
@@ -261,6 +268,7 @@ async function browserChecks() {
   A.app.store.redo();
   const tableSaved = JSON.stringify(A.app.store.project);
   for (const method of ['Cancel', 'Escape', 'Close']) {
+    if (doc.querySelector('.workspace').dataset.panel !== 'properties') doc.querySelector('.workspace-nav [data-panel="properties"]').click();
     doc.getElementById('prop-edit-annotation').focus();
     clickText('Edit Table');
     check(!!doc.querySelector('dialog.annotation-table-dialog[open]'), 'Properties opens same shared table popup: ' + method);
@@ -613,6 +621,45 @@ async function browserChecks() {
   check(!store.project.connections[conn.id].sourceAnchor && !store.project.connections[conn.id].targetAnchor && store.project.connections[conn.id].waypoints.length === 1, 'Anchor reset restores automatic attachments without deleting route');
   store.undo();
   check(JSON.stringify(store.project.connections[conn.id].targetAnchor) === JSON.stringify(beforeReverse.targetAnchor), 'Anchor reset is undoable');
+  const workspace = doc.querySelector('.workspace');
+  const tools = doc.getElementById('toolbar-toggle');
+  const panelButton = (name) => doc.querySelector('.workspace-nav [data-panel="' + name + '"]');
+  check((await fetch('/touch')).ok && win.matchMedia('(pointer: coarse)').matches, 'Mobile checks use touch emulation');
+  for (const [width, height] of [[320, 568], [390, 844], [768, 700], [1024, 768], [667, 375]]) {
+    annotationFrame.style.cssText = 'width:' + width + 'px;height:' + height + 'px';
+    await pause();
+    check(doc.documentElement.scrollWidth <= width && doc.documentElement.scrollHeight <= height, 'No page overflow at ' + width + 'x' + height + ': ' + doc.documentElement.scrollWidth + 'x' + doc.documentElement.scrollHeight);
+    check(doc.getElementById('canvas').getBoundingClientRect().height >= height / 2, 'Canvas retains usable height at ' + width + '×' + height);
+    check(win.getComputedStyle(doc.getElementById('main-toolbar')).display === 'none', 'Tools start collapsed at ' + width);
+    panelButton('palette').click();
+    check(workspace.dataset.panel === 'palette' && panelButton('palette').getAttribute('aria-expanded') === 'true' && doc.getElementById('resource-sidebar').getBoundingClientRect().width > 0, 'Resources are accessible at ' + width);
+    const before = Object.keys(store.project.nodes).length;
+    doc.querySelector('.palette-item[data-type="annotation-text"]').click();
+    await pause();
+    check(Object.keys(store.project.nodes).length === before + 1 && workspace.dataset.panel === 'canvas', 'Tap-to-add returns to canvas at ' + width);
+    panelButton('properties').click();
+    check(win.getComputedStyle(doc.getElementById('properties-sidebar')).display !== 'none', 'Properties are accessible at ' + width);
+    panelButton('canvas').click();
+    tools.click();
+    check(tools.getAttribute('aria-expanded') === 'true' && doc.getElementById('main-toolbar').getBoundingClientRect().width <= width, 'Tools fit the viewport at ' + width);
+    doc.querySelector('[data-action="export-menu"]').click();
+    const menuBounds = doc.querySelector('.menu-list').getBoundingClientRect();
+    check(menuBounds.left >= 0 && menuBounds.right <= width, 'Export menu remains on screen at ' + width);
+    key(tools, 'Escape');
+    check(tools.getAttribute('aria-expanded') === 'false', 'Escape closes tools at ' + width);
+    check(panelButton('palette').getBoundingClientRect().height >= 44, 'Touch controls have finger-sized targets at ' + width + ': ' + panelButton('palette').getBoundingClientRect().height + ', ' + win.getComputedStyle(panelButton('palette')).minHeight + ', ' + win.matchMedia('(pointer: coarse)').matches);
+    doc.querySelector('[data-action="help"]').click();
+    const mobileDialog = doc.querySelector('dialog[open]');
+    const dialogBounds = mobileDialog.getBoundingClientRect();
+    check(dialogBounds.left >= 0 && dialogBounds.right <= width && dialogBounds.top >= 0 && dialogBounds.bottom <= height, 'Dialogs fit the viewport at ' + width);
+    mobileDialog.querySelector('.dlg-head button').click();
+    const zoom = Number.parseInt(doc.getElementById('zoom-label').textContent, 10);
+    doc.querySelector('.workspace-nav [data-action="zoom-in"]').click();
+    check(Number.parseInt(doc.getElementById('zoom-label').textContent, 10) >= zoom, 'Quick zoom is accessible at ' + width);
+  }
+  annotationFrame.style.cssText = 'width:1440px;height:900px';
+  await pause();
+  check(win.getComputedStyle(doc.getElementById('resource-sidebar')).display === 'flex' && win.getComputedStyle(doc.getElementById('properties-sidebar')).display === 'flex' && win.getComputedStyle(doc.getElementById('main-toolbar')).display === 'flex', 'Desktop restores both sidebars and the full toolbar');
   return results;
 }
 
@@ -624,9 +671,10 @@ test('real browser export dialogs, raster alpha and PDF margins', { skip: !brows
     ')(); document.getElementById("result").textContent = "PASS " + JSON.stringify(results); } catch (e) { document.getElementById("result").textContent = "FAIL " + e.stack; }' +
     'fetch("/result", {method: "POST", body: document.getElementById("result").textContent}); };</script>';
   let report;
+  let touchSocket;
   const completed = new Promise((resolve) => { report = resolve; });
   const server = http.createServer((req, res) => {
-    if (req.url === '/escape' || req.url.startsWith('/route-double-click?') || req.url.startsWith('/canvas-double-click?')) {
+    if (req.url === '/touch' || req.url === '/escape' || req.url.startsWith('/route-double-click?') || req.url.startsWith('/canvas-double-click?')) {
       (async () => {
         const port = fs.readFileSync(path.join(profile, 'DevToolsActivePort'), 'utf8').split('\n')[0];
         const targets = await (await fetch('http://127.0.0.1:' + port + '/json/list')).json();
@@ -647,7 +695,9 @@ test('real browser export dialogs, raster alpha and PDF margins', { skip: !brows
             socket.addEventListener('message', receive);
             socket.send(JSON.stringify({ id, method, params }));
           });
-          if (req.url !== '/escape') {
+          if (req.url === '/touch') {
+            await command(1, 'Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
+          } else if (req.url !== '/escape') {
             const query = new URL(req.url, 'http://localhost').searchParams;
             const x = Number(query.get('x'));
             const y = Number(query.get('y'));
@@ -661,7 +711,10 @@ test('real browser export dialogs, raster alpha and PDF margins', { skip: !brows
             await command(2, 'Input.dispatchKeyEvent', { type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27, nativeVirtualKeyCode: 27 });
           }
           res.end();
-        } finally { socket.close(); }
+        } finally {
+          if (req.url === '/touch') touchSocket = socket;
+          else socket.close();
+        }
       })().catch((error) => { res.writeHead(500); res.end(error.message); });
       return;
     }
@@ -699,6 +752,7 @@ test('real browser export dialogs, raster alpha and PDF margins', { skip: !brows
     assert.ok(result.includes('PNG pixel transparent: 0,0,0,0'));
   } finally {
     clearTimeout(timer);
+    if (touchSocket) touchSocket.close();
     if (child && child.exitCode === null) {
       child.kill();
       await new Promise((resolve) => child.once('close', resolve));

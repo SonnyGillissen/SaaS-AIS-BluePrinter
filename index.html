@@ -21,7 +21,8 @@
     <input id="project-name" class="project-name" type="text" aria-label="Project name" spellcheck="false" maxlength="200">
     <span id="save-state" class="save-state" aria-live="polite"></span>
 
-    <nav class="toolbar" aria-label="Main toolbar">
+    <button type="button" id="toolbar-toggle" class="btn compact-control" aria-controls="main-toolbar" aria-expanded="false">Tools</button>
+    <nav id="main-toolbar" class="toolbar" aria-label="Main toolbar">
       <div class="group">
         <button type="button" data-action="new" data-icon="new" title="New blueprint">New</button>
         <button type="button" data-action="projects" data-icon="open" title="Open a saved blueprint">Open</button>
@@ -83,8 +84,16 @@
     </nav>
   </header>
 
-  <main class="workspace">
-    <aside class="sidebar left" aria-label="Palette and explorer">
+  <main class="workspace" data-panel="canvas">
+    <nav class="workspace-nav compact-control" aria-label="Workspace panels">
+      <button type="button" class="btn" data-panel="palette" aria-controls="resource-sidebar" aria-expanded="false">Resources</button>
+      <button type="button" class="btn" data-panel="canvas" aria-controls="canvas" aria-pressed="true">Canvas</button>
+      <button type="button" class="btn" data-panel="properties" aria-controls="properties-sidebar" aria-expanded="false">Properties</button>
+      <button type="button" class="btn" data-action="zoom-out" aria-label="Zoom out">−</button>
+      <button type="button" class="btn" data-action="zoom-in" aria-label="Zoom in">+</button>
+      <button type="button" class="btn" data-action="fit">Fit</button>
+    </nav>
+    <aside id="resource-sidebar" class="sidebar left" aria-label="Palette and explorer">
       <div class="tabs" role="tablist">
         <button type="button" role="tab" id="tab-palette" aria-controls="panel-palette" aria-selected="true">Palette</button>
         <button type="button" role="tab" id="tab-explorer" aria-controls="panel-explorer" aria-selected="false">Explorer</button>
@@ -104,13 +113,13 @@
       </svg>
       <div id="canvas-empty" class="canvas-empty" hidden>
         <h2>Start your blueprint</h2>
-        <p>Drag a <strong>management group</strong>, <strong>subscription</strong> or <strong>resource group</strong> from the palette onto the canvas, then drop resources inside it.</p>
+        <p>Click or tap a resource in the palette to add it, or drag it onto the canvas. Start with a <strong>management group</strong>, <strong>subscription</strong> or <strong>resource group</strong>, then add resources inside it.</p>
         <p><button type="button" data-action="sample" data-icon="diagram">Load the sample blueprint</button> <button type="button" data-action="azure" data-icon="cloud">Load your Azure environment</button></p>
       </div>
       <div class="canvas-hint" id="canvas-hint">Drag empty space to pan &bull; Shift+drag to select &bull; Ctrl+wheel to zoom &bull; Drag the &#9675; handle to connect</div>
     </section>
 
-    <aside class="sidebar right" aria-label="Properties">
+    <aside id="properties-sidebar" class="sidebar right" aria-label="Properties">
       <section id="panel-properties" class="properties"></section>
     </aside>
   </main>
