@@ -7,7 +7,7 @@ const Mirror = require('../tools/mirror-icons.js');
 
 test('every catalog icon is a safe MS Icons library path', () => {
   const paths = Mirror.iconPaths();
-  const used = new Set(AISBP.Catalog.all().map((t) => t.icon));
+  const used = new Set(AISBP.Catalog.all().map((t) => t.icon).filter(Boolean));
   assert.equal(paths.length, used.size, 'no icon path was rejected by the safety filter');
   paths.forEach((p) => assert.match(p, /^[a-z-]+\/[\w.+()-]+\.svg$/i));
 });
@@ -17,6 +17,23 @@ test('icon URLs point at msicons.com by default and honour a custom base URL', (
   assert.ok(AISBP.Icons.url(p, 'function-app').startsWith('https://msicons.com/icons/'));
   p.settings.icons.baseUrl = 'icons/msicons/';
   assert.ok(AISBP.Icons.url(p, 'function-app').startsWith('icons/msicons/'));
+});
+
+test('annotation icons are distinct, offline, and available in embedded exports', async () => {
+  const p = AISBP.Model.createProject();
+  p.settings.icons.baseUrl = 'https://example.invalid/icons/';
+  const types = ['annotation-text', 'annotation-markdown', 'annotation-table'];
+  const urls = types.map((type) => {
+    AISBP.Model.addNode(p, type, null, {});
+    const url = AISBP.Icons.url(p, type);
+    assert.match(url, /^data:image\/svg\+xml;base64,/);
+    assert.equal(AISBP.Icons.resolver(p, true)(type), url);
+    assert.equal(AISBP.Icons.resolver(p, false)(type), url);
+    assert.ok(Mirror.isPlainSvg(Buffer.from(url.split(',')[1], 'base64').toString()));
+    return url;
+  });
+  assert.equal(new Set(urls).size, types.length);
+  assert.equal(await AISBP.Icons.inlineAll(p), 0);
 });
 
 test('the mirror only accepts plain SVG documents', () => {

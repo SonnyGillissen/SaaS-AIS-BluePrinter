@@ -261,6 +261,7 @@
     }
 
     svg.addEventListener('pointerdown', (e) => {
+      if (e.pointerType === 'touch' && !e.isPrimary) return;
       if (AISBP.AnnotationEditor.isOpen(app)) { e.preventDefault(); return; }
       if (e.button !== 0 && e.button !== 1) return;
       lockSelection(true);
@@ -326,6 +327,7 @@
     });
 
     svg.addEventListener('pointermove', (e) => {
+      if (e.pointerType === 'touch' && !e.isPrimary) return;
       if (!gesture) return;
       const pt = toCanvas(e.clientX, e.clientY);
       if (gesture.type === 'pan') {
@@ -449,8 +451,8 @@
       if (gst.edit && !gst.moved && !cancelled) AISBP.AnnotationEditor.open(app, gst.id);
     }
 
-    svg.addEventListener('pointerup', (e) => endGesture(e, false));
-    svg.addEventListener('pointercancel', (e) => endGesture(e, true));
+    svg.addEventListener('pointerup', (e) => { if (e.pointerType !== 'touch' || e.isPrimary) endGesture(e, false); });
+    svg.addEventListener('pointercancel', (e) => { if (e.pointerType !== 'touch' || e.isPrimary) endGesture(e, true); });
     wrap.addEventListener('keydown', (e) => {
       if (e.key !== 'Escape' || !gesture || !['route', 'anchor'].includes(gesture.type)) return;
       e.preventDefault();

@@ -15,7 +15,7 @@
   const Util = AISBP.Util || (typeof require === 'function' ? require('../core/util.js') : null);
   const Model = AISBP.Model || (typeof require === 'function' ? require('../core/model.js') : null);
 
-  const APP_VERSION = '1.3.4';
+  const APP_VERSION = '1.4.0';
   const MAX_IMPORT_BYTES = 20 * 1024 * 1024;
 
   /**

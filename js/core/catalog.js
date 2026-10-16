@@ -820,15 +820,15 @@
     },
 
     'annotation-text': {
-      label: 'Text', category: 'annotations', abbr: 'text', icon: I.allResources, parents: [ROOT], annotation: true,
+      label: 'Text', category: 'annotations', abbr: 'text', icon: null, parents: [ROOT], annotation: true,
       archimate: 'Artifact', rule: R.free, azure: false, nameMode: 'custom', seed: 'Text', attributes: []
     },
     'annotation-markdown': {
-      label: 'Markdown', category: 'annotations', abbr: 'markdown', icon: I.allResources, parents: [ROOT], annotation: true,
+      label: 'Markdown', category: 'annotations', abbr: 'markdown', icon: null, parents: [ROOT], annotation: true,
       archimate: 'Artifact', rule: R.free, azure: false, nameMode: 'custom', seed: 'Markdown', attributes: []
     },
     'annotation-table': {
-      label: 'Table', category: 'annotations', abbr: 'table', icon: I.allResources, parents: [ROOT], annotation: true,
+      label: 'Table', category: 'annotations', abbr: 'table', icon: null, parents: [ROOT], annotation: true,
       archimate: 'Artifact', rule: R.free, azure: false, nameMode: 'custom', seed: 'Table', attributes: []
     },
 

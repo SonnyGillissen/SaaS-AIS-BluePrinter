@@ -34,6 +34,13 @@ architectures. Click your environment together, and get an architecture diagram 
 - **Load your own Azure environment**: sign in with your own app registration (in the browser,
   no backend), tick the management groups, subscriptions and resource groups, and the real
   environment is drawn with its resources, details, tags, networks and connections.
+- **Small-screen and touch support**: on tablets and phones, switch between Resources, Canvas,
+  and Properties using the workspace buttons. Tap a palette item to add it; drag empty canvas
+  space to pan and use the +, −, and Fit buttons to navigate. Open **Tools** for the full toolbar.
+  Larger screens keep both sidebars visible.
+- **Compact desktop layout**: lower-resolution desktops use narrower sidebars and tighter
+  toolbar spacing. **Labels: Auto** (the default) hides toolbar text at desktop widths up to
+  1600px or heights up to 800px; choose **Show** or **Hide** to keep your own preference.
 - **Copy/paste and drag-and-drop everywhere**: palette › canvas, canvas › container, explorer
   tree, Ctrl+C/V (also between tabs), duplicate, undo/redo.
 - **Configuration package**: export and import the complete setup as an open JSON document.

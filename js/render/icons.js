@@ -31,6 +31,18 @@
 
   /** url -> data URI (string) or null when the icon could not be fetched. */
   const cache = new Map();
+  const annotationPaths = {
+    'annotation-text': 'M5 5h14M12 5v14M8 19h8',
+    'annotation-markdown': 'M3 6h18v12H3zM6 15V9l3 3 3-3v6M17 9v6m-2-2 2 2 2-2',
+    'annotation-table': 'M3 4h18v16H3zM3 9h18M3 14h18M9 4v16M15 4v16'
+  };
+  const annotationIcons = {};
+  Object.keys(annotationPaths).forEach((type) => {
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect width="24" height="24" rx="4" fill="#eef4fb"/><path d="' + annotationPaths[type] + '" fill="none" stroke="#0a63c9" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    const uri = 'data:image/svg+xml;base64,' + Util.toBase64(svg);
+    annotationIcons[type] = uri;
+    cache.set(uri, uri);
+  });
 
   /** Normalize the configured base URL (falls back to msicons.com). */
   function baseUrl(project) {
@@ -41,6 +53,7 @@
 
   /** Icon URL for a resource type. */
   function url(project, typeId) {
+    if (Object.prototype.hasOwnProperty.call(annotationIcons, typeId)) return annotationIcons[typeId];
     const def = Catalog.get(typeId);
     if (!def || !def.icon) return null;
     return baseUrl(project) + def.icon.split('/').map(encodeURIComponent).join('/');
