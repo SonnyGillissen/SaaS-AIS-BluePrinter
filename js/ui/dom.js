@@ -65,7 +65,7 @@
   }
 
   function setActionLabels(show) {
-    doc.documentElement.setAttribute('data-action-labels', show === false ? 'hidden' : 'shown');
+    doc.documentElement.setAttribute('data-action-labels', show === false ? 'hidden' : show === true ? 'shown' : 'auto');
   }
 
   /**
@@ -238,11 +238,11 @@
     return el;
   }
 
-  let showActionLabels = true;
+  let showActionLabels;
   try {
-    showActionLabels = AISBP.Storage.loadPrefs().showActionLabels !== false;
+    showActionLabels = AISBP.Storage.loadPrefs().showActionLabels;
   } catch (e) {
-    /* storage unavailable: labels remain visible */
+    /* storage unavailable: use responsive defaults */
   }
   setActionLabels(showActionLabels);
   doc.querySelectorAll('[data-icon]').forEach(decorateAction);

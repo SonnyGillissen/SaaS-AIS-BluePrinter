@@ -15,7 +15,7 @@ async function browserChecks() {
   const A = win.AISBP;
   const doc = win.document;
   const annotationFrame = document.querySelector('iframe');
-  annotationFrame.style.cssText = 'width:1440px;height:550px';
+  annotationFrame.style.cssText = 'width:1920px;height:900px';
   const pause = () => new Promise((resolve) => win.setTimeout(resolve, 30));
   const annotationEvents = [];
   win.addEventListener('error', (e) => annotationEvents.push(e.message));
@@ -47,7 +47,7 @@ async function browserChecks() {
   else doc.documentElement.setAttribute('data-theme', themeBefore);
   const labelsSelect = doc.getElementById('action-labels-select');
   const label = copyButton.querySelector('.action-label');
-  check(labelsSelect.value === 'show' && win.getComputedStyle(label).position !== 'absolute', 'Action labels are shown by default');
+  check(labelsSelect.value === 'auto' && win.getComputedStyle(label).position !== 'absolute', 'Auto shows action labels on roomy desktops by default');
   const projectBeforeLabels = JSON.stringify(A.app.store.project);
   const prefsBeforeLabels = A.Storage.loadPrefs();
   labelsSelect.value = 'hide';
@@ -83,6 +83,46 @@ async function browserChecks() {
   labelsSelect.value = 'show';
   labelsSelect.dispatchEvent(new win.Event('change'));
   check(win.getComputedStyle(label).position !== 'absolute' && A.Storage.loadPrefs().showActionLabels === true, 'Show labels restores visible action text and persists the choice');
+  labelsSelect.value = 'auto';
+  labelsSelect.dispatchEvent(new win.Event('change'));
+  check(!Object.prototype.hasOwnProperty.call(A.Storage.loadPrefs(), 'showActionLabels'), 'Auto clears the explicit override rather than persisting a screen-specific default');
+  const autoPrefs = JSON.stringify(A.Storage.loadPrefs());
+  for (const [width, height, compact] of [[1280, 720, true], [1366, 768, true], [1440, 900, true], [1600, 900, true], [1920, 800, true], [1920, 1080, false]]) {
+    annotationFrame.style.cssText = 'width:' + width + 'px;height:' + height + 'px';
+    await pause();
+    check((win.getComputedStyle(label).clipPath === 'inset(50%)') === compact, 'Auto adapts toolbar labels at ' + width + 'x' + height);
+    check(copyButton.textContent === 'Copy' && copyButton.title === 'Copy (Ctrl+C)' && win.getComputedStyle(copyButton.querySelector('svg')).marginRight === (compact ? '0px' : '6px'), 'Compact icons preserve accessible text, tooltips and spacing at ' + width);
+    check(win.getComputedStyle(doc.querySelector('[data-action="undo"] .action-icon')).marginRight === '0px', 'Icon-only controls keep their spacing at ' + width);
+    exportMenuButton.click();
+    check(submenuActions.every((button) => win.getComputedStyle(button.querySelector('.action-label')).clipPath === 'none' && button.querySelector('.action-label').getBoundingClientRect().width > 1), 'Auto keeps export menu labels visible at ' + width);
+    exportMenuButton.click();
+    const bounds = doc.getElementById('canvas').getBoundingClientRect();
+    check(bounds.width >= width - (compact ? 500 : 612) - 1 && bounds.height >= height - 150, 'Desktop canvas keeps room for the diagram at ' + width);
+    check(doc.documentElement.scrollWidth <= width && doc.querySelector('.app-header').getBoundingClientRect().height <= 100, 'Desktop header stays tidy without page overflow at ' + width);
+    check(JSON.stringify(A.Storage.loadPrefs()) === autoPrefs, 'Automatic resizing does not overwrite preferences');
+  }
+  annotationFrame.style.cssText = 'width:1366px;height:768px';
+  await pause();
+  labelsSelect.value = 'show';
+  labelsSelect.dispatchEvent(new win.Event('change'));
+  check(win.getComputedStyle(label).clipPath === 'none', 'Explicit Show overrides compact desktop defaults');
+  labelsSelect.value = 'hide';
+  labelsSelect.dispatchEvent(new win.Event('change'));
+  annotationFrame.style.cssText = 'width:1920px;height:1080px';
+  await pause();
+  check(win.getComputedStyle(label).clipPath === 'inset(50%)', 'Explicit Hide overrides roomy desktop defaults');
+  labelsSelect.value = 'auto';
+  labelsSelect.dispatchEvent(new win.Event('change'));
+  await new Promise((resolve, reject) => {
+    const script = doc.createElement('script');
+    script.src = '/js/ui/dom.js';
+    script.onload = resolve;
+    script.onerror = reject;
+    doc.head.appendChild(script);
+  });
+  check(doc.documentElement.getAttribute('data-action-labels') === 'auto', 'Responsive default is restored on DOM initialization when no explicit preference exists');
+  labelsSelect.value = 'show';
+  labelsSelect.dispatchEvent(new win.Event('change'));
   annotationFrame.style.cssText = 'width:760px;height:550px';
   await pause();
   const annotationsBefore = A.Util.clone(A.app.store.project);

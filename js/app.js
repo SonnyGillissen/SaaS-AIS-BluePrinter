@@ -475,12 +475,15 @@
     });
   }
   const actionLabelsSelect = doc.getElementById('action-labels-select');
-  actionLabelsSelect.value = doc.documentElement.getAttribute('data-action-labels') === 'hidden' ? 'hide' : 'show';
+  actionLabelsSelect.value = ({ hidden: 'hide', shown: 'show' })[doc.documentElement.getAttribute('data-action-labels')] || 'auto';
   actionLabelsSelect.addEventListener('change', () => {
-    const showActionLabels = actionLabelsSelect.value !== 'hide';
+    const showActionLabels = actionLabelsSelect.value === 'auto' ? undefined : actionLabelsSelect.value === 'show';
     AISBP.Dom.setActionLabels(showActionLabels);
     try {
-      Storage.savePrefs(Object.assign(Storage.loadPrefs(), { showActionLabels }));
+      const prefs = Storage.loadPrefs();
+      if (showActionLabels === undefined) delete prefs.showActionLabels;
+      else prefs.showActionLabels = showActionLabels;
+      Storage.savePrefs(prefs);
     } catch (e) {
       toast('Could not save action label preference: ' + e.message, 'error');
     }

@@ -474,6 +474,31 @@ table.naming-types { table-layout: fixed; min-width: 800px; }
 @keyframes toast-in { from { transform: translateY(8px); opacity: 0; } to { transform: none; opacity: 1; } }
 
 /* ---------------------------------------------------------------- responsive */
+@media (min-width: 1101px) and (max-width: 1600px), (min-width: 1101px) and (max-height: 800px) {
+  :root { --sidebar-left: 220px; --sidebar-right: 280px; }
+  :root[data-action-labels='auto'] .toolbar button:not([role='menuitem']) > .action-icon { margin-right: 0; }
+  :root[data-action-labels='auto'] .toolbar button:not([role='menuitem']) > .action-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .app-header { gap: 6px; padding: 5px 8px; }
+  .project-name { flex-basis: 180px; min-width: 120px; max-width: 220px; }
+  .toolbar { gap: 6px; }
+  .toolbar .group { padding-left: 6px; }
+  .toolbar button { padding: 4px 7px; }
+  .brand { font-size: 14px; }
+  .select-label { font-size: 0; gap: 0; }
+  .select-label select { font-size: 12px; max-width: 140px; }
+  .properties { padding: 8px; }
+  .canvas-hint { max-width: calc(100% - 20px); }
+  .app-footer .attribution, .app-footer .sep { display: none; }
+}
 @media (max-width: 1100px) {
   .app-header { position: relative; gap: 6px; padding: 6px 8px; }
   .brand { font-size: 14px; }
