@@ -260,7 +260,7 @@ a { color: var(--c-primary); }
   position: absolute;
   inset: 0;
   margin: auto;
-  width: min(440px, 90%);
+  width: min(600px, 90%);
   height: fit-content;
   padding: 20px 24px;
   background: var(--c-overlay);
@@ -270,6 +270,8 @@ a { color: var(--c-primary); }
   pointer-events: none;
 }
 .canvas-empty button { pointer-events: auto; }
+.canvas-empty-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.canvas-empty-actions button { max-width: 100%; }
 .canvas-empty h2 { margin: 0 0 8px; font-size: 18px; }
 .canvas-hint { position: absolute; left: 10px; bottom: 8px; font-size: 11px; color: var(--c-muted); background: var(--c-overlay); padding: 2px 8px; border-radius: 10px; pointer-events: none; }
 

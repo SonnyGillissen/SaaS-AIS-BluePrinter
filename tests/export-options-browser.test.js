@@ -25,6 +25,18 @@ async function browserChecks() {
     if (!condition) throw new Error(label);
     results.push(label);
   };
+  for (const [width, height] of [[1920, 1080], [1280, 720], [390, 844], [320, 568]]) {
+    annotationFrame.style.cssText = 'width:' + width + 'px;height:' + height + 'px';
+    await pause();
+    const panel = doc.getElementById('canvas-empty');
+    const bounds = panel.getBoundingClientRect();
+    const buttons = Array.from(panel.querySelectorAll('button')).map((button) => button.getBoundingClientRect());
+    check(!panel.hidden && bounds.left >= 0 && bounds.right <= width && buttons.every((button) => button.left >= bounds.left && button.right <= bounds.right), 'Start panel and actions stay within viewport at ' + width);
+    if (width >= 1280) check(Math.abs(buttons[0].top - buttons[1].top) < 1 && buttons[1].left >= buttons[0].right + 7, 'Start panel actions align horizontally with a gap at ' + width);
+    else check(buttons[1].top >= buttons[0].bottom + 7, 'Start panel actions stack with spacing on phones at ' + width);
+  }
+  annotationFrame.style.cssText = 'width:1920px;height:900px';
+  await pause();
   const actionButtons = Array.from(doc.querySelectorAll('button[data-icon]'));
   check(actionButtons.length >= 20 && actionButtons.every((button) => button.querySelectorAll('.action-icon').length === 1), 'Static toolbar and export actions have one local SVG icon each');
   check(actionButtons.every((button) => {
