@@ -16,14 +16,17 @@
 Azure's resource hierarchy is enforced:
 
 ```
-Management group (optional, can be nested)
-└── Subscription
-    └── Resource group
-        └── Resource (Logic App, Service Bus namespace, Function App, Key Vault, ...)
-            └── Child resource (workflow, queue, topic › subscription, API, container, ...)
+Azure Tenant (optional logical grouping)
+├── Management group (optional, can be nested)
+│   └── Subscription
+│       └── Resource group
+│           └── Resource (Logic App, Service Bus namespace, Function App, Key Vault, ...)
+│               └── Child resource (workflow, queue, topic › subscription, API, container, ...)
+└── Subscription (can also be directly under the tenant)
 ```
 
-External systems, on-premises systems and users can be placed at the top level. The
+Management groups and subscriptions can also be placed directly at the top level. External
+systems, on-premises systems and users can be placed at the top level or inside an Azure Tenant. The
 [Resource catalog](Resource-Catalog.md) lists which parents each type accepts.
 
 There are several ways to add objects:

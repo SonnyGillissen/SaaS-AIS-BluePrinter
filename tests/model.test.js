@@ -15,6 +15,21 @@ test('the sample project is valid and round-trips through normalize', () => {
   assert.deepEqual(Object.keys(project.connections).sort(), Object.keys(p.connections).sort());
 });
 
+test('Azure Tenant can group management groups and subscriptions', () => {
+  const p = Model.createProject();
+  const tenant = Model.addNode(p, 'azure-tenant', null, {});
+  const mg = Model.addNode(p, 'management-group', tenant.id, {});
+  const sub = Model.addNode(p, 'subscription', tenant.id, {});
+  const nestedSub = Model.addNode(p, 'subscription', mg.id, {});
+  const rg = Model.addNode(p, 'resource-group', sub.id, {});
+  assert.equal(Model.canContain(p, tenant.id, 'management-group'), true);
+  assert.equal(Model.canContain(p, tenant.id, 'subscription'), true);
+  assert.equal(Model.canContain(p, tenant.id, 'resource-group'), false);
+  assert.equal(Model.canContain(p, mg.id, 'azure-tenant'), false);
+  assert.equal(Model.canContain(p, nestedSub.id, 'resource-group'), true);
+  assert.equal(rg.parentId, sub.id);
+});
+
 test('containment rules are enforced (management group > subscription > resource group > resource)', () => {
   const p = Model.createProject();
   assert.throws(() => Model.addNode(p, 'function-app', null, {}), /cannot be placed/);
