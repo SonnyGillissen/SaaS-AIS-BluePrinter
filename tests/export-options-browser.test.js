@@ -106,6 +106,20 @@ async function browserChecks() {
   labelsSelect.value = 'show';
   labelsSelect.dispatchEvent(new win.Event('change'));
   check(win.getComputedStyle(label).clipPath === 'none', 'Explicit Show overrides compact desktop defaults');
+  for (const mode of ['show', 'hide', 'auto']) {
+    labelsSelect.value = mode;
+    labelsSelect.dispatchEvent(new win.Event('change'));
+    for (const width of [1101, 1280, 1366, 1600, 1920, 2000, 2560]) {
+      annotationFrame.style.cssText = 'width:' + width + 'px;height:900px';
+      await pause();
+      const brandBounds = doc.querySelector('.brand').getBoundingClientRect();
+      const toolbarBounds = doc.getElementById('main-toolbar').getBoundingClientRect();
+      const firstBounds = doc.querySelector('.toolbar .group').getBoundingClientRect();
+      check(Math.abs(firstBounds.left - brandBounds.left) < 1 && Math.abs(toolbarBounds.left - brandBounds.left) < 1, 'Toolbar starts at the brand edge at ' + width + ' with ' + mode + ' labels');
+      check(toolbarBounds.top >= brandBounds.bottom && toolbarBounds.right <= width, 'Toolbar has a dedicated row without overlap at ' + width + ' with ' + mode + ' labels');
+      check(doc.documentElement.scrollWidth <= width, 'Toolbar wrapping stays within the viewport at ' + width + ' with ' + mode + ' labels');
+    }
+  }
   labelsSelect.value = 'hide';
   labelsSelect.dispatchEvent(new win.Event('change'));
   annotationFrame.style.cssText = 'width:1920px;height:1080px';
@@ -664,11 +678,18 @@ async function browserChecks() {
   const workspace = doc.querySelector('.workspace');
   const tools = doc.getElementById('toolbar-toggle');
   const panelButton = (name) => doc.querySelector('.workspace-nav [data-panel="' + name + '"]');
+  const mobileButtons = [tools, ...doc.querySelectorAll('.workspace-nav button')];
+  check(mobileButtons.every((button) => button.querySelectorAll('.action-icon').length === 1 && (button.textContent.trim() || button.getAttribute('aria-label'))), 'All mobile controls have exactly one icon and an accessible name');
   check((await fetch('/touch')).ok && win.matchMedia('(pointer: coarse)').matches, 'Mobile checks use touch emulation');
   for (const [width, height] of [[320, 568], [390, 844], [768, 700], [1024, 768], [667, 375]]) {
     annotationFrame.style.cssText = 'width:' + width + 'px;height:' + height + 'px';
     await pause();
     check(doc.documentElement.scrollWidth <= width && doc.documentElement.scrollHeight <= height, 'No page overflow at ' + width + 'x' + height + ': ' + doc.documentElement.scrollWidth + 'x' + doc.documentElement.scrollHeight);
+    const navBounds = doc.querySelector('.workspace-nav').getBoundingClientRect();
+    check(Array.from(doc.querySelectorAll('.workspace-nav button')).every((button) => {
+      const bounds = button.getBoundingClientRect();
+      return bounds.left >= navBounds.left && bounds.right <= navBounds.right && button.scrollWidth <= button.clientWidth;
+    }), 'Mobile icon controls and labels fit without clipping at ' + width);
     check(doc.getElementById('canvas').getBoundingClientRect().height >= height / 2, 'Canvas retains usable height at ' + width + '×' + height);
     check(win.getComputedStyle(doc.getElementById('main-toolbar')).display === 'none', 'Tools start collapsed at ' + width);
     panelButton('palette').click();

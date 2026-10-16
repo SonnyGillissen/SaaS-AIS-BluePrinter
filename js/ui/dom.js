@@ -12,6 +12,7 @@
   const doc = root.document;
 
   const ACTION_PATHS = {
+    menu: 'M3 6h18 M3 12h18 M3 18h18',
     new: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6Z M14 2v6h6 M12 12v6 M9 15h6',
     open: 'M3 7V5a2 2 0 0 1 2-2h5l2 3h7a2 2 0 0 1 2 2v2 M3 7h5l2 3h11l-3 10H3L1 7Z',
     import: 'M12 3v12 M7 10l5 5 5-5 M4 15v5a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-5',

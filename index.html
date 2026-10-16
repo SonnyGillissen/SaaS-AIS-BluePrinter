@@ -21,7 +21,7 @@
     <input id="project-name" class="project-name" type="text" aria-label="Project name" spellcheck="false" maxlength="200">
     <span id="save-state" class="save-state" aria-live="polite"></span>
 
-    <button type="button" id="toolbar-toggle" class="btn compact-control" aria-controls="main-toolbar" aria-expanded="false">Tools</button>
+    <button type="button" id="toolbar-toggle" class="btn compact-control" data-icon="menu" aria-controls="main-toolbar" aria-expanded="false">Tools</button>
     <nav id="main-toolbar" class="toolbar" aria-label="Main toolbar">
       <div class="group">
         <button type="button" data-action="new" data-icon="new" title="New blueprint">New</button>
@@ -87,12 +87,12 @@
 
   <main class="workspace" data-panel="canvas">
     <nav class="workspace-nav compact-control" aria-label="Workspace panels">
-      <button type="button" class="btn" data-panel="palette" aria-controls="resource-sidebar" aria-expanded="false">Resources</button>
-      <button type="button" class="btn" data-panel="canvas" aria-controls="canvas" aria-pressed="true">Canvas</button>
-      <button type="button" class="btn" data-panel="properties" aria-controls="properties-sidebar" aria-expanded="false">Properties</button>
-      <button type="button" class="btn" data-action="zoom-out" aria-label="Zoom out">−</button>
-      <button type="button" class="btn" data-action="zoom-in" aria-label="Zoom in">+</button>
-      <button type="button" class="btn" data-action="fit">Fit</button>
+      <button type="button" class="btn" data-icon="open" data-panel="palette" aria-controls="resource-sidebar" aria-expanded="false">Resources</button>
+      <button type="button" class="btn" data-icon="diagram" data-panel="canvas" aria-controls="canvas" aria-pressed="true">Canvas</button>
+      <button type="button" class="btn" data-icon="settings" data-panel="properties" aria-controls="properties-sidebar" aria-expanded="false">Properties</button>
+      <button type="button" class="btn" data-icon="zoom-out" data-icon-only data-action="zoom-out" aria-label="Zoom out" title="Zoom out"></button>
+      <button type="button" class="btn" data-icon="zoom-in" data-icon-only data-action="zoom-in" aria-label="Zoom in" title="Zoom in"></button>
+      <button type="button" class="btn" data-icon="fit" data-icon-only data-action="fit" aria-label="Fit to screen" title="Fit to screen"></button>
     </nav>
     <aside id="resource-sidebar" class="sidebar left" aria-label="Palette and explorer">
       <div class="tabs" role="tablist">
