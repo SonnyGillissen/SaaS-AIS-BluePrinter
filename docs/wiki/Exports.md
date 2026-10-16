@@ -73,7 +73,7 @@ either way.
 
 ## draw.io
 
-- Management groups, subscriptions, resource groups and parent resources become **draw.io
+- Azure tenants, management groups, subscriptions, resource groups and parent resources become **draw.io
   containers**: moving a container moves its contents.
 - Resources become image shapes with the MS Icons icon.
 - All attributes, including the attached VNets/subnets (`network`), are attached as **shape data**

@@ -111,7 +111,7 @@ tag on all of them.
 - define tag names with **suggested values**, a **colour** and whether they are **shown on the
   diagram**; the *Used by* column counts the objects that have the tag;
 - renaming a tag renames it on all objects; *Remove from objects* removes it everywhere;
-- **Assign a tag to many objects**: set a tag on all management groups & subscriptions, resource
+- **Assign a tag to many objects**: set a tag on all Azure tenants, management groups & subscriptions, resource
   groups, Azure resources and/or external objects at once (optionally overwriting existing
   values).
 
@@ -122,8 +122,8 @@ Tags are hidden at the *High-level* detail level and can be switched off with *S
 
 Azure limits are validated: at most 50 tags per object, names up to 512 characters without
 `< > % & \ ? /` (names are case-insensitive, so *Env* and *env* are duplicates) and values up to
-256 characters. Azure does not support tags on management groups; there they are documentation
-only. Older blueprints with the former "Tags (key=value per line)" attribute are converted
+256 characters. Azure does not support tags on Azure tenants or management groups; there they are
+documentation only. Older blueprints with the former "Tags (key=value per line)" attribute are converted
 automatically when they are opened or imported.
 
 ## Virtual networks and subnets

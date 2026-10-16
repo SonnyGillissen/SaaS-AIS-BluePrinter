@@ -3,7 +3,7 @@
  *
  * Generates an uncompressed .drawio (mxfile) document that opens in draw.io / diagrams.net
  * (web, desktop and the VS Code extension):
- *  - containers (management groups, subscriptions, resource groups, parent resources) become
+ *  - containers (Azure tenants, management groups, subscriptions, resource groups, parent resources) become
  *    draw.io containers, so moving them in draw.io moves their content,
  *  - resources become image shapes using the MS Icons icon (embedded when available,
  *    otherwise referenced by URL),
