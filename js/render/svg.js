@@ -606,7 +606,7 @@
     }
     s += renderContent(project, { geometry: g, iconHref: o.iconHref, forExport: true });
     s += '<text x="' + (x0 + width - 12) + '" y="' + (y0 + height - 10) + '" text-anchor="end" font-family="' + esc(st.font) + '" font-size="9" fill="' + st.subtext + '">' +
-      esc('Made with AIS BluePrinter \u2022 Icons: MS Icons (msicons.com), \u00a9 Microsoft') + '</text>';
+      esc('Made with AIS BluePrinter \u2022 Azure icons: MS Icons (msicons.com), \u00a9 Microsoft') + '</text>';
     s += '</svg>';
     return { svg: s, width, height };
   }

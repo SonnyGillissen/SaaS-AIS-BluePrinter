@@ -4,7 +4,7 @@
  * Describes every object that can be placed in a blueprint:
  *  - its position in the Azure hierarchy (`parents`), mirroring Azure Resource Manager
  *    (management groups > subscriptions > resource groups > resources > child resources),
- *  - the icon taken from the MS Icons community library (https://msicons.com),
+ *  - the icon taken from the MS Icons community library or a built-in provider logo,
  *  - the Cloud Adoption Framework (CAF) abbreviation used for naming conventions,
  *  - the Azure naming restrictions (length, characters, uniqueness scope),
  *  - the configurable attributes of the resource,
@@ -841,22 +841,67 @@
       attributes: [text('resourceType', 'Resource type', { show: true }), text('kind', 'Kind'), text('sku', 'SKU')]
     },
 
-    // ----- DevOps process ---------------------------------------------------------
+      // ----- DevOps process ---------------------------------------------------------
     'azure-devops': {
-      label: 'Azure DevOps', category: 'devops', icon: I.workflow, abbr: 'ado',
-      parents: ANYWHERE, archimate: 'ApplicationComponent', rule: R.free, azure: false, nameMode: 'custom', seed: 'Azure DevOps',
-      attributes: [text('url', 'URL', { show: true })]
+        label: 'Azure DevOps', category: 'devops', icon: null, abbr: 'ado',
+        parents: ANYWHERE, archimate: 'ApplicationComponent', rule: R.free, azure: false, container: true, nameMode: 'custom', seed: 'Azure DevOps',
+        attributes: [text('url', 'Organization URL', { show: true })]
     },
-    'github': {
-      label: 'GitHub', category: 'devops', icon: I.branch, abbr: 'gh',
-      parents: ANYWHERE, archimate: 'ApplicationComponent', rule: R.free, azure: false, nameMode: 'custom', seed: 'GitHub',
-      attributes: [text('url', 'URL', { show: true })]
+      'azure-devops-project': {
+        label: 'Azure DevOps Project', category: 'devops', icon: null, abbr: 'adop',
+        parents: ['azure-devops'], archimate: 'Grouping', rule: R.free, azure: false, container: true, nameMode: 'custom', seed: 'Project',
+        attributes: [text('url', 'Project URL', { show: true }), select('visibility', 'Visibility', ['Private', 'Public'], { default: 'Private' })]
     },
-    'github-enterprise': {
-      label: 'GitHub Enterprise', category: 'devops', icon: I.code, abbr: 'ghe',
-      parents: ANYWHERE, archimate: 'ApplicationComponent', rule: R.free, azure: false, nameMode: 'custom', seed: 'GitHub Enterprise',
-      attributes: [text('url', 'URL', { show: true })]
-    }
+      'azure-devops-pipeline': {
+        label: 'Azure DevOps Pipeline', category: 'devops', icon: null, abbr: 'pipe',
+        parents: ['azure-devops-project'], archimate: 'ApplicationProcess', rule: R.free, azure: false, nameMode: 'custom', seed: 'Pipeline',
+        attributes: [text('repository', 'Repository', { show: true }), text('branch', 'Default branch', { default: 'main' }), text('yamlPath', 'YAML path', { default: 'azure-pipelines.yml' }), select('status', 'Status', ['Enabled', 'Disabled'], { default: 'Enabled' })]
+      },
+      'azure-devops-repository': {
+        label: 'Azure DevOps Repository', category: 'devops', icon: null, abbr: 'repo',
+        parents: ['azure-devops-project'], archimate: 'Artifact', rule: R.free, azure: false, nameMode: 'custom', seed: 'Repository',
+        attributes: [text('url', 'Repository URL', { show: true }), text('defaultBranch', 'Default branch', { default: 'main' }), select('visibility', 'Visibility', ['Private', 'Public'], { default: 'Private' })]
+      },
+      'azure-devops-boards': {
+        label: 'Azure Boards', category: 'devops', icon: null, abbr: 'boards',
+        parents: ['azure-devops-project'], archimate: 'BusinessProcess', rule: R.free, azure: false, nameMode: 'custom', seed: 'Boards',
+        attributes: [select('process', 'Process', ['Agile', 'Basic', 'Scrum', 'CMMI'], { default: 'Agile' }), text('areaPaths', 'Area paths'), text('iterationPaths', 'Iteration paths')]
+      },
+      'azure-devops-artifacts': {
+        label: 'Azure Artifacts Feed', category: 'devops', icon: null, abbr: 'feed',
+        parents: ['azure-devops-project'], archimate: 'Artifact', rule: R.free, azure: false, nameMode: 'custom', seed: 'Artifacts',
+        attributes: [select('feedType', 'Feed type', ['npm', 'NuGet', 'Maven', 'Python', 'Universal'], { show: true }), text('upstreamSources', 'Upstream sources')]
+      },
+      github: {
+        label: 'GitHub', category: 'devops', icon: null, abbr: 'gh',
+        parents: ANYWHERE, archimate: 'ApplicationComponent', rule: R.free, azure: false, container: true, nameMode: 'custom', seed: 'GitHub',
+        attributes: [text('url', 'Account URL', { show: true })]
+      },
+      'github-enterprise': {
+        label: 'GitHub Enterprise', category: 'devops', icon: null, abbr: 'ghe',
+        parents: ANYWHERE, archimate: 'ApplicationComponent', rule: R.free, azure: false, container: true, nameMode: 'custom', seed: 'GitHub Enterprise',
+        attributes: [text('url', 'Server URL', { show: true }), select('deployment', 'Deployment', ['Cloud', 'Server'], { default: 'Server' })]
+      },
+      'github-organization': {
+        label: 'GitHub Organization', category: 'devops', icon: null, abbr: 'org',
+        parents: ['github', 'github-enterprise'], archimate: 'Grouping', rule: R.free, azure: false, container: true, nameMode: 'custom', seed: 'Organization',
+        attributes: [text('url', 'Organization URL', { show: true }), select('visibility', 'Default repository visibility', ['Private', 'Internal', 'Public'], { default: 'Private' })]
+      },
+      'github-repository': {
+        label: 'GitHub Repository', category: 'devops', icon: null, abbr: 'repo',
+        parents: ['github', 'github-organization'], archimate: 'Artifact', rule: R.free, azure: false, container: true, nameMode: 'custom', seed: 'Repository',
+        attributes: [text('url', 'Repository URL', { show: true }), text('defaultBranch', 'Default branch', { default: 'main' }), select('visibility', 'Visibility', ['Private', 'Internal', 'Public'], { default: 'Private' }), text('language', 'Primary language')]
+      },
+      'github-actions': {
+        label: 'GitHub Actions Workflow', category: 'devops', icon: null, abbr: 'ghact',
+        parents: ['github-repository'], archimate: 'ApplicationProcess', rule: R.free, azure: false, nameMode: 'custom', seed: 'Workflow',
+        attributes: [text('workflowFile', 'Workflow file', { default: '.github/workflows/ci.yml', show: true }), text('triggers', 'Triggers'), select('status', 'Status', ['Enabled', 'Disabled'], { default: 'Enabled' })]
+      },
+      'github-package': {
+        label: 'GitHub Package', category: 'devops', icon: null, abbr: 'pkg',
+        parents: ['github-repository'], archimate: 'Artifact', rule: R.free, azure: false, nameMode: 'custom', seed: 'Package',
+        attributes: [select('packageType', 'Package type', ['Container', 'npm', 'Maven', 'NuGet', 'RubyGems'], { show: true }), text('registryUrl', 'Registry URL')]
+      }
   };
 
   // Finalize entries: ids, defaults and common attributes.

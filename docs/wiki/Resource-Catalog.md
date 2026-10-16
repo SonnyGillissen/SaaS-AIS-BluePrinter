@@ -143,8 +143,21 @@ The resource types available in the palette, generated from [`js/core/catalog.js
 
 | Type | Abbr. | Allowed parents | Naming rule | Attributes |
 |---|---|---|---|---|
-| Azure DevOps | `ado` | *(top level)*, Management Group, Subscription, Resource Group | Custom name | Description, URL |
-| GitHub | `gh` | *(top level)*, Management Group, Subscription, Resource Group | Custom name | Description, URL |
-| GitHub Enterprise | `ghe` | *(top level)*, Management Group, Subscription, Resource Group | Custom name | Description, URL |
+| Azure DevOps | `ado` | *(top level)*, Management Group, Subscription, Resource Group | Custom name | Description, Organization URL |
+| Azure DevOps Project | `adop` | Azure DevOps | Custom name | Description, Project URL, Visibility |
+| Azure DevOps Pipeline | `pipe` | Azure DevOps Project | Custom name | Description, Repository, Default branch, YAML path, Status |
+| Azure DevOps Repository | `repo` | Azure DevOps Project | Custom name | Description, Repository URL, Default branch, Visibility |
+| Azure Boards | `boards` | Azure DevOps Project | Custom name | Description, Process, Area paths, Iteration paths |
+| Azure Artifacts Feed | `feed` | Azure DevOps Project | Custom name | Description, Feed type, Upstream sources |
+| GitHub | `gh` | *(top level)*, Management Group, Subscription, Resource Group | Custom name | Description, Account URL |
+| GitHub Enterprise | `ghe` | *(top level)*, Management Group, Subscription, Resource Group | Custom name | Description, Server URL, Deployment |
+| GitHub Organization | `org` | GitHub, GitHub Enterprise | Custom name | Description, Organization URL, Default repository visibility |
+| GitHub Repository | `repo` | GitHub, GitHub Organization | Custom name | Description, Repository URL, Default branch, Visibility, Primary language |
+| GitHub Actions Workflow | `ghact` | GitHub Repository | Custom name | Description, Workflow file, Triggers, Status |
+| GitHub Package | `pkg` | GitHub Repository | Custom name | Description, Package type, Registry URL |
+
+Azure DevOps projects contain pipelines, repositories, boards, and artifact feeds. GitHub accounts
+and Enterprise instances contain organizations and repositories; repositories can contain Actions
+workflows and packages. These DevOps logos are built in and available offline.
 
 Want another resource type? Add an entry to `TYPES` in `js/core/catalog.js` (see [Architecture](Architecture.md#adding-a-resource-type)).

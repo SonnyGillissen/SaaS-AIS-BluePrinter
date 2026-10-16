@@ -13,16 +13,44 @@ test('palette orders DevOps Process between Other and Text & Tables', () => {
   assert.deepEqual(categories[categories.length - 1], { id: 'annotations', label: 'Text & Tables' });
 });
 
-test('DevOps process catalog entries can be placed at the root and in containers', () => {
-  const types = ['azure-devops', 'github', 'github-enterprise'];
-  const { project, rg } = smallProject(AISBP);
-  types.forEach((type) => {
-    const definition = AISBP.Catalog.get(type);
-    assert.equal(definition.category, 'devops');
-    assert.ok(AISBP.Catalog.byCategory('devops').some((t) => t.id === type));
-    assert.ok(Model.addNode(project, type, null));
-    assert.ok(Model.addNode(project, type, rg.id));
-  });
+test('DevOps components have provider dependencies and editable attributes', () => {
+  const project = Model.createProject();
+  const azure = Model.addNode(project, 'azure-devops', null, { attributes: { url: 'https://dev.azure.com/example' } });
+  const adoProject = Model.addNode(project, 'azure-devops-project', azure.id);
+  const pipeline = Model.addNode(project, 'azure-devops-pipeline', adoProject.id, { attributes: { branch: 'release' } });
+  const adoRepo = Model.addNode(project, 'azure-devops-repository', adoProject.id);
+  const boards = Model.addNode(project, 'azure-devops-boards', adoProject.id);
+  const artifacts = Model.addNode(project, 'azure-devops-artifacts', adoProject.id);
+  const github = Model.addNode(project, 'github', null);
+  const organization = Model.addNode(project, 'github-organization', github.id);
+  const repository = Model.addNode(project, 'github-repository', organization.id);
+  const actions = Model.addNode(project, 'github-actions', repository.id, { attributes: { status: 'Disabled' } });
+  const packageNode = Model.addNode(project, 'github-package', repository.id);
+  const enterprise = Model.addNode(project, 'github-enterprise', null);
+  const enterpriseOrg = Model.addNode(project, 'github-organization', enterprise.id);
+  const enterpriseRepo = Model.addNode(project, 'github-repository', enterpriseOrg.id);
+
+  assert.equal(project.nodes[azure.id].attributes.url, 'https://dev.azure.com/example');
+  assert.equal(project.nodes[pipeline.id].attributes.branch, 'release');
+  assert.equal(project.nodes[actions.id].attributes.status, 'Disabled');
+  assert.equal(project.nodes[adoRepo.id].parentId, adoProject.id);
+  assert.equal(project.nodes[boards.id].parentId, adoProject.id);
+  assert.equal(project.nodes[artifacts.id].parentId, adoProject.id);
+  assert.equal(project.nodes[packageNode.id].parentId, repository.id);
+  assert.equal(project.nodes[enterpriseRepo.id].parentId, enterpriseOrg.id);
+
+  [
+    ['azure-devops', 'azure-devops-project'],
+    ['azure-devops-project', 'azure-devops-pipeline'],
+    ['azure-devops-project', 'azure-devops-repository'],
+    ['azure-devops-project', 'azure-devops-boards'],
+    ['azure-devops-project', 'azure-devops-artifacts'],
+    ['github', 'github-organization'],
+    ['github-enterprise', 'github-organization'],
+    ['github-organization', 'github-repository'],
+    ['github-repository', 'github-actions'],
+    ['github-repository', 'github-package']
+  ].forEach(([parent, child]) => assert.equal(AISBP.Catalog.canContain(parent, child), true));
 });
 
 test('annotation catalog placement accepts root and containers, never annotations', () => {
