@@ -112,7 +112,7 @@
     const ph = () => h('span', { class: 'ph', 'aria-hidden': 'true', text: (def ? def.abbr : '?').slice(0, 4).toUpperCase() });
     const url = AISBP.Icons.url(project, typeId);
     if (!url) return ph();
-    const img = h('img', { src: url, alt: '', width: size || 24, height: size || 24, loading: 'lazy', draggable: 'false' });
+    const img = h('img', { src: url, alt: '', width: size || 24, height: size || 24, loading: 'lazy', draggable: 'false', 'data-icon-type': typeId });
     img.addEventListener('error', () => { if (img.parentNode) img.parentNode.replaceChild(ph(), img); }, { once: true });
     return img;
   }

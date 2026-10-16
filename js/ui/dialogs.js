@@ -367,7 +367,7 @@
     // ---- Icons
     const baseInput = textInput(s.icons.baseUrl, (v) => { s.icons.baseUrl = v; }, { id: 'opt-icons-base' });
     AISBP.Dom.append(t.panels.icons, [
-      h('p', { class: 'note' }, 'All resource icons come from ', h('a', { href: 'https://msicons.com/', target: '_blank', rel: 'noopener', text: 'MS Icons' }), ', a community project by Daniel Bradley (', h('a', { href: 'https://github.com/DanielBradley1/msicons', target: '_blank', rel: 'noopener', text: 'github.com/DanielBradley1/msicons' }), ') that hosts the official Microsoft Azure architecture icons. The icons are property of Microsoft and subject to the Microsoft icon terms.'),
+      h('p', { class: 'note' }, 'Azure resource icons come from ', h('a', { href: 'https://msicons.com/', target: '_blank', rel: 'noopener', text: 'MS Icons' }), ', a community project by Daniel Bradley (', h('a', { href: 'https://github.com/DanielBradley1/msicons', target: '_blank', rel: 'noopener', text: 'github.com/DanielBradley1/msicons' }), '). Azure DevOps and GitHub product logos are built in for offline use.'),
       field('Icon base URL', baseInput, { help: 'Default: ' + AISBP.Icons.DEFAULT_BASE + ' \u2014 for offline/intranet use, mirror the icons with "node tools/mirror-icons.js" and set this to "icons/msicons/".' }),
       h('button', { type: 'button', class: 'btn small', text: 'Reset to msicons.com', onclick: () => { s.icons.baseUrl = AISBP.Icons.DEFAULT_BASE; baseInput.value = s.icons.baseUrl; } })
     ]);
@@ -496,7 +496,7 @@
         h('p', { text: app.storage.kind === 'local' ? 'Everything runs in your browser and is stored in localStorage on this machine. Nothing is uploaded. Icons are loaded from msicons.com (or your own mirror).' : 'This instance stores blueprints in a server database.' }),
         h('h3', { text: 'Credits' }),
         h('p', {}, 'AIS BluePrinter \u2014 Community Project by ', h('strong', { text: 'Sonny Gillissen' }), '. Version ' + AISBP.Package.APP_VERSION + '.'),
-        h('p', {}, 'Resource icons: ', h('a', { href: 'https://msicons.com/', target: '_blank', rel: 'noopener', text: 'MS Icons (msicons.com)' }), ', a community project by Daniel Bradley. Azure icons \u00a9 Microsoft, used according to the Microsoft architecture icon terms.'))
+        h('p', {}, 'Azure resource icons: ', h('a', { href: 'https://msicons.com/', target: '_blank', rel: 'noopener', text: 'MS Icons (msicons.com)' }), ', a community project by Daniel Bradley. DevOps logos are built in. Azure icons \u00a9 Microsoft, used according to the Microsoft architecture icon terms.'))
     });
   }
 

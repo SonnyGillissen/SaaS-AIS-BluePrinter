@@ -11,6 +11,13 @@ to Microsoft's [icon terms of use](https://learn.microsoft.com/azure/architectur
 not part of this repository: they are loaded from msicons.com at runtime, or from a mirror you
 create yourself with `tools/mirror-icons.js`.
 
+## DevOps logos
+
+The Azure DevOps logo follows Microsoft's [Azure architecture icon terms](https://learn.microsoft.com/azure/architecture/icons/).
+GitHub and GitHub Actions marks are from [Simple Icons](https://github.com/simple-icons/simple-icons)
+([CC0 1.0](https://github.com/simple-icons/simple-icons/blob/develop/LICENSE.md)); GitHub is a
+trademark of GitHub, Inc. These logos are bundled as built-in SVGs for offline use.
+
 ## Standards and references
 
 - [ArchiMate® Model Exchange File Format](https://www.opengroup.org/open-group-archimate-model-exchange-file-format) – The Open Group

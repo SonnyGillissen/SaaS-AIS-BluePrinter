@@ -32,7 +32,7 @@
   --c-backdrop: rgba(10, 25, 45, 0.45);
   --radius: 6px;
   --font: 'Segoe UI', system-ui, -apple-system, Roboto, 'Helvetica Neue', Arial, sans-serif;
-  --sidebar-left: 272px;
+  --sidebar-left: 288px;
   --sidebar-right: 340px;
   color-scheme: light;
 }
@@ -229,6 +229,9 @@ a { color: var(--c-primary); }
 .palette-item:focus-visible { outline: 2px solid var(--c-primary); outline-offset: 1px; }
 .palette-item:hover { border-color: var(--c-primary); background: var(--c-hover); }
 .palette-item img, .palette-item .ph { width: 24px; height: 24px; flex: none; }
+:root[data-theme='dark'] img[data-icon-type='github-organization'],
+:root[data-theme='dark'] img[data-icon-type='github-repository'],
+:root[data-theme='dark'] img[data-icon-type='github-package'] { filter: invert(1); }
 .ph { display: inline-grid; flex: none; overflow: hidden; line-height: 1; place-items: center; background: var(--c-primary); color: #fff; border-radius: 4px; font-size: 8px; font-weight: 700; }
 .palette-note { color: var(--c-muted); font-size: 11px; margin: 8px 2px; }
 

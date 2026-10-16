@@ -1,1 +1,1 @@
-Community Project by Sonny Gillissen · Icons: [MS Icons](https://msicons.com/) by Daniel Bradley (Azure icons © Microsoft)
+Community Project by Sonny Gillissen · Azure icons: [MS Icons](https://msicons.com/) by Daniel Bradley (Azure icons © Microsoft) · GitHub logos: [Simple Icons](https://github.com/simple-icons/simple-icons)

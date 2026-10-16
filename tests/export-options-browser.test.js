@@ -32,6 +32,7 @@ async function browserChecks() {
     const bounds = panel.getBoundingClientRect();
     const buttons = Array.from(panel.querySelectorAll('button')).map((button) => button.getBoundingClientRect());
     check(!panel.hidden && bounds.left >= 0 && bounds.right <= width && buttons.every((button) => button.left >= bounds.left && button.right <= bounds.right), 'Start panel and actions stay within viewport at ' + width);
+    if (width >= 1600) check(doc.getElementById('resource-sidebar').getBoundingClientRect().width >= 288, 'Resource sidebar has wider desktop layout at ' + width);
     if (width >= 1280) check(Math.abs(buttons[0].top - buttons[1].top) < 1 && buttons[1].left >= buttons[0].right + 7, 'Start panel actions align horizontally with a gap at ' + width);
     else check(buttons[1].top >= buttons[0].bottom + 7, 'Start panel actions stack with spacing on phones at ' + width);
   }
@@ -55,6 +56,13 @@ async function browserChecks() {
     const svg = copyButton.querySelector('.action-icon');
     check(win.getComputedStyle(svg).stroke === win.getComputedStyle(copyButton).color && win.getComputedStyle(svg).pointerEvents === 'none' && svg.getBoundingClientRect().width === 16, 'Action icons inherit theme colour and do not intercept clicks: ' + theme);
   }
+  const themedProviderIcons = ['github-organization', 'github-repository', 'github-package'].map((type) => A.Dom.icon(A.app.store.project, type, 24));
+  themedProviderIcons.forEach((icon) => doc.body.appendChild(icon));
+  doc.documentElement.setAttribute('data-theme', 'light');
+  check(themedProviderIcons.every((icon) => win.getComputedStyle(icon).filter === 'none'), 'GitHub organization, repository and package icons retain their light-theme appearance');
+  doc.documentElement.setAttribute('data-theme', 'dark');
+  check(themedProviderIcons.every((icon) => win.getComputedStyle(icon).filter === 'invert(1)'), 'GitHub organization, repository and package icons gain contrast in dark theme');
+  themedProviderIcons.forEach((icon) => icon.remove());
   if (themeBefore === null) doc.documentElement.removeAttribute('data-theme');
   else doc.documentElement.setAttribute('data-theme', themeBefore);
   const labelsSelect = doc.getElementById('action-labels-select');
@@ -109,7 +117,7 @@ async function browserChecks() {
     check(submenuActions.every((button) => win.getComputedStyle(button.querySelector('.action-label')).clipPath === 'none' && button.querySelector('.action-label').getBoundingClientRect().width > 1), 'Auto keeps export menu labels visible at ' + width);
     exportMenuButton.click();
     const bounds = doc.getElementById('canvas').getBoundingClientRect();
-    check(bounds.width >= width - (compact ? 500 : 612) - 1 && bounds.height >= height - 150, 'Desktop canvas keeps room for the diagram at ' + width);
+    check(bounds.width >= width - (compact ? 500 : 628) - 1 && bounds.height >= height - 150, 'Desktop canvas keeps room for the diagram at ' + width);
     check(doc.documentElement.scrollWidth <= width && doc.querySelector('.app-header').getBoundingClientRect().height <= 100, 'Desktop header stays tidy without page overflow at ' + width);
     check(JSON.stringify(A.Storage.loadPrefs()) === autoPrefs, 'Automatic resizing does not overwrite preferences');
   }
@@ -180,7 +188,7 @@ async function browserChecks() {
   }
   check(doc.querySelectorAll('[data-type^="annotation-"]').length === 3, 'Palette exposes Text, Markdown and Table annotations');
   const paletteGroups = Array.from(doc.querySelectorAll('#panel-palette .palette-group > summary'));
-  check(paletteGroups[0].textContent.startsWith('Hierarchy (') && paletteGroups[paletteGroups.length - 2].textContent.startsWith('Other (') && paletteGroups[paletteGroups.length - 1].textContent.startsWith('Text & Tables ('), 'Actual palette puts Azure hierarchy first and Text & Tables last, after Other');
+  check(paletteGroups[0].textContent.startsWith('Hierarchy (') && paletteGroups[paletteGroups.length - 3].textContent.startsWith('Other (') && paletteGroups[paletteGroups.length - 2].textContent.startsWith('DevOps Process (') && paletteGroups[paletteGroups.length - 1].textContent.startsWith('Text & Tables ('), 'Actual palette puts DevOps Process between Other and Text & Tables');
   A.app.actions.addAuto('annotation-markdown');
   const markdownId = A.app.store.singleNode().id;
   change('prop-annotation-content', '# Browser heading\n**Bold** and *italic*\n<script>unsafe<' + '/script>', 'input');
