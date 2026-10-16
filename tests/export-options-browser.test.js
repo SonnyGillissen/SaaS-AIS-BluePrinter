@@ -118,6 +118,10 @@ async function browserChecks() {
       check(Math.abs(firstBounds.left - brandBounds.left) < 1 && Math.abs(toolbarBounds.left - brandBounds.left) < 1, 'Toolbar starts at the brand edge at ' + width + ' with ' + mode + ' labels');
       check(toolbarBounds.top >= brandBounds.bottom && toolbarBounds.right <= width, 'Toolbar has a dedicated row without overlap at ' + width + ' with ' + mode + ' labels');
       check(doc.documentElement.scrollWidth <= width, 'Toolbar wrapping stays within the viewport at ' + width + ' with ' + mode + ' labels');
+      exportMenuButton.click();
+      const menuBounds = doc.querySelector('.menu-list').getBoundingClientRect();
+      check(menuBounds.left >= 0 && menuBounds.right <= width, 'Desktop export menu stays on screen at ' + width + ' with ' + mode + ' labels');
+      exportMenuButton.click();
     }
   }
   labelsSelect.value = 'hide';

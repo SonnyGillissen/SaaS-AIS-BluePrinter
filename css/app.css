@@ -169,7 +169,7 @@ a { color: var(--c-primary); }
 .menu { position: relative; }
 .menu-list {
   position: absolute;
-  right: 0;
+  left: 0;
   top: calc(100% + 4px);
   z-index: 50;
   min-width: 260px;
@@ -522,7 +522,7 @@ table.naming-types { table-layout: fixed; min-width: 800px; }
   }
   .toolbar .group { flex-wrap: wrap; padding: 0; border: 0; gap: 4px; }
   .toolbar .menu { position: static; }
-  .toolbar .menu-list { top: 0; right: 0; max-width: 100%; max-height: 100%; overflow: auto; }
+  .toolbar .menu-list { top: 0; left: auto; right: 0; max-width: 100%; max-height: 100%; overflow: auto; }
   .toolbar select { max-width: 160px; }
   .workspace { position: relative; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
   .workspace-nav { flex-wrap: wrap; gap: 4px; padding: 4px; border-bottom: 1px solid var(--c-border); background: var(--c-panel); }
