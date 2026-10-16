@@ -139,4 +139,12 @@ The resource types available in the palette, generated from [`js/core/catalog.js
 *Other Azure Resource* represents any Azure resource without a dedicated type, for example when
 [loading an environment from Azure](Load-from-Azure.md).
 
+## DevOps Process
+
+| Type | Abbr. | Allowed parents | Naming rule | Attributes |
+|---|---|---|---|---|
+| Azure DevOps | `ado` | *(top level)*, Management Group, Subscription, Resource Group | Custom name | Description, URL |
+| GitHub | `gh` | *(top level)*, Management Group, Subscription, Resource Group | Custom name | Description, URL |
+| GitHub Enterprise | `ghe` | *(top level)*, Management Group, Subscription, Resource Group | Custom name | Description, URL |
+
 Want another resource type? Add an entry to `TYPES` in `js/core/catalog.js` (see [Architecture](Architecture.md#adding-a-resource-type)).

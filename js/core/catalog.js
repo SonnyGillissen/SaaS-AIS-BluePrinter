@@ -81,6 +81,7 @@
     { id: 'ai', label: 'AI' },
     { id: 'external', label: 'External & On-premises' },
     { id: 'other', label: 'Other' },
+    { id: 'devops', label: 'DevOps Process' },
     { id: 'annotations', label: 'Text & Tables' }
   ];
 
@@ -838,6 +839,23 @@
       label: 'Other Azure Resource', category: 'other', icon: I.allResources, abbr: 'res', provider: 'Any resource type',
       parents: RG, archimate: 'TechnologyService', rule: R.free, nameMode: 'custom', seed: 'resource',
       attributes: [text('resourceType', 'Resource type', { show: true }), text('kind', 'Kind'), text('sku', 'SKU')]
+    },
+
+    // ----- DevOps process ---------------------------------------------------------
+    'azure-devops': {
+      label: 'Azure DevOps', category: 'devops', icon: I.workflow, abbr: 'ado',
+      parents: ANYWHERE, archimate: 'ApplicationComponent', rule: R.free, azure: false, nameMode: 'custom', seed: 'Azure DevOps',
+      attributes: [text('url', 'URL', { show: true })]
+    },
+    'github': {
+      label: 'GitHub', category: 'devops', icon: I.branch, abbr: 'gh',
+      parents: ANYWHERE, archimate: 'ApplicationComponent', rule: R.free, azure: false, nameMode: 'custom', seed: 'GitHub',
+      attributes: [text('url', 'URL', { show: true })]
+    },
+    'github-enterprise': {
+      label: 'GitHub Enterprise', category: 'devops', icon: I.code, abbr: 'ghe',
+      parents: ANYWHERE, archimate: 'ApplicationComponent', rule: R.free, azure: false, nameMode: 'custom', seed: 'GitHub Enterprise',
+      attributes: [text('url', 'URL', { show: true })]
     }
   };
 

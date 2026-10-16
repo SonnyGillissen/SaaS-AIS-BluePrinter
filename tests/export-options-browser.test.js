@@ -180,7 +180,7 @@ async function browserChecks() {
   }
   check(doc.querySelectorAll('[data-type^="annotation-"]').length === 3, 'Palette exposes Text, Markdown and Table annotations');
   const paletteGroups = Array.from(doc.querySelectorAll('#panel-palette .palette-group > summary'));
-  check(paletteGroups[0].textContent.startsWith('Hierarchy (') && paletteGroups[paletteGroups.length - 2].textContent.startsWith('Other (') && paletteGroups[paletteGroups.length - 1].textContent.startsWith('Text & Tables ('), 'Actual palette puts Azure hierarchy first and Text & Tables last, after Other');
+  check(paletteGroups[0].textContent.startsWith('Hierarchy (') && paletteGroups[paletteGroups.length - 3].textContent.startsWith('Other (') && paletteGroups[paletteGroups.length - 2].textContent.startsWith('DevOps Process (') && paletteGroups[paletteGroups.length - 1].textContent.startsWith('Text & Tables ('), 'Actual palette puts DevOps Process between Other and Text & Tables');
   A.app.actions.addAuto('annotation-markdown');
   const markdownId = A.app.store.singleNode().id;
   change('prop-annotation-content', '# Browser heading\n**Bold** and *italic*\n<script>unsafe<' + '/script>', 'input');

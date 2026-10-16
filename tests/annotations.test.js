@@ -5,11 +5,24 @@ const { AISBP, smallProject } = require('./helpers');
 const { Annotations: A, Model, Layout, Render, Package, DrawIo, ArchiMate, Store } = AISBP;
 const TYPES = ['annotation-text', 'annotation-markdown', 'annotation-table'];
 
-test('palette orders Azure hierarchy first and Text & Tables last after Other', () => {
+test('palette orders DevOps Process between Other and Text & Tables', () => {
   const categories = AISBP.Catalog.CATEGORIES;
   assert.equal(categories[0].id, 'hierarchy');
-  assert.equal(categories[categories.length - 2].id, 'other');
+  assert.equal(categories[categories.length - 3].id, 'other');
+  assert.deepEqual(categories[categories.length - 2], { id: 'devops', label: 'DevOps Process' });
   assert.deepEqual(categories[categories.length - 1], { id: 'annotations', label: 'Text & Tables' });
+});
+
+test('DevOps process catalog entries can be placed at the root and in containers', () => {
+  const types = ['azure-devops', 'github', 'github-enterprise'];
+  const { project, rg } = smallProject(AISBP);
+  types.forEach((type) => {
+    const definition = AISBP.Catalog.get(type);
+    assert.equal(definition.category, 'devops');
+    assert.ok(AISBP.Catalog.byCategory('devops').some((t) => t.id === type));
+    assert.ok(Model.addNode(project, type, null));
+    assert.ok(Model.addNode(project, type, rg.id));
+  });
 });
 
 test('annotation catalog placement accepts root and containers, never annotations', () => {
