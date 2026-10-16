@@ -10,7 +10,7 @@ architectures. Click your environment together, and get an architecture diagram 
 
 ## Features
 
-- **Build your environment the Azure way**: management groups › subscriptions › resource groups ›
+- **Build your environment the Azure way**: Azure tenants › management groups › subscriptions › resource groups ›
   resources › child resources, with the hierarchy rules enforced. Includes 70+ resource types:
   Logic Apps, Azure Automation, API Management, Service Bus, Event Grid, Event Hubs, Functions, Container Apps,
   Data Factory, Integration Accounts, storage, Key Vault, networking, monitoring, and more. Each
@@ -26,7 +26,7 @@ architectures. Click your environment together, and get an architecture diagram 
   per object (eye toggle), switch between names-only, selected attributes or all attributes, and
   hide whole container levels for management views.
 - **Tag Manager**: define tags (e.g. *Managed by: customer*) with suggested values and colours,
-  assign them in bulk to management groups, subscriptions, resource groups and resources, or per
+  assign them in bulk to Azure tenants, management groups, subscriptions, resource groups and resources, or per
   object; tags are shown as coloured chips on the diagram and exported to draw.io and ArchiMate.
 - **Naming conventions**: global patterns and tokens (`{abbr}-{workload}-{env}-{region}-{instance}`),
   per-type and per-object overrides, inherited tokens, and the **Azure naming rules** (length,

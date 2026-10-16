@@ -34,7 +34,7 @@
 
   /** Bulk-assignment scopes used by the Tag Manager. */
   const SCOPES = [
-    { id: 'hierarchy', label: 'Management groups & subscriptions' },
+    { id: 'hierarchy', label: 'Azure tenants, management groups & subscriptions' },
     { id: 'resource-group', label: 'Resource groups' },
     { id: 'resource', label: 'Azure resources' },
     { id: 'other', label: 'External / generic objects' }

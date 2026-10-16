@@ -1,7 +1,7 @@
 # AIS BluePrinter
 
 **AIS BluePrinter** is a visual designer for **Azure Integration Services** architectures. You
-click your environment together the way Azure structures it (management groups › subscriptions ›
+click your environment together the way Azure structures it (Azure tenants › management groups › subscriptions ›
 resource groups › resources), fill in the attributes you care about, and the tool draws the
 architecture diagram for you. You can export the diagram to **PNG, PDF, SVG, draw.io and ArchiMate**,
 and the whole setup to a JSON **configuration package**.

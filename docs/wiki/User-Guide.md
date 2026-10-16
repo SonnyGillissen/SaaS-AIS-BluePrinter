@@ -16,14 +16,17 @@
 Azure's resource hierarchy is enforced:
 
 ```
-Management group (optional, can be nested)
-└── Subscription
-    └── Resource group
-        └── Resource (Logic App, Service Bus namespace, Function App, Key Vault, ...)
-            └── Child resource (workflow, queue, topic › subscription, API, container, ...)
+Azure Tenant (optional logical grouping)
+├── Management group (optional, can be nested)
+│   └── Subscription
+│       └── Resource group
+│           └── Resource (Logic App, Service Bus namespace, Function App, Key Vault, ...)
+│               └── Child resource (workflow, queue, topic › subscription, API, container, ...)
+└── Subscription (can also be directly under the tenant)
 ```
 
-External systems, on-premises systems and users can be placed at the top level. The
+Management groups and subscriptions can also be placed directly at the top level. External
+systems, on-premises systems and users can be placed at the top level or inside an Azure Tenant. The
 [Resource catalog](Resource-Catalog.md) lists which parents each type accepts.
 
 There are several ways to add objects:
@@ -108,7 +111,7 @@ tag on all of them.
 - define tag names with **suggested values**, a **colour** and whether they are **shown on the
   diagram**; the *Used by* column counts the objects that have the tag;
 - renaming a tag renames it on all objects; *Remove from objects* removes it everywhere;
-- **Assign a tag to many objects**: set a tag on all management groups & subscriptions, resource
+- **Assign a tag to many objects**: set a tag on all Azure tenants, management groups & subscriptions, resource
   groups, Azure resources and/or external objects at once (optionally overwriting existing
   values).
 
@@ -119,8 +122,8 @@ Tags are hidden at the *High-level* detail level and can be switched off with *S
 
 Azure limits are validated: at most 50 tags per object, names up to 512 characters without
 `< > % & \ ? /` (names are case-insensitive, so *Env* and *env* are duplicates) and values up to
-256 characters. Azure does not support tags on management groups; there they are documentation
-only. Older blueprints with the former "Tags (key=value per line)" attribute are converted
+256 characters. Azure does not support tags on Azure tenants or management groups; there they are
+documentation only. Older blueprints with the former "Tags (key=value per line)" attribute are converted
 automatically when they are opened or imported.
 
 ## Virtual networks and subnets

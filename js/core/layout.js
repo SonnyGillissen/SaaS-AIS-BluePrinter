@@ -3,7 +3,7 @@
  *
  * Computes the size and position of every object on the canvas:
  *  - leaf resources are fixed-width tiles whose height depends on the attributes shown,
- *  - containers (management groups, subscriptions, resource groups and resources that have
+ *  - containers (Azure tenants, management groups, subscriptions, resource groups and resources that have
  *    child resources) automatically grow to wrap their children,
  *  - container types can be hidden (e.g. a high-level view without resource groups); their
  *    children are then drawn directly inside the next visible ancestor.

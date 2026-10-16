@@ -251,7 +251,7 @@
   };
 
   const RG = ['resource-group'];
-  const ANYWHERE = [ROOT, 'management-group', 'subscription', 'resource-group'];
+  const ANYWHERE = [ROOT, 'azure-tenant', 'management-group', 'subscription', 'resource-group'];
 
   /**
    * The catalog. Order inside a category is the order shown in the palette.
@@ -263,15 +263,21 @@
    */
   const TYPES = {
     // ----- Hierarchy -----------------------------------------------------------
+    'azure-tenant': {
+      label: 'Azure Tenant', category: 'hierarchy', icon: I.groups, abbr: 'tenant',
+      provider: 'Microsoft Entra ID', parents: [ROOT],
+      archimate: 'Grouping', rule: R.free, azure: false, container: true, nameMode: 'custom', seed: 'Tenant',
+      attributes: [text('tenantId', 'Tenant ID'), text('primaryDomain', 'Primary domain'), area('description', 'Description')]
+    },
     'management-group': {
       label: 'Management Group', category: 'hierarchy', icon: I.managementGroup, abbr: 'mg',
-      provider: 'Microsoft.Management/managementGroups', parents: [ROOT, 'management-group'],
+      provider: 'Microsoft.Management/managementGroups', parents: [ROOT, 'azure-tenant', 'management-group'],
       archimate: 'Grouping', rule: R.managementGroup, container: true, pattern: '{abbr}-{name}', seed: 'platform',
       attributes: [text('displayName', 'Display name', { show: true }), area('policies', 'Policy assignments'), area('description', 'Description')]
     },
     subscription: {
       label: 'Subscription', category: 'hierarchy', icon: I.subscription, abbr: 'sub',
-      provider: 'Microsoft.Subscription/aliases', parents: [ROOT, 'management-group'],
+      provider: 'Microsoft.Subscription/aliases', parents: [ROOT, 'azure-tenant', 'management-group'],
       archimate: 'Grouping', rule: R.subscription, container: true, pattern: '{abbr}-{workload}-{env}-{instance}',
       attributes: [
         text('subscriptionId', 'Subscription ID'),

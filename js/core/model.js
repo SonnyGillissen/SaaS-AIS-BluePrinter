@@ -9,7 +9,7 @@
  *   format: 'ais-blueprinter', version: 1,
  *   meta:      { id, name, description, author, created, modified, seq },
  *   settings:  { naming: {...}, diagram: {...}, icons: {...}, tags: { definitions: [...] } },
- *   nodes:     { [id]: Node },        // management groups, subscriptions, resource groups, resources
+ *   nodes:     { [id]: Node },        // Azure tenants, management groups, subscriptions, resource groups, resources
  *   connections: { [id]: Connection } // arrows between nodes (data flow, triggers, dependencies, ...)
  * }
  *

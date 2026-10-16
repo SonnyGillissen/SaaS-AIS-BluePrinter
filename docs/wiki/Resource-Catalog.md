@@ -6,8 +6,9 @@ The resource types available in the palette, generated from [`js/core/catalog.js
 
 | Type | Abbr. | Allowed parents | Naming rule | Attributes |
 |---|---|---|---|---|
-| Management Group | `mg` | *(top level)*, Management Group | 1-90 characters; allowed: letters, digits_.()-; can't end with a period; unique in the tenant | Display name, Policy assignments, Description |
-| Subscription | `sub` | *(top level)*, Management Group | 1-64 characters; not allowed: <>;\|; unique in the tenant | Subscription ID, Offer, Owner, Monthly budget, Policy assignments, Description |
+| Azure Tenant | `tenant` | *(top level)* | Custom name | Tenant ID, Primary domain, Description |
+| Management Group | `mg` | *(top level)*, Azure Tenant, Management Group | 1-90 characters; allowed: letters, digits_.()-; can't end with a period; unique in the tenant | Display name, Policy assignments, Description |
+| Subscription | `sub` | *(top level)*, Azure Tenant, Management Group | 1-64 characters; not allowed: <>;\|; unique in the tenant | Subscription ID, Offer, Owner, Monthly budget, Policy assignments, Description |
 | Resource Group | `rg` | Subscription | 1-90 characters; allowed: letters, digits_.()-; can't end with a period; unique in the subscription | Location, Resource lock, Description |
 
 ## Integration
