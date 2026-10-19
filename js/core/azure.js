@@ -172,6 +172,8 @@
     'microsoft.apimanagement/service/apis': 'apim-api',
     'microsoft.apimanagement/service/products': 'apim-product',
     'microsoft.apimanagement/service/backends': 'apim-backend',
+    'microsoft.apimanagement/service/workspaces': 'apim-workspace',
+    'microsoft.apimanagement/service/gateways': 'apim-gateway',
     'microsoft.apicenter/services': 'api-center',
     'microsoft.web/connections': 'api-connection',
     'microsoft.web/customapis': 'custom-connector',
@@ -292,6 +294,13 @@
     'api-management': [
       { type: 'apim-api', path: '/apis', api: '2022-08-01' },
       { type: 'apim-product', path: '/products', api: '2022-08-01' },
+      { type: 'apim-backend', path: '/backends', api: '2022-08-01' },
+      { type: 'apim-workspace', path: '/workspaces', api: '2022-08-01' },
+      { type: 'apim-gateway', path: '/gateways', api: '2022-08-01' }
+    ],
+    'apim-workspace': [
+      { type: 'apim-api', path: '/apis', api: '2022-08-01' },
+      { type: 'apim-product', path: '/products', api: '2022-08-01' },
       { type: 'apim-backend', path: '/backends', api: '2022-08-01' }
     ],
     'service-bus-namespace': [
@@ -407,6 +416,8 @@
     'apim-api': (r, p) => ({ apiType: API_TYPES[lower(p.type || 'http')] || p.type, path: p.path, version: p.apiVersion, backendUrl: p.serviceUrl, subscriptionRequired: bool(p.subscriptionRequired) }),
     'apim-product': (r, p) => ({ state: p.state, approvalRequired: bool(p.approvalRequired), subscriptionRequired: bool(p.subscriptionRequired) }),
     'apim-backend': (r, p) => ({ url: p.url, protocol: p.protocol, circuitBreaker: p.circuitBreaker ? true : undefined }),
+    'apim-workspace': (r, p) => ({ displayName: p.displayName, description: p.description }),
+    'apim-gateway': (r, p) => ({ gatewayLocation: p.locationData && join([p.locationData.name, p.locationData.city, p.locationData.countryOrRegion]) }),
     'api-center': (r) => ({ sku: r.sku && r.sku.name }),
     'api-connection': (r, p) => ({ connector: p.api && (p.api.displayName || p.api.name) }),
     'custom-connector': (r, p) => ({ host: p.backendService && p.backendService.serviceUrl }),

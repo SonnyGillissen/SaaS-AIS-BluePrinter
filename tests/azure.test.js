@@ -36,6 +36,8 @@ test('Azure resource types map to catalog types (including kinds)', () => {
   assert.equal(Azure.mapType({ type: 'Microsoft.Web/sites', kind: 'app' }), 'app-service');
   assert.equal(Azure.mapType({ type: 'Microsoft.CognitiveServices/accounts', kind: 'OpenAI' }), 'azure-openai');
   assert.equal(Azure.mapType({ type: 'Microsoft.Network/expressRouteCircuits' }), 'expressroute-circuit');
+  assert.equal(Azure.mapType({ type: 'Microsoft.ApiManagement/service/workspaces' }), 'apim-workspace');
+  assert.equal(Azure.mapType({ type: 'Microsoft.ApiManagement/service/gateways' }), 'apim-gateway');
   assert.equal(Azure.mapType({ type: 'Microsoft.Contoso/widgets' }), null);
   assert.ok(Azure.isSupporting({ type: 'Microsoft.Network/networkInterfaces' }));
   assert.ok(!Azure.isSkipped({ type: 'Microsoft.Network/networkInterfaces' }));
@@ -46,6 +48,63 @@ test('Azure resource types map to catalog types (including kinds)', () => {
     const walk = (specs) => specs.forEach((s) => { if (s.type) assert.ok(Catalog.get(s.type), s.type); walk(s.children || []); });
     walk(Azure.CHILD_SPECS[k]);
   });
+});
+
+test('API Management gateways are catalog children and import their location', () => {
+  const apimId = RG + '/providers/Microsoft.ApiManagement/service/apim-int';
+  const gatewayId = apimId + '/gateways/gw-eu';
+  const { project } = Azure.buildProject({
+    managementGroups: [],
+    subscriptions: [{ subscriptionId: SUB, displayName: 'Integration' }],
+    resourceGroups: [{ id: RG, name: 'rg-int', location: 'westeurope', subscriptionId: SUB }],
+    resources: [
+      { id: apimId, name: 'apim-int', type: 'Microsoft.ApiManagement/service', location: 'westeurope' },
+      {
+        id: gatewayId, name: 'gw-eu', type: 'Microsoft.ApiManagement/service/gateways',
+        _catalogType: 'apim-gateway', _parent: apimId,
+        properties: { locationData: { name: 'West Europe', city: 'Amsterdam', countryOrRegion: 'Netherlands' } }
+      }
+    ],
+    extras: {}
+  });
+  const apim = byName(project, 'apim-int');
+  const gateway = byName(project, 'gw-eu');
+  assert.equal(gateway.type, 'apim-gateway');
+  assert.equal(gateway.parentId, apim.id);
+  assert.equal(gateway.attributes.gatewayLocation, 'West Europe, Amsterdam, Netherlands');
+});
+
+test('API Management workspaces import their details and workspace resources', () => {
+  const apimId = RG + '/providers/Microsoft.ApiManagement/service/apim-int';
+  const workspaceId = apimId + '/workspaces/team-a';
+  const apiId = workspaceId + '/apis/orders';
+  const { project } = Azure.buildProject({
+    managementGroups: [],
+    subscriptions: [{ subscriptionId: SUB, displayName: 'Integration' }],
+    resourceGroups: [{ id: RG, name: 'rg-int', location: 'westeurope', subscriptionId: SUB }],
+    resources: [
+      { id: apimId, name: 'apim-int', type: 'Microsoft.ApiManagement/service', location: 'westeurope' },
+      {
+        id: workspaceId, name: 'team-a', type: 'Microsoft.ApiManagement/service/workspaces',
+        _catalogType: 'apim-workspace', _parent: apimId,
+        properties: { displayName: 'Team A', description: 'Workspace for Team A' }
+      },
+      {
+        id: apiId, name: 'team-a/orders', type: 'Microsoft.ApiManagement/service/workspaces/apis',
+        _catalogType: 'apim-api', _parent: workspaceId, properties: { path: 'orders' }
+      }
+    ],
+    extras: {}
+  });
+  const apim = byName(project, 'apim-int');
+  const workspace = byName(project, 'team-a');
+  const api = byName(project, 'orders');
+  assert.equal(workspace.type, 'apim-workspace');
+  assert.equal(workspace.parentId, apim.id);
+  assert.equal(workspace.attributes.displayName, 'Team A');
+  assert.equal(workspace.attributes.description, 'Workspace for Team A');
+  assert.equal(api.parentId, workspace.id);
+  assert.ok(Catalog.canContain('apim-workspace', 'apim-api'));
 });
 
 test('the generic "Other Azure Resource" type exists and fits in a resource group', () => {
