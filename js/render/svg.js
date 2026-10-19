@@ -183,6 +183,11 @@
     }
     if (routing && kind === 'orthogonal') {
       if (!Model.cleanWaypoints(waypoints).length) path = automaticRoute(a, b, source, target, routing, path);
+      if (!Model.cleanWaypoints(waypoints).length) {
+        path.vertices = compactRoute(path.vertices);
+        path.d = path.vertices.map((p, i) => !i ? 'M' + p.x + ' ' + p.y :
+          p.x === path.vertices[i - 1].x ? 'V' + p.y : 'H' + p.x).join(' ');
+      }
       path.label = routeLabel(path.vertices, routing.labelWidth || 0, routing.labelObstacles || routing.obstacles || []) || path.label;
     }
     const numbers = path.d.match(/-?\d+(?:\.\d+)?(?:e[+-]?\d+)?/gi).map(Number);

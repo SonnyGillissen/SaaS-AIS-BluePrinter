@@ -47,6 +47,8 @@ there; dropping it on another container moves it there (if allowed). **Tidy up**
 everything automatically and resets manually resized containers to the size they need.
 It orders sibling groups by directed data flows and triggers where possible, keeping
 external producers to the left of the Azure hierarchy and consumers to the right.
+Connected content is aligned on a common flow lane, with space for connection labels.
+Dependency-only supporting resources are placed below their consumers to keep the main path clear.
 Cycles retain a deterministic order; this does not change the hierarchy or saved routing points.
 Loading the sample also applies this layout so resource sizes follow the current detail settings.
 

@@ -403,11 +403,24 @@
         Model.descendants(project, kid.id).forEach((node) => owner.set(node.id, kid.id));
       });
       const edges = new Map(kids.map((kid) => [kid.id, new Set()]));
+      const gaps = new Map();
+      const participants = new Set();
+      const dependencies = new Map();
       const incoming = new Map(kids.map((kid) => [kid.id, 0]));
       Object.values(project.connections).forEach((c) => {
-        if (!['flow', 'trigger'].includes(c.kind) || c.direction === 'bidirectional') return;
         const from = owner.get(c.from), to = owner.get(c.to);
-        if (!from || !to || from === to || edges.get(from).has(to)) return;
+        if (!from || !to || from === to) return;
+        const text = [c.label, c.attributes && c.attributes.protocol && c.attributes.protocol !== c.label ? c.attributes.protocol : ''].filter(Boolean).join(' \u00b7 ');
+        const gap = project.settings.diagram.showConnectionLabels !== false && text ?
+          Math.max(GAP_X, truncate(text, 40).length * 5.8 + 34) : GAP_X;
+        const key = [from, to].sort().join(':');
+        gaps.set(key, Math.max(gaps.get(key) || GAP_X, gap));
+        if (c.kind === 'dependency') {
+          if (!dependencies.has(to)) dependencies.set(to, from);
+          return;
+        }
+        if (['flow', 'trigger'].includes(c.kind)) { participants.add(from); participants.add(to); }
+        if (!['flow', 'trigger'].includes(c.kind) || c.direction === 'bidirectional' || edges.get(from).has(to)) return;
         edges.get(from).add(to);
         incoming.set(to, incoming.get(to) + 1);
       });
@@ -420,7 +433,25 @@
         ordered.push(kid);
         edges.get(kid.id).forEach((id) => incoming.set(id, incoming.get(id) - 1));
       }
-      return { kids: ordered, connected: Array.from(edges.values()).some((set) => set.size) };
+      const connected = Array.from(edges.values()).some((set) => set.size);
+      const support = connected ? ordered.filter((kid) =>
+        !participants.has(kid.id) && participants.has(dependencies.get(kid.id))) : [];
+      return { kids: ordered.filter((kid) => !support.includes(kid)), support, dependencies, gaps, connected };
+    };
+    const lane = (node) => {
+      const kids = childIndex[node.id] || [];
+      const def = Catalog.get(node.type);
+      // Content, rather than nested hierarchy headers, defines the visual flow baseline.
+      if (kids.length && !(def && def.annotation)) {
+        const lanes = flowOrder(kids).kids.map(lane);
+        return (Math.min(...lanes) + Math.max(...lanes)) / 2;
+      }
+      const r = measure(node);
+      return r.y + r.h / 2;
+    };
+    const shift = (node, dx, dy) => {
+      // Tidy moves geometry only; saved absolute routes stay under the user's control.
+      [node].concat(Model.descendants(project, node.id)).forEach((n) => { n.x += dx; n.y += dy; });
     };
     const layoutChildren = (parentId, originX, originY, headerH) => {
       const flow = flowOrder(Model.children(project, parentId));
@@ -430,18 +461,48 @@
       let cx = originX;
       let cy = originY + headerH;
       let rowH = 0;
-      kids.forEach((kid) => {
+      let row = [];
+      const alignRow = () => {
+        if (!flow.connected || row.length < 2) return;
+        const baseline = Math.max(...row.map(lane));
+        row.forEach((kid) => shift(kid, 0, baseline - lane(kid)));
+        rowH = Math.max(...row.map((kid) => {
+          const r = measure(kid);
+          return r.y + r.h - cy;
+        }));
+      };
+      kids.forEach((kid, index) => {
+        if (row.length) {
+          const previous = kids[index - 1];
+          cx += (flow.gaps.get([previous.id, kid.id].sort().join(':')) || GAP_X) - GAP_X;
+        }
         const size = place(kid, cx, cy);
         if (cx > originX && cx + size.w - originX > rowWidth) {
+          alignRow();
           // wrap to the next row
-          Model.moveNodes(project, [kid.id], originX - cx, rowH + GAP_Y);
+          shift(kid, originX - cx, rowH + GAP_Y);
           cy += rowH + GAP_Y;
           cx = originX;
           rowH = 0;
+          row = [];
         }
+        row.push(kid);
         cx += size.w + GAP_X;
         rowH = Math.max(rowH, size.h);
       });
+      alignRow();
+      if (flow.support.length) {
+        const bottom = Math.max(...kids.map((kid) => { const r = measure(kid); return r.y + r.h; }));
+        let right = originX - GAP_X;
+        flow.support.forEach((kid) => {
+          const owner = project.nodes[flow.dependencies.get(kid.id)];
+          const related = measure(owner);
+          const size = place(kid, originX, bottom + GAP_Y);
+          const x = Math.max(originX, related.x + (related.w - size.w) / 2, right + GAP_X);
+          shift(kid, x - originX, 0);
+          right = x + size.w;
+        });
+      }
     };
     const place = (node, x, y) => {
       node.x = x;
