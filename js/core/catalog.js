@@ -420,6 +420,11 @@
       parents: ['api-management'], archimate: 'ApplicationInterface', rule: R.apimBackend, pattern: '{name}', seed: 'backend',
       attributes: [text('url', 'URL', { show: true }), select('protocol', 'Protocol', ['http', 'soap']), bool('circuitBreaker', 'Circuit breaker')]
     },
+    'apim-gateway': {
+      label: 'API Management Gateway', category: 'integration', icon: I.apim, abbr: 'gw', provider: 'Microsoft.ApiManagement/service/gateways',
+      parents: ['api-management'], archimate: 'ApplicationComponent', rule: R.apimBackend, pattern: '{name}', seed: 'gateway',
+      attributes: [text('gatewayLocation', 'Gateway location', { show: true })]
+    },
     'api-center': {
       label: 'API Center', category: 'integration', icon: I.apiCenter, abbr: 'apic', provider: 'Microsoft.ApiCenter/services',
       parents: RG, archimate: 'ApplicationComponent', rule: R.apiCenter,

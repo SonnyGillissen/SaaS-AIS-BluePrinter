@@ -36,6 +36,7 @@ test('Azure resource types map to catalog types (including kinds)', () => {
   assert.equal(Azure.mapType({ type: 'Microsoft.Web/sites', kind: 'app' }), 'app-service');
   assert.equal(Azure.mapType({ type: 'Microsoft.CognitiveServices/accounts', kind: 'OpenAI' }), 'azure-openai');
   assert.equal(Azure.mapType({ type: 'Microsoft.Network/expressRouteCircuits' }), 'expressroute-circuit');
+  assert.equal(Azure.mapType({ type: 'Microsoft.ApiManagement/service/gateways' }), 'apim-gateway');
   assert.equal(Azure.mapType({ type: 'Microsoft.Contoso/widgets' }), null);
   assert.ok(Azure.isSupporting({ type: 'Microsoft.Network/networkInterfaces' }));
   assert.ok(!Azure.isSkipped({ type: 'Microsoft.Network/networkInterfaces' }));
@@ -46,6 +47,30 @@ test('Azure resource types map to catalog types (including kinds)', () => {
     const walk = (specs) => specs.forEach((s) => { if (s.type) assert.ok(Catalog.get(s.type), s.type); walk(s.children || []); });
     walk(Azure.CHILD_SPECS[k]);
   });
+});
+
+test('API Management gateways are catalog children and import their location', () => {
+  const apimId = RG + '/providers/Microsoft.ApiManagement/service/apim-int';
+  const gatewayId = apimId + '/gateways/gw-eu';
+  const { project } = Azure.buildProject({
+    managementGroups: [],
+    subscriptions: [{ subscriptionId: SUB, displayName: 'Integration' }],
+    resourceGroups: [{ id: RG, name: 'rg-int', location: 'westeurope', subscriptionId: SUB }],
+    resources: [
+      { id: apimId, name: 'apim-int', type: 'Microsoft.ApiManagement/service', location: 'westeurope' },
+      {
+        id: gatewayId, name: 'gw-eu', type: 'Microsoft.ApiManagement/service/gateways',
+        _catalogType: 'apim-gateway', _parent: apimId,
+        properties: { locationData: { name: 'West Europe', city: 'Amsterdam', countryOrRegion: 'Netherlands' } }
+      }
+    ],
+    extras: {}
+  });
+  const apim = byName(project, 'apim-int');
+  const gateway = byName(project, 'gw-eu');
+  assert.equal(gateway.type, 'apim-gateway');
+  assert.equal(gateway.parentId, apim.id);
+  assert.equal(gateway.attributes.gatewayLocation, 'West Europe, Amsterdam, Netherlands');
 });
 
 test('the generic "Other Azure Resource" type exists and fits in a resource group', () => {
