@@ -1,0 +1,184 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.48.1.52935",
+      "templateHash": "6316414106089474970"
+    }
+  },
+  "parameters": {
+    "r0010_name": {
+      "type": "string"
+    },
+    "r0010_properties": {
+      "type": "object"
+    },
+    "r0010_location": {
+      "type": "string"
+    },
+    "r0010_tags": {
+      "type": "object"
+    },
+    "r0001_name": {
+      "type": "string"
+    },
+    "r0001_properties": {
+      "type": "object"
+    },
+    "r0002_name": {
+      "type": "string"
+    },
+    "r0002_properties": {
+      "type": "object"
+    },
+    "r0002_location": {
+      "type": "string"
+    },
+    "r0002_tags": {
+      "type": "object"
+    },
+    "r0002_sku": {
+      "type": "object"
+    },
+    "r0002_kind": {
+      "type": "string"
+    },
+    "r0003_name": {
+      "type": "string"
+    },
+    "r0003_properties": {
+      "type": "object"
+    },
+    "r0003_location": {
+      "type": "string"
+    },
+    "r0003_tags": {
+      "type": "object"
+    },
+    "r0003_sku": {
+      "type": "object"
+    },
+    "r0005_name": {
+      "type": "string"
+    },
+    "r0005_properties": {
+      "type": "object"
+    },
+    "r0005_location": {
+      "type": "string"
+    },
+    "r0005_tags": {
+      "type": "object"
+    },
+    "r0006_name": {
+      "type": "string"
+    },
+    "r0006_properties": {
+      "type": "object"
+    },
+    "r0007_name": {
+      "type": "string"
+    },
+    "r0007_properties": {
+      "type": "object"
+    },
+    "r0007_location": {
+      "type": "string"
+    },
+    "r0007_tags": {
+      "type": "object"
+    },
+    "r0008_name": {
+      "type": "string"
+    },
+    "r0008_properties": {
+      "type": "object"
+    },
+    "r0011_name": {
+      "type": "string"
+    },
+    "r0011_properties": {
+      "type": "object"
+    },
+    "r0012_name": {
+      "type": "string"
+    },
+    "r0012_properties": {
+      "type": "object"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Network/virtualNetworks",
+      "apiVersion": "2023-11-01",
+      "name": "[parameters('r0010_name')]",
+      "location": "[parameters('r0010_location')]",
+      "tags": "[parameters('r0010_tags')]",
+      "properties": "[union(parameters('r0010_properties'), createObject('subnets', createArray(createObject('name', parameters('r0001_name'), 'properties', parameters('r0001_properties')), createObject('name', parameters('r0006_name'), 'properties', parameters('r0006_properties')))))]"
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts",
+      "apiVersion": "2023-05-01",
+      "name": "[parameters('r0002_name')]",
+      "location": "[parameters('r0002_location')]",
+      "tags": "[parameters('r0002_tags')]",
+      "sku": "[parameters('r0002_sku')]",
+      "kind": "[parameters('r0002_kind')]",
+      "properties": "[parameters('r0002_properties')]"
+    },
+    {
+      "type": "Microsoft.ServiceBus/namespaces",
+      "apiVersion": "2021-11-01",
+      "name": "[parameters('r0003_name')]",
+      "location": "[parameters('r0003_location')]",
+      "tags": "[parameters('r0003_tags')]",
+      "sku": "[parameters('r0003_sku')]",
+      "properties": "[parameters('r0003_properties')]"
+    },
+    {
+      "type": "Microsoft.OperationalInsights/workspaces",
+      "apiVersion": "2022-10-01",
+      "name": "[parameters('r0005_name')]",
+      "location": "[parameters('r0005_location')]",
+      "tags": "[parameters('r0005_tags')]",
+      "properties": "[parameters('r0005_properties')]"
+    },
+    {
+      "type": "Microsoft.Network/networkSecurityGroups",
+      "apiVersion": "2023-11-01",
+      "name": "[parameters('r0007_name')]",
+      "location": "[parameters('r0007_location')]",
+      "tags": "[parameters('r0007_tags')]",
+      "properties": "[parameters('r0007_properties')]"
+    },
+    {
+      "type": "Microsoft.ServiceBus/namespaces/queues",
+      "apiVersion": "2021-11-01",
+      "name": "[format('{0}/{1}', parameters('r0003_name'), parameters('r0008_name'))]",
+      "properties": "[parameters('r0008_properties')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.ServiceBus/namespaces', parameters('r0003_name'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.ServiceBus/namespaces/topics",
+      "apiVersion": "2021-11-01",
+      "name": "[format('{0}/{1}', parameters('r0003_name'), parameters('r0011_name'))]",
+      "properties": "[parameters('r0011_properties')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.ServiceBus/namespaces', parameters('r0003_name'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.ServiceBus/namespaces/topics/subscriptions",
+      "apiVersion": "2021-11-01",
+      "name": "[format('{0}/{1}/{2}', parameters('r0003_name'), parameters('r0011_name'), parameters('r0012_name'))]",
+      "properties": "[parameters('r0012_properties')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.ServiceBus/namespaces/topics', parameters('r0003_name'), parameters('r0011_name'))]"
+      ]
+    }
+  ]
+}

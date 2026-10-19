@@ -26,12 +26,14 @@
       <div class="group">
         <button type="button" data-action="new" data-icon="new" title="New blueprint">New</button>
         <button type="button" data-action="projects" data-icon="open" title="Open a saved blueprint">Open</button>
-        <button type="button" data-action="import" data-icon="import" title="Import a configuration package or an export with an embedded blueprint">Import</button>
+        <button type="button" data-action="import" data-icon="import" title="Import a blueprint or ARM template; optionally select its parameters JSON together">Import</button>
         <button type="button" data-action="azure" data-icon="cloud" title="Sign in and load your own Azure environment into a new blueprint">Load from Azure</button>
         <div class="menu">
           <button type="button" data-action="export-menu" data-icon="export" aria-haspopup="true" aria-expanded="false" title="Export">Export &#9662;</button>
           <div class="menu-list" role="menu" hidden>
             <button type="button" role="menuitem" data-action="export-json" data-icon="code">Configuration package (.json)</button>
+            <button type="button" role="menuitem" data-action="export-bicep" data-icon="code">Bicep infrastructure</button>
+            <button type="button" role="menuitem" data-action="export-arm" data-icon="code">ARM infrastructure (.json)</button>
             <hr>
             <button type="button" role="menuitem" data-action="export-png" data-icon="image">PNG image</button>
             <button type="button" role="menuitem" data-action="export-pdf" data-icon="document">PDF document</button>
@@ -135,7 +137,7 @@
     <a href="https://github.com/SonnyGillissen/SaaS-AIS-BluePrinter/wiki" target="_blank" rel="noopener">Documentation</a>
   </footer>
 
-  <input id="file-input" type="file" accept=".json,.png,.pdf,.svg,.drawio,.xml,application/json,image/png,application/pdf,image/svg+xml,application/xml" hidden>
+  <input id="file-input" type="file" accept=".json,.png,.pdf,.svg,.drawio,.xml,application/json,image/png,application/pdf,image/svg+xml,application/xml" multiple hidden>
   <div id="toasts" class="toasts" role="status" aria-live="polite"></div>
 
   <!-- Configuration (edit for hosted deployments) -->
@@ -155,6 +157,7 @@
   <script src="js/render/svg.js"></script>
   <script src="js/render/icons.js"></script>
   <script src="js/export/package.js"></script>
+  <script src="js/export/infrastructure.js"></script>
   <script src="js/export/embedded.js"></script>
   <script src="js/export/drawio.js"></script>
   <script src="js/export/archimate.js"></script>

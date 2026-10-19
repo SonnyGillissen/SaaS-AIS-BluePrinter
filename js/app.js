@@ -298,10 +298,10 @@
       }
     },
 
-    async importFile(file) {
+    async importFile(file, files) {
       if (!file) return;
       try {
-        const result = await AISBP.Embedded.fromFile(file);
+        const result = await AISBP.Exporter.readImport(files || [file]);
         const project = result.project;
         const existing = await storage.list();
         if (existing.some((e) => e.id === project.meta.id)) {
@@ -316,6 +316,10 @@
         save();
         toast('Imported "' + project.meta.name + '".' + (result.warnings.length ? ' ' + result.warnings.length + ' warning(s), see the console.' : ''), result.warnings.length ? 'info' : 'success');
         if (result.warnings.length && root.console) root.console.warn('Import warnings:\n' + result.warnings.join('\n'));
+        if (result.warnings.length) AISBP.Dom.modal({
+          title: 'Import notes',
+          body: AISBP.Dom.h('ul', {}, result.warnings.map((note) => AISBP.Dom.h('li', { text: note })))
+        });
       } catch (e) {
         toast('Import failed: ' + e.message, 'error');
       }
@@ -348,7 +352,7 @@
     async exportAs(format) {
       try {
         const project = store.snapshot();
-        const opts = format === 'json' ? {} : await AISBP.Dialogs.openExportOptions(format, project);
+        const opts = ['json', 'arm', 'bicep'].includes(format) ? {} : await AISBP.Dialogs.openExportOptions(format, project);
         if (opts === null) return;
         await AISBP.Exporter.run(format, project, opts);
       } catch (e) {
@@ -517,6 +521,8 @@
     azure: () => AISBP.AzureUi.open(app),
     'export-menu': () => toggleExportMenu(exportMenu.hidden),
     'export-json': () => actions.exportAs('json'),
+    'export-bicep': () => actions.exportAs('bicep'),
+    'export-arm': () => actions.exportAs('arm'),
     'export-png': () => actions.exportAs('png'),
     'export-pdf': () => actions.exportAs('pdf'),
     'export-svg': () => actions.exportAs('svg'),
@@ -550,7 +556,8 @@
   });
 
   doc.getElementById('file-input').addEventListener('change', (e) => {
-    actions.importFile(e.target.files[0]);
+    const files = Array.from(e.target.files);
+    actions.importFile(files[0], files);
     e.target.value = '';
   });
 
