@@ -928,6 +928,9 @@
     // Common attributes come first, but an own attribute with the same key wins.
     t.attributes = common.filter((a) => !seen.has(a.key)).concat(own);
     if (t.azure) {
+      if (id === 'resource-group' || t.category !== 'hierarchy') {
+        t.attributes.push(text('subscriptionId', 'Subscription ID', { subscriptionSource: 'subscriptionId' }));
+      }
       [
         text('tenantId', 'Tenant ID', { tenantSource: 'tenantId' }),
         text('tenantDomain', 'Tenant domain', { tenantSource: 'primaryDomain' })

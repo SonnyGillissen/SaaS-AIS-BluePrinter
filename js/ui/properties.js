@@ -105,10 +105,12 @@
         case 'textarea':
           return field(attr.label, textArea(id, value, set), { eye: eye(node, attr.key) });
         default: {
-          const inherited = attr.tenantSource && Model.inheritedTenantAttributes(store.project, node.id)[attr.key];
+          const inherited = attr.tenantSource ? Model.inheritedTenantAttributes(store.project, node.id)[attr.key] :
+            attr.subscriptionSource && Model.inheritedSubscriptionAttributes(store.project, node.id)[attr.key];
+          const source = attr.subscriptionSource ? 'Subscription' : 'Azure Tenant';
           return field(attr.label, textInput(id, value, set, { placeholder: inherited ? '(inherit: ' + inherited + ')' : '' }), {
             eye: eye(node, attr.key),
-            help: inherited ? 'Inherited from Azure Tenant: ' + inherited + '. Leave blank to inherit; enter a value to override.' : ''
+            help: inherited ? 'Inherited from ' + source + ': ' + inherited + '. Leave blank to inherit; enter a value to override.' : ''
           });
         }
       }

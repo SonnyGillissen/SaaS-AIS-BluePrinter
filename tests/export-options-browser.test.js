@@ -855,7 +855,9 @@ async function browserChecks() {
   const tenant = A.Model.addNode(tenantProject, 'azure-tenant', null, {
     attributes: { tenantId: 'tenant-one', primaryDomain: 'tenant.example' }
   });
-  const tenantSub = A.Model.addNode(tenantProject, 'subscription', tenant.id, {});
+  const tenantSub = A.Model.addNode(tenantProject, 'subscription', tenant.id, {
+    attributes: { subscriptionId: 'subscription-one' }
+  });
   const tenantRg = A.Model.addNode(tenantProject, 'resource-group', tenantSub.id, {});
   const tenantVault = A.Model.addNode(tenantProject, 'key-vault', tenantRg.id, {});
   store.load(tenantProject);
@@ -877,6 +879,21 @@ async function browserChecks() {
   check(A.Model.effectiveAttributes(store.project, tenantVault.id).tenantId === 'tenant-one' &&
     doc.getElementById('prop-attr-tenantId').placeholder.includes('tenant-one'),
   'Clearing a Tenant ID override resumes inheritance');
+  check(doc.getElementById('prop-attr-subscriptionId').placeholder.includes('subscription-one') &&
+    doc.getElementById('prop-attr-subscriptionId').value === '',
+  'Properties show inherited Subscription ID without storing a copy');
+  const subscriptionInput = doc.getElementById('prop-attr-subscriptionId');
+  subscriptionInput.value = 'subscription-override';
+  subscriptionInput.dispatchEvent(new win.Event('input', { bubbles: true }));
+  await pause();
+  check(A.Model.effectiveAttributes(store.project, tenantVault.id).subscriptionId === 'subscription-override',
+    'Subscription ID controls preserve explicit overrides');
+  const updatedSubscriptionInput = doc.getElementById('prop-attr-subscriptionId');
+  updatedSubscriptionInput.value = '';
+  updatedSubscriptionInput.dispatchEvent(new win.Event('input', { bubbles: true }));
+  await pause();
+  check(A.Model.effectiveAttributes(store.project, tenantVault.id).subscriptionId === 'subscription-one',
+    'Clearing a Subscription ID override resumes inheritance');
   return results;
 }
 
