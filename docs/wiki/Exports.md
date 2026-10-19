@@ -38,6 +38,9 @@ Warnings identify resources by their resolved diagram names rather than internal
 
 | Resources | Pinned API | First-release boundaries |
 |---|---|---|
+| Logic App (Consumption) | `2019-05-01` | State is mapped; the complete executable workflow definition must be supplied as a required secure parameter |
+| Logic App (Standard) host | `2023-12-01` | Existing compatible plan ID and secure runtime/storage site configuration required; application content deployed separately |
+| API Management service | `2024-05-01` | Tier, capacity and publisher details; APIs, policies, products, gateways and advanced networking are not generated |
 | Service Bus namespace, queue, topic, topic subscription | `2021-11-01` | Basic/Standard/Premium tier checks; no authorization rules, filters or private endpoints |
 | Storage account | `2023-05-01` | Standard StorageV2 only; no data-plane content or child services |
 | Virtual network, subnet, network security group | `2023-11-01` | Address spaces/prefixes and selected settings; free-text NSG rules and subnet security associations need manual configuration |
@@ -63,6 +66,38 @@ that cannot be derived must be supplied before deployment. Resource types and AP
 are deliberately pinned schema identifiers, not user-configurable resource settings.
 Secrets are not extracted from arbitrary diagram attributes or custom properties.
 Do not put credentials in names, tags or other non-secret settings.
+
+### Logic Apps and API Management
+
+These resource types produce resource declarations in both ARM and Bicep, even when
+required inputs are missing. **Generated does not mean ready to deploy:** supply every
+missing parameter before validating or deploying.
+
+- **Consumption Logic Apps:** supply the complete workflow definition using the required
+  secure `*_definition` object parameter. A diagram's trigger label cannot reconstruct
+  executable triggers/actions. Workflow parameters, API connections and integration-account
+  configuration must be supplied separately in the properties parameter.
+- **Standard Logic Apps:** supply the full resource ID of an existing compatible Workflow
+  Standard App Service plan (`*_serverFarmId`), not just its display name. Supply secure
+  `*_siteConfig` with the required runtime/storage app settings and TLS 1.2 or newer.
+  HTTPS is enforced and public network access defaults to Disabled. Plan/storage resources
+  and credentials are not generated. Deploy workflow folders containing `workflow.json`,
+  `host.json`, connections and runtime configuration separately using the
+  [Standard Logic Apps deployment process](https://learn.microsoft.com/azure/logic-apps/devops-deployment-single-tenant-azure-logic-apps).
+  A **Workflow (Standard)** diagram node is application content, not an independently
+  deployable ARM child resource; its warning does not mean the host export failed.
+- **API Management:** supply publisher name/email if missing. Catalog v2 tier names are
+  mapped to ARM SKU names, and Consumption uses capacity `0`. Networking modes other than
+  None require explicit properties rather than silently falling back to a public service.
+
+Secure object parameters have no generated values. Supply them through a protected
+deployment process; do not commit workflow credentials or storage secrets in parameter files.
+
+**Unknown subscription ID** is a scope warning, not a template-generation failure. Set
+**Subscription ID** on the subscription container to the actual subscription GUID, or
+select it explicitly with `--subscription <subscription-id>` when deploying. A display
+name is not a subscription ID. Existing empty-deployment warnings remain meaningful for
+groups containing only unsupported resources or diagram objects.
 
 Only explicit parent/child resource relationships generate deployment dependencies.
 Diagram arrows and network attachment drawings do **not** grant permissions, create private

@@ -5,6 +5,9 @@
   const PARAM_SCHEMA = 'https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#';
   // Deliberately pinned stable APIs, not the inventory API-version table.
   const TYPES = {
+    'logic-app-consumption': ['Microsoft.Logic/workflows', '2019-05-01'],
+    'logic-app-standard': ['Microsoft.Web/sites', '2023-12-01'],
+    'api-management': ['Microsoft.ApiManagement/service', '2024-05-01'],
     'service-bus-namespace': ['Microsoft.ServiceBus/namespaces', '2021-11-01'],
     'service-bus-queue': ['Microsoft.ServiceBus/namespaces/queues', '2021-11-01', 'service-bus-namespace'],
     'service-bus-topic': ['Microsoft.ServiceBus/namespaces/topics', '2021-11-01', 'service-bus-namespace'],
@@ -85,6 +88,7 @@
     if (Object.keys(project.connections || {}).length) warnings.push('Diagram connections are not deployment dependencies, permissions, role assignments or network rules; all are ignored.');
     nodes.forEach((n) => {
       if (TYPES[n.type] && !ancestor(n, 'resource-group')) warn(n, 'Skipped: resource has no resource-group scope.');
+      else if (n.type === 'logic-app-workflow') warn(n, 'Standard workflow application content must be deployed separately to its Logic App Standard host (workflow.json and connections/runtime configuration); it is not an independently deployable ARM child resource.');
       else if (!TYPES[n.type] && !['azure-tenant', 'management-group', 'subscription', 'resource-group'].includes(n.type)) warn(n, 'Skipped: unsupported resource or diagram-only object.');
     });
     groups.forEach((rg, gi) => {
@@ -147,6 +151,11 @@
         }
         const used = new Set(['location', 'description']);
         const properties = {};
+        const propertyParameters = [];
+        const propertyParam = (key, type, value) => {
+          const ref = param(n, key, type, value);
+          propertyParameters.push({ key, ref });
+        };
         let validProperties = true;
         const use = (key) => { used.add(key); return attrs[key]; };
         const str = (key, target) => {
@@ -184,7 +193,45 @@
           properties.minimumTlsVersion = storage ? 'TLS1_2' : '1.2';
         };
         let sku, kind;
-        if (n.type === 'service-bus-namespace') {
+        if (n.type === 'logic-app-consumption') {
+          const state = use('state');
+          if (state === 'Enabled' || state === 'Disabled') properties.state = state;
+          else if (present(state)) { validProperties = false; warn(n, 'Invalid workflow state; correct the properties parameter.'); }
+          propertyParam('definition', 'secureObject');
+          warn(n, 'Supply the complete workflow definition in the required secure definition parameter; trigger labels are not executable definitions. Configure API connections, workflow parameters and integration accounts separately.');
+        } else if (n.type === 'logic-app-standard') {
+          kind = 'functionapp,workflowapp';
+          const plan = use('appServicePlan');
+          const planId = typeof plan === 'string' && /^\/subscriptions\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/resourceGroups\/[^/]+\/providers\/Microsoft\.Web\/serverfarms\/[^/]+$/i.test(plan) && !credentialValue.test(plan) ? plan : undefined;
+          propertyParam('serverFarmId', 'string', planId);
+          propertyParam('siteConfig', 'secureObject');
+          properties.httpsOnly = true;
+          network();
+          used.add('sku'); used.add('runtime'); used.add('storageAccount');
+          warn(n, 'Supply an existing Workflow Standard App Service plan resource ID and secure siteConfig with appSettings for the workflow runtime and storage. Plan/storage resources, credentials and workflow application content are not synthesized. Configure TLS 1.2 or newer in siteConfig.');
+          if (present(attrs.vnetIntegration) && attrs.vnetIntegration !== false && attrs.vnetIntegration !== 'false') {
+            validProperties = false; warn(n, 'VNet integration requires explicit subnet configuration in the properties parameter.');
+          }
+        } else if (n.type === 'api-management') {
+          const tier = use('sku'), capacity = use('capacity');
+          const tiers = ['Consumption', 'Developer', 'Basic', 'Standard', 'Premium', 'Basic v2', 'Standard v2', 'Premium v2'];
+          if (tiers.includes(tier)) {
+            if (tier === 'Consumption') {
+              sku = { name: tier, capacity: 0 };
+              if (present(capacity) && Number(capacity) !== 0) warn(n, 'Consumption API Management requires capacity 0; the diagram unit count is not applicable.');
+            }
+            else if (/^\d+$/.test(String(capacity)) && Number.isSafeInteger(Number(capacity)) && Number(capacity) >= 1 && (tier !== 'Developer' || Number(capacity) === 1)) sku = { name: tier.replace(' v2', 'V2'), capacity: Number(capacity) };
+          }
+          ['publisherName', 'publisherEmail'].forEach((key) => {
+            const v = use(key);
+            const valid = typeof v === 'string' && v.trim() && !v.startsWith('[') && !credentialValue.test(v) && (key !== 'publisherEmail' || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v));
+            propertyParam(key, 'string', valid ? v : undefined);
+          });
+          const mode = use('vnetMode');
+          if (!present(mode) || mode === 'None') properties.virtualNetworkType = 'None';
+          else { validProperties = false; warn(n, 'API Management networking requires explicit configuration in the properties parameter; no public fallback is supplied.'); }
+          warn(n, 'API Management exports the service only; APIs, policies, products, custom domains, zones and gateways require separate configuration. Validate tier capacity and regional availability before deployment.');
+        } else if (n.type === 'service-bus-namespace') {
           const tier = use('sku'), capacity = use('capacity');
           if (['Basic', 'Standard', 'Premium'].includes(tier)) {
             sku = { name: tier, tier };
@@ -300,15 +347,19 @@
           res.location = pl.arm; res.tags = pt.arm;
           lines.push('  location: ' + pl.bicep, '  tags: ' + pt.bicep);
         } else if ((n.tags || []).length) warn(n, 'Child-resource tags are unsupported and were ignored.');
-        if (n.type === 'service-bus-namespace' || n.type === 'storage-account') {
+        if (n.type === 'service-bus-namespace' || n.type === 'storage-account' || n.type === 'api-management') {
           const ps = param(n, 'sku', 'object', sku);
           res.sku = ps.arm; lines.push('  sku: ' + ps.bicep);
         }
-        if (n.type === 'storage-account') {
+        if (n.type === 'storage-account' || n.type === 'logic-app-standard') {
           const pk = param(n, 'kind', 'string', kind || undefined);
           res.kind = pk.arm; lines.push('  kind: ' + pk.bicep);
         }
         res.properties = props.arm; lines.push('  properties: ' + props.bicep);
+        if (propertyParameters.length) {
+          res.properties = '[union(' + props.arm.slice(1, -1) + ', createObject(' + propertyParameters.map(({ key, ref }) => "'" + key + "', " + ref.arm.slice(1, -1)).join(', ') + '))]';
+          lines[lines.length - 1] = '  properties: union(' + props.bicep + ', {\n' + propertyParameters.map(({ key, ref }) => '    ' + key + ': ' + ref.bicep).join('\n') + '\n  })';
+        }
         const result = { symbol, armNames, n, res, lines, pn, props, spec };
         records.push(result);
         emitted.set(n.id, result);
@@ -332,7 +383,7 @@
       const deploymentName = stem + (format === 'arm' ? '.json' : '.bicep');
       if (format === 'arm') files.push({ name: deploymentName, content: json({ $schema: SCHEMA, contentVersion: '1.0.0.0', parameters, resources }), mime: 'application/json' });
       else {
-        const declarations = Object.entries(parameters).map(([k, v]) => 'param ' + k + ' ' + (v.type === 'int' ? 'int' : v.type));
+        const declarations = Object.entries(parameters).map(([k, v]) => v.type === 'secureObject' ? '@secure()\nparam ' + k + ' object' : 'param ' + k + ' ' + v.type);
         files.push({ name: deploymentName, content: "targetScope = 'resourceGroup'\n\n" + declarations.join('\n') + '\n\n' + bResources.join('\n\n') + '\n', mime: 'text/plain' });
         files.push({ name: stem + '.bicepparam', content: 'using ' + literal('./' + deploymentName) + '\n\n' + Object.entries(values).map(([k, v]) => 'param ' + k + ' = ' + bicep(v.value)).join('\n\n') + '\n', mime: 'text/plain' });
       }
@@ -350,7 +401,7 @@
       const rawSubscriptionId = sub && sub.attributes && sub.attributes.subscriptionId;
       const subscriptionId = typeof rawSubscriptionId === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rawSubscriptionId) ? rawSubscriptionId : null;
       scope.push({ template: deploymentName, parameters: stem + '.parameters.json', resourceGroup: scopeName(rg), subscription: scopeName(sub), subscriptionId, resourceCount: resources.length });
-      if (!subscriptionId) warn(rg, 'Scope subscription ID is unknown or invalid; confirm the actual target subscription rather than relying on its display name.');
+      if (!subscriptionId) warn(rg, 'Scope subscription ID is unknown or invalid; set Subscription ID on the subscription container or select the actual target using --subscription <subscription-id>. A display name is not a subscription ID.');
       if (!sub) warn(rg, 'No subscription boundary; select the target subscription explicitly.');
       if (Object.keys(rg.attributes || {}).some((k) => !['location', 'description', 'lock'].includes(k)) || present((rg.attributes || {}).lock) && rg.attributes.lock !== 'None' || (rg.tags || []).length) warn(rg, 'Resource-group settings/tags/locks are not deployed; groups must already exist.');
     });
@@ -360,6 +411,7 @@
     const instructions = files.find((file) => file.name === base + '.instructions.txt');
     instructions.content += '\nPinned API coverage and canonical Microsoft Learn references\nThese intentional first-release API pins are not a claim of Microsoft certification, exhaustive resource coverage, or complete standards compliance. Local compilation/tests do not replace Azure what-if, tenant-policy checks or deployment validation. Review these version-specific references manually when network access is available.\n' + API_REFERENCES + '\nCoverage limits: Standard StorageV2 only; NSGs without custom rules only; PerGB2018 workspaces only. VNet subnets are inline. Service Bus support covers namespaces, queues, topics and subscriptions, not subscription rules or authorization rules. Private endpoints, identities, diagnostics, advanced networking, direct Bicep import and Terraform are not supported.\nARM expressions: https://learn.microsoft.com/en-us/azure/azure-resource-manager/templates/template-expressions\nARM parameter files: https://learn.microsoft.com/en-us/azure/azure-resource-manager/templates/parameter-files\nBicep child resources: https://learn.microsoft.com/en-us/azure/azure-resource-manager/bicep/child-resource-name-type\n';
     instructions.content += '\nExport warnings\n' + (warnings.length ? warnings.map((warning) => '- ' + warning).join('\n') : 'No export warnings.') + '\n';
+    instructions.content += '\nIntegration services: Consumption Logic Apps require a complete secure definition parameter. Standard Logic Apps require an existing compatible plan resource ID and secure siteConfig containing runtime/storage appSettings; workflow files and connections must be deployed separately. API Management exports the service only and requires publisher details. Supply secure parameters through a protected deployment process; do not commit credentials in parameter files. Subscription-ID warnings describe deployment scope, not failed template generation.\n';
     return { files, warnings };
   }
 
@@ -541,6 +593,10 @@
       const type = typeMap.get(item.type.toLowerCase());
       if (!type) { warn('Unsupported ARM resource type skipped: ' + item.type); return; }
       const spec = TYPES[type];
+      if (type === 'logic-app-standard' && !(typeof item.raw.kind === 'string' && item.raw.kind.toLowerCase().split(',').map((k) => k.trim()).includes('workflowapp'))) {
+        warn('Unsupported Microsoft.Web/sites kind skipped; only Logic App Standard workflowapp hosts are supported.');
+        return;
+      }
       let parent = rg;
       if (spec[2]) {
         const parentType = TYPES[spec[2]][0].toLowerCase();

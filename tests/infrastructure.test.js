@@ -4,6 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const os = require('node:os');
 const { spawnSync } = require('node:child_process');
 const { AISBP: A, smallProject } = require('./helpers');
 const { Infrastructure: I, Model } = A;
@@ -58,6 +59,107 @@ test('infrastructure exports supported resources with fixed stable APIs and requ
   assert.match(out.warnings.join('\n'), /Secure baseline/);
 });
 const own = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+
+test('integration diagrams export Logic Apps and API Management instead of empty deployments', () => {
+  const { project, sub, nodes } = smallProject(A, ['logic-app-consumption', 'api-management', 'logic-app-standard']);
+  sub.attributes.subscriptionId = '12345678-1234-1234-1234-123456789abc';
+  nodes[1].attributes.publisherName = 'Example';
+  nodes[1].attributes.publisherEmail = 'publisher@example.test';
+  Model.addNode(project, 'logic-app-workflow', nodes[2].id, {});
+  const out = arm(project);
+  assert.deepEqual(new Set(out.template.resources.map((r) => r.type)), new Set([
+    'Microsoft.Logic/workflows', 'Microsoft.ApiManagement/service', 'Microsoft.Web/sites'
+  ]));
+  assert.ok(!out.warnings.some((w) => /Empty deployment|unsupported resource or diagram-only|Scope subscription ID/.test(w)));
+  assert.match(out.warnings.join('\n'), /Standard workflow application content must be deployed separately/);
+  const scope = JSON.parse(out.files.find((f) => f.name.endsWith('.deployment-scopes.json')).content);
+  assert.equal(scope.deployments[0].resourceCount, 3);
+  assert.equal(scope.deployments[0].subscriptionId, sub.attributes.subscriptionId);
+  const apim = out.template.resources.find((r) => r.type === 'Microsoft.ApiManagement/service');
+  assert.deepEqual(value(out, apim.sku), { name: 'Developer', capacity: 1 });
+  assert.match(apim.properties, /'publisherName', parameters\('r\d+_publisherName'\)/);
+  const host = out.template.resources.find((r) => r.type === 'Microsoft.Web/sites');
+  assert.equal(value(out, host.kind), 'functionapp,workflowapp');
+  assert.match(out.warnings.join('\n'), /Required parameter r\d+_serverFarmId has no value/);
+  const secure = Object.entries(out.template.parameters).filter(([, p]) => p.type === 'secureObject');
+  assert.equal(secure.length, 2);
+  secure.forEach(([key]) => assert.ok(!own(out.parameters.parameters, key)));
+  assert.equal(Object.values(out.parameters.parameters).find((p) => p.value.state)?.value.state, 'Enabled');
+  const imported = I.importTemplate(out.template, out.parameters);
+  for (const type of ['logic-app-consumption', 'logic-app-standard', 'api-management']) assert.equal(nodesOf(imported.project, type).length, 1);
+});
+
+test('integration exports require missing or sensitive configuration without leaking it', () => {
+  const { project, nodes } = smallProject(A, ['logic-app-consumption', 'logic-app-standard', 'api-management']);
+  nodes[0].attributes.definition = 'AccountKey=OMITTED_DEFINITION';
+  nodes[1].attributes.appServicePlan = 'AccountKey=OMITTED_PLAN';
+  nodes[1].attributes.storageAccount = 'AccountKey=OMITTED_STORAGE';
+  nodes[2].attributes.publisherName = 'AccountKey=OMITTED_PUBLISHER';
+  nodes[2].attributes.publisherEmail = '[unresolved()]';
+  nodes[2].attributes.sku = 'unknown';
+  const out = arm(project);
+  const required = Object.keys(out.template.parameters).filter((key) => !own(out.parameters.parameters, key));
+  for (const suffix of ['definition', 'siteConfig', 'serverFarmId', 'publisherName', 'publisherEmail', 'sku']) {
+    assert.ok(required.some((key) => key.endsWith('_' + suffix)), suffix);
+  }
+  assert.ok(out.files.every((f) => !f.content.includes('OMITTED_')));
+  const bicep = I.exportProject(project, 'bicep').files.find((f) => f.name.endsWith('.bicep')).content;
+  assert.match(bicep, /@secure\(\)\nparam r\d+_definition object/);
+  assert.match(bicep, /@secure\(\)\nparam r\d+_siteConfig object/);
+  assert.ok(!bicep.includes(' secureObject'));
+});
+
+test('Standard plan IDs and API Management tiers map explicitly without inventing networking', () => {
+  const { project, nodes } = smallProject(A, ['logic-app-standard', 'api-management']);
+  const plan = '/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/rg/providers/Microsoft.Web/serverfarms/plan';
+  nodes[0].attributes.appServicePlan = plan;
+  nodes[1].attributes.sku = 'Standard v2';
+  let out = arm(project);
+  assert.ok(Object.values(out.parameters.parameters).some((p) => p.value === plan));
+  const apim = out.template.resources.find((r) => r.type === 'Microsoft.ApiManagement/service');
+  assert.deepEqual(value(out, apim.sku), { name: 'StandardV2', capacity: 1 });
+  nodes[1].attributes.sku = 'Consumption';
+  out = arm(project);
+  assert.deepEqual(value(out, out.template.resources.find((r) => r.type === apim.type).sku), { name: 'Consumption', capacity: 0 });
+  nodes[0].attributes.vnetIntegration = true;
+  nodes[1].attributes.vnetMode = 'Internal';
+  out = arm(project);
+  const properties = Object.keys(out.template.parameters).filter((key) => key.endsWith('_properties'));
+  assert.equal(properties.length, 2);
+  properties.forEach((key) => assert.ok(!own(out.parameters.parameters, key)));
+  assert.match(out.warnings.join('\n'), /no public fallback/);
+});
+
+test('ARM import does not mistake other Microsoft.Web/sites kinds for Standard Logic Apps', () => {
+  const out = I.importTemplate(template([
+    resource('Microsoft.Web/sites', 'web', {}, { kind: 'app' }),
+    resource('Microsoft.Web/sites', 'function', {}, { kind: 'functionapp' }),
+    resource('Microsoft.Web/sites', 'logic', {}, { kind: 'functionapp,workflowapp' })
+  ]));
+  assert.equal(nodesOf(out.project, 'logic-app-standard').length, 1);
+  assert.equal(nodesOf(out.project, 'logic-app-standard')[0].name, 'logic');
+  assert.match(out.warnings.join('\n'), /only Logic App Standard workflowapp hosts/);
+});
+
+test('integration Bicep compiles with secure parameters and explicit missing values', (t) => {
+  if (spawnSync('bicep', ['--version']).status !== 0) { t.skip('Bicep CLI is not installed.'); return; }
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'aisbp-integration-'));
+  try {
+    const { project } = smallProject(A, ['logic-app-consumption', 'logic-app-standard', 'api-management']);
+    const out = I.exportProject(project, 'bicep');
+    const source = out.files.find((f) => f.name.endsWith('.bicep'));
+    const file = path.join(directory, source.name);
+    fs.writeFileSync(file, source.content);
+    const compiled = spawnSync('bicep', ['build', file, '--no-restore', '--stdout'], { encoding: 'utf8' });
+    assert.equal(compiled.status, 0, compiled.stderr);
+    const result = JSON.parse(compiled.stdout);
+    assert.equal(result.resources.length, 3);
+    assert.equal(Object.values(result.parameters).filter((p) => p.type === 'secureObject').length, 2);
+    assert.ok(!result.resources.some((r) => r.type.endsWith('/workflows') && r.type !== 'Microsoft.Logic/workflows'));
+  } finally {
+    fs.rmSync(directory, { recursive: true });
+  }
+});
 
 test('each RG/subscription stays separate, metadata is separate and scope is selectable at deployment time', () => {
   const { project, sub, rg } = smallProject(A, ['nsg']);
@@ -339,7 +441,7 @@ test('export warnings identify resources by resolved names instead of internal s
   rg.name = 'rg-orders-production';
   const out = arm(project);
   assert.ok(out.warnings.some((warning) => warning.startsWith('sb-orders-production: ')));
-  assert.ok(out.warnings.some((warning) => warning.startsWith('apim-orders-production: Skipped:')));
+  assert.ok(out.warnings.some((warning) => warning.startsWith('apim-orders-production: ')));
   assert.ok(out.warnings.some((warning) => warning.startsWith('rg-orders-production: ')));
   assert.ok(out.warnings.every((warning) => !/^r\d+ \(/.test(warning)));
   const instructions = out.files.find((file) => file.name.endsWith('.instructions.txt')).content;
@@ -352,11 +454,11 @@ test('warning names use safe labels or resource types when names are missing or 
   node.nameMode = 'custom';
   node.name = '';
   node.label = 'Orders API';
-  assert.ok(arm(project).warnings.some((warning) => warning.startsWith('Orders API: Skipped:')));
+  assert.ok(arm(project).warnings.some((warning) => warning.startsWith('Orders API: ')));
   node.name = 'AccountKey=DO_NOT_INCLUDE_IN_WARNINGS';
   node.label = node.name;
   const out = arm(project);
-  assert.ok(out.warnings.some((warning) => warning.startsWith('API Management: Skipped:')));
+  assert.ok(out.warnings.some((warning) => warning.startsWith('API Management: ')));
   assert.ok(out.files.every((file) => !file.content.includes('DO_NOT_INCLUDE_IN_WARNINGS')));
 });
 
