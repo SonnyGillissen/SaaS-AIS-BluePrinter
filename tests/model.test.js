@@ -30,6 +30,67 @@ test('Azure Tenant can group management groups and subscriptions', () => {
   assert.equal(rg.parentId, sub.id);
 });
 
+test('Azure descendants resolve tenant ID and primary domain without storing inherited values', () => {
+  const p = Model.createProject();
+  const tenant = Model.addNode(p, 'azure-tenant', null, {
+    attributes: { tenantId: 'tenant-one', primaryDomain: 'contoso.onmicrosoft.com' }
+  });
+  const mg = Model.addNode(p, 'management-group', tenant.id, {});
+  const sub = Model.addNode(p, 'subscription', mg.id, {});
+  const rg = Model.addNode(p, 'resource-group', sub.id, {});
+  const ns = Model.addNode(p, 'service-bus-namespace', rg.id, {});
+  const queue = Model.addNode(p, 'service-bus-queue', ns.id, {});
+  const vault = Model.addNode(p, 'key-vault', rg.id, {});
+  for (const node of [mg, sub, rg, ns, queue, vault]) {
+    assert.deepEqual(Model.inheritedTenantAttributes(p, node.id), {
+      tenantId: 'tenant-one', tenantDomain: 'contoso.onmicrosoft.com'
+    });
+    assert.equal(Model.effectiveAttributes(p, node.id).tenantId, 'tenant-one');
+    assert.equal(Model.effectiveAttributes(p, node.id).tenantDomain, 'contoso.onmicrosoft.com');
+    assert.equal(node.attributes.tenantId, undefined);
+    assert.equal(node.attributes.tenantDomain, undefined);
+    assert.equal(AISBP.Catalog.get(node.type).attributes.filter((a) => a.key === 'tenantId').length, 1);
+  }
+  Model.updateNode(p, tenant.id, { attributes: { tenantId: 'tenant-two', primaryDomain: '' } });
+  assert.equal(Model.effectiveAttributes(p, queue.id).tenantId, 'tenant-two');
+  assert.equal(Model.effectiveAttributes(p, queue.id).tenantDomain, undefined);
+  const users = Model.addNode(p, 'users', tenant.id, {});
+  const text = Model.addNode(p, 'annotation-text', tenant.id, {});
+  for (const node of [tenant, users, text]) {
+    assert.deepEqual(Model.inheritedTenantAttributes(p, node.id), {});
+  }
+  assert.deepEqual(Model.effectiveAttributes(p, 'missing'), {});
+});
+
+test('tenant inheritance preserves explicit overrides and follows hierarchy changes, paste and import', () => {
+  const { project: p, sub, rg, nodes: [vault] } = smallProject(AISBP, ['key-vault']);
+  const tenant = Model.addNode(p, 'azure-tenant', null, {
+    attributes: { tenantId: 'tenant-one', primaryDomain: 'one.example' }
+  });
+  const other = Model.addNode(p, 'azure-tenant', null, {
+    attributes: { tenantId: 'tenant-two', primaryDomain: 'two.example' }
+  });
+  assert.deepEqual(Model.inheritedTenantAttributes(p, vault.id), {});
+  Model.reparent(p, sub.id, tenant.id);
+  Model.updateNode(p, vault.id, { attributes: { tenantId: 'explicit', tenantDomain: 'explicit.example' } });
+  assert.equal(Model.effectiveAttributes(p, vault.id).tenantId, 'explicit');
+  assert.equal(Model.effectiveAttributes(p, vault.id).tenantDomain, 'explicit.example');
+  Model.updateNode(p, vault.id, { attributes: { tenantId: '  ', tenantDomain: '(inherit)' } });
+  assert.equal(Model.effectiveAttributes(p, vault.id).tenantId, 'tenant-one');
+  assert.equal(Model.effectiveAttributes(p, vault.id).tenantDomain, 'one.example');
+  Model.reparent(p, sub.id, other.id);
+  assert.equal(Model.effectiveAttributes(p, vault.id).tenantId, 'tenant-two');
+  const clip = Model.extract(p, [rg.id], []);
+  const dest = Model.addNode(p, 'subscription', tenant.id, {});
+  const pasted = Model.paste(p, clip, dest.id);
+  const copy = pasted.nodeIds.map((id) => p.nodes[id]).find((n) => n.type === 'key-vault');
+  assert.equal(Model.effectiveAttributes(p, copy.id).tenantId, 'tenant-one');
+  const restored = Model.normalize(JSON.parse(JSON.stringify(p))).project;
+  assert.equal(Model.effectiveAttributes(restored, copy.id).tenantDomain, 'one.example');
+  Model.reparent(p, sub.id, null);
+  assert.deepEqual(Model.inheritedTenantAttributes(p, vault.id), {});
+});
+
 test('containment rules are enforced (management group > subscription > resource group > resource)', () => {
   const p = Model.createProject();
   assert.throws(() => Model.addNode(p, 'function-app', null, {}), /cannot be placed/);

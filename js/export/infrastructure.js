@@ -126,7 +126,7 @@
         if (emitted.has(n.id)) return emitted.get(n.id);
         if (visiting.has(n.id)) { warn(n, 'Skipped: cyclic resource hierarchy.'); return null; }
         visiting.add(n.id);
-        const spec = TYPES[n.type], attrs = n.attributes || {};
+        const spec = TYPES[n.type], attrs = A.Model.effectiveAttributes(project, n.id);
         const parent = project.nodes[n.parentId];
         let parentResult;
         if (spec[2]) {
@@ -155,7 +155,7 @@
           emitted.set(n.id, null);
           return null;
         }
-        const used = new Set(['location', 'description']);
+        const used = new Set(['location', 'description', 'tenantId', 'tenantDomain']);
         const properties = {};
         const propertyParameters = [];
         const propertyParam = (key, type, value) => {
@@ -295,8 +295,7 @@
           if (properties.isSftpEnabled && !properties.isHnsEnabled) { validProperties = false; warn(n, 'SFTP requires hierarchical namespace.'); }
           tls(true); network();
         } else if (n.type === 'key-vault') {
-          const tenant = ancestor(n, 'azure-tenant');
-          const tenantId = use('tenantId') || (tenant && (tenant.attributes || {}).tenantId);
+          const tenantId = use('tenantId');
           propertyParam('tenantId', 'string', typeof tenantId === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(tenantId) ? tenantId : undefined);
           const tier = use('sku');
           propertyParam('sku', 'object', ['Standard', 'Premium'].includes(tier) ? { family: 'A', name: tier.toLowerCase() } : undefined);

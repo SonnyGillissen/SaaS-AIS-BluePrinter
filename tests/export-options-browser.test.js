@@ -851,6 +851,32 @@ async function browserChecks() {
   check(JSON.stringify(store.project.nodes) !== nodesBeforeAll &&
     JSON.stringify(store.project.connections) === savedArrows,
   'Tidy resources arranges nodes without resetting saved arrow routing');
+  const tenantProject = A.Model.createProject();
+  const tenant = A.Model.addNode(tenantProject, 'azure-tenant', null, {
+    attributes: { tenantId: 'tenant-one', primaryDomain: 'tenant.example' }
+  });
+  const tenantSub = A.Model.addNode(tenantProject, 'subscription', tenant.id, {});
+  const tenantRg = A.Model.addNode(tenantProject, 'resource-group', tenantSub.id, {});
+  const tenantVault = A.Model.addNode(tenantProject, 'key-vault', tenantRg.id, {});
+  store.load(tenantProject);
+  store.select([tenantVault.id]);
+  await pause();
+  check(doc.getElementById('prop-attr-tenantId').placeholder.includes('tenant-one') &&
+    doc.getElementById('prop-attr-tenantDomain').placeholder.includes('tenant.example'),
+  'Properties show inherited Tenant ID and domain defaults');
+  const tenantInput = doc.getElementById('prop-attr-tenantId');
+  tenantInput.value = 'override';
+  tenantInput.dispatchEvent(new win.Event('input', { bubbles: true }));
+  await pause();
+  check(A.Model.effectiveAttributes(store.project, tenantVault.id).tenantId === 'override',
+    'Tenant attribute controls preserve explicit overrides');
+  const updatedTenantInput = doc.getElementById('prop-attr-tenantId');
+  updatedTenantInput.value = '';
+  updatedTenantInput.dispatchEvent(new win.Event('input', { bubbles: true }));
+  await pause();
+  check(A.Model.effectiveAttributes(store.project, tenantVault.id).tenantId === 'tenant-one' &&
+    doc.getElementById('prop-attr-tenantId').placeholder.includes('tenant-one'),
+  'Clearing a Tenant ID override resumes inheritance');
   return results;
 }
 
