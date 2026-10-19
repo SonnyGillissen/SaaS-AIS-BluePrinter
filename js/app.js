@@ -271,6 +271,12 @@
       if (!rootId) root.requestAnimationFrame(() => canvas.fit());
     },
 
+    tidyArrows() {
+      const count = store.change('tidy arrows', (p) => Model.resetConnectionRoutes(p));
+      root.requestAnimationFrame(() => canvas.fit());
+      toast(count ? 'Arrow routes and attachments reset. Undo restores your manual routing.' : 'All arrows already use automatic routing.');
+    },
+
     loadSample() {
       store.change('sample', (p) => { Model.addSample(p); Layout.autoLayout(p); });
       root.requestAnimationFrame(() => canvas.fit());
@@ -540,6 +546,7 @@
     'zoom-reset': () => canvas.zoomReset(),
     fit: () => canvas.fit(),
     tidy: () => actions.tidy(),
+    'tidy-arrows': () => actions.tidyArrows(),
     options: () => AISBP.Dialogs.openOptions(app),
     help: () => AISBP.Dialogs.openHelp(app),
     sample: () => actions.loadSample()

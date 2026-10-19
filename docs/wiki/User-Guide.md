@@ -52,6 +52,12 @@ Dependency-only supporting resources are placed below their consumers to keep th
 Cycles retain a deterministic order; this does not change the hierarchy or saved routing points.
 Loading the sample also applies this layout so resource sizes follow the current detail settings.
 
+If an existing diagram still has awkward arrows after arranging resources, use **Tidy arrows**
+(the reset icon beside **Tidy up**). It clears all saved routing points and fixed endpoint
+attachments so the scene-aware router can choose fresh paths. Resource positions, connection
+endpoints, directions, labels and attributes are unchanged. **Undo** restores all manual routes
+in one step. Ordinary **Tidy up** continues to preserve manual routes.
+
 ## Text blocks and tables
 
 Use **Text & Tables** at the bottom of the palette to add **Text**, **Markdown** or a **Table**, by clicking

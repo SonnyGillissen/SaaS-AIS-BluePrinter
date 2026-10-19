@@ -765,6 +765,21 @@ async function browserChecks() {
   await pause();
   check(JSON.stringify(Object.values(store.project.nodes).map((n) => [n.x, n.y])) === samplePositions,
     'Tidy up keeps the freshly loaded sample layout stable');
+  store.change('saved arrow edits', (p) => {
+    Object.values(p.connections).forEach((c) => A.Model.updateConnection(p, c.id, {
+      waypoints: [{ x: -500, y: 900 }],
+      sourceAnchor: { side: 'top', offset: 0.2 }, targetAnchor: { side: 'bottom', offset: 0.8 }
+    }));
+  });
+  const savedArrows = JSON.stringify(store.project.connections);
+  const arrowPositions = JSON.stringify(store.project.nodes);
+  doc.querySelector('[data-action="tidy-arrows"]').click();
+  await pause();
+  check(Object.values(store.project.connections).every((c) => !c.waypoints.length && !c.sourceAnchor && !c.targetAnchor),
+    'Tidy arrows clears saved bends and attachments via the toolbar');
+  check(JSON.stringify(store.project.nodes) === arrowPositions, 'Tidy arrows leaves resource positions untouched');
+  store.undo();
+  check(JSON.stringify(store.project.connections) === savedArrows, 'One undo restores all saved arrow routing');
   return results;
 }
 

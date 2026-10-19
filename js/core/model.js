@@ -450,6 +450,20 @@
     return c;
   }
 
+  /** Return all arrows to automatic routing without changing their endpoints or resources. */
+  function resetConnectionRoutes(project) {
+    let count = 0;
+    Object.values(project.connections).forEach((c) => {
+      if (!(c.waypoints && c.waypoints.length) && !c.sourceAnchor && !c.targetAnchor) return;
+      c.waypoints = [];
+      c.sourceAnchor = null;
+      c.targetAnchor = null;
+      count++;
+    });
+    if (count) touch(project);
+    return count;
+  }
+
   function removeConnections(project, ids) {
     let n = 0;
     (ids || []).forEach((id) => {
@@ -838,6 +852,7 @@
     reparent,
     addConnection,
     updateConnection,
+    resetConnectionRoutes,
     removeConnections,
     extract,
     paste,
