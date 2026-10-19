@@ -64,8 +64,13 @@
       while (symbols.has(symbol)) symbol = baseSymbol + 'c' + (++collision);
       symbols.add(symbol); ids.set(n.id, symbol);
     });
-    const warn = (n, text) => warnings.push(ids.get(n.id) + ' (' + n.type + '): ' + text);
     const nameOf = (n) => A.Naming ? A.Naming.resolveName(project, n) : n.name;
+    const warn = (n, text) => {
+      const name = [nameOf(n), n.label].find((value) =>
+        typeof value === 'string' && value.trim() && !credentialValue.test(value));
+      const fallback = A.Catalog.get(n.type);
+      warnings.push((name || (fallback && fallback.label) || 'Unnamed resource') + ': ' + text);
+    };
     const ancestor = (n, type) => {
       const seen = new Set();
       while (n && !seen.has(n.id)) {

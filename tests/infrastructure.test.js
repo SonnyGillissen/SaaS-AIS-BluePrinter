@@ -295,7 +295,7 @@ test('catalog naming restrictions omit invalid resource-name values and persist 
   const instructions = out.files.find((f) => f.name.endsWith('.instructions.txt')).content;
   assert.equal(out.warnings.filter((warning) => warning.includes('fails catalog naming restrictions')).length, 3);
   out.warnings.forEach((warning) => assert.ok(instructions.includes(warning)));
-  assert.ok(!instructions.includes('BAD NAME?'));
+  assert.ok(instructions.includes('BAD NAME?: Resource name fails catalog naming restrictions:'));
 });
 
 test('unsupported objects, unscoped resources, ignored settings and security features warn explicitly', () => {
@@ -327,6 +327,37 @@ test('unknown credentials, custom values and sensitive tags never enter deployme
   assert.match(out.warnings.join('\n'), /sensitive/);
   assert.match(out.warnings.join('\n'), /Custom properties are not exported/);
   assert.equal(value(out, out.template.resources[0].tags).team, 'integration');
+});
+
+test('export warnings identify resources by resolved names instead of internal symbols', () => {
+  const { project, rg, nodes } = smallProject(A, ['service-bus-namespace', 'api-management']);
+  nodes[0].nameMode = 'custom';
+  nodes[0].name = 'sb-orders-production';
+  nodes[1].nameMode = 'custom';
+  nodes[1].name = 'apim-orders-production';
+  rg.nameMode = 'custom';
+  rg.name = 'rg-orders-production';
+  const out = arm(project);
+  assert.ok(out.warnings.some((warning) => warning.startsWith('sb-orders-production: ')));
+  assert.ok(out.warnings.some((warning) => warning.startsWith('apim-orders-production: Skipped:')));
+  assert.ok(out.warnings.some((warning) => warning.startsWith('rg-orders-production: ')));
+  assert.ok(out.warnings.every((warning) => !/^r\d+ \(/.test(warning)));
+  const instructions = out.files.find((file) => file.name.endsWith('.instructions.txt')).content;
+  out.warnings.forEach((warning) => assert.ok(instructions.includes(warning)));
+});
+
+test('warning names use safe labels or resource types when names are missing or sensitive', () => {
+  const { project, nodes } = smallProject(A, ['api-management']);
+  const node = nodes[0];
+  node.nameMode = 'custom';
+  node.name = '';
+  node.label = 'Orders API';
+  assert.ok(arm(project).warnings.some((warning) => warning.startsWith('Orders API: Skipped:')));
+  node.name = 'AccountKey=DO_NOT_INCLUDE_IN_WARNINGS';
+  node.label = node.name;
+  const out = arm(project);
+  assert.ok(out.warnings.some((warning) => warning.startsWith('API Management: Skipped:')));
+  assert.ok(out.files.every((file) => !file.content.includes('DO_NOT_INCLUDE_IN_WARNINGS')));
 });
 
 test('missing required SKU, location, names or CIDRs have no fabricated values', () => {

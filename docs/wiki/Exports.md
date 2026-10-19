@@ -32,6 +32,7 @@ format and all resource groups. Extract the ZIP before deploying. ZIPs are creat
 in your browser without uploading files. Individual file download buttons remain available.
 Download the template and its parameter file into the same directory. Review every note:
 unsupported resources and settings are not silently converted into deployment instructions.
+Warnings identify resources by their resolved diagram names rather than internal identifiers.
 
 ### Export coverage
 
