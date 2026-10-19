@@ -70,6 +70,16 @@
         h('p', { text: 'Review the notes before downloading. Each resource group has separate deployment files. Deploy to the matching existing subscription and resource group; hierarchy containers are not provisioned.' }),
         h('p', { text: 'Download every file for the desired group into the same folder. Edit the parameter file, supply required values, and validate with Azure tooling before deployment. No diagram metadata is embedded.' }),
         h('ul', {}, result.warnings.map((note) => h('li', { text: note }))),
+        result.files.length ? h('p', {}, h('button', {
+          type: 'button', class: 'btn primary', 'data-icon': 'export', text: 'Download all as ZIP',
+          onclick: () => {
+            try {
+              download(AISBP.Zip.create(result.files), name + '-' + format + '.zip', 'application/zip');
+            } catch (e) {
+              toast('ZIP export failed: ' + e.message, 'error');
+            }
+          }
+        })) : null,
         result.files.length ? h('div', {}, result.files.map((file) => h('p', {}, h('button', {
           type: 'button', class: 'btn', 'data-icon': 'export', text: file.name,
           onclick: () => download(file.content, file.name, file.mime)

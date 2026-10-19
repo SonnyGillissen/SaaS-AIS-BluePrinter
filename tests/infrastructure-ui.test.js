@@ -101,6 +101,10 @@ test('infrastructure downloads require individual clicks and warnings use text n
   }
   collect(dialog.body);
   assert.ok(nodes.some((node) => node.attrs && node.attrs.text === '<img src=x onerror=alert(1)>'));
-  nodes.find((node) => node.tag === 'button').attrs.onclick();
+  nodes.find((node) => node.tag === 'button' && node.attrs.text === 'test.bicep').attrs.onclick();
   assert.equal(downloads[0][1], 'test.bicep');
+  nodes.find((node) => node.tag === 'button' && node.attrs.text === 'Download all as ZIP').attrs.onclick();
+  assert.match(downloads[1][1], /-bicep\.zip$/);
+  assert.equal(downloads[1][2], 'application/zip');
+  assert.equal(new DataView(downloads[1][0].buffer).getUint32(0, true), 0x04034b50);
 });

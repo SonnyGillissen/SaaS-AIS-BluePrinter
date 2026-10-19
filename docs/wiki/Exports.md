@@ -25,7 +25,11 @@ markers are left out.
 ## Infrastructure export and import
 
 **Bicep infrastructure** and **ARM infrastructure** export deployment definitions, not pictures.
-The download dialog lists limitations and offers a separate download button for each file.
+These actions are grouped at the bottom of the Export menu, below a divider.
+The download dialog lists limitations and offers **Download all as ZIP**, containing every
+deployment template, parameter file, scope manifest and instructions file for the selected
+format and all resource groups. Extract the ZIP before deploying. ZIPs are created locally
+in your browser without uploading files. Individual file download buttons remain available.
 Download the template and its parameter file into the same directory. Review every note:
 unsupported resources and settings are not silently converted into deployment instructions.
 

@@ -77,6 +77,11 @@ async function browserChecks() {
   const exportMenuButton = doc.querySelector('[data-action="export-menu"]');
   exportMenuButton.click();
   const submenuActions = Array.from(doc.querySelectorAll('.menu-list [role="menuitem"]'));
+  const infrastructureActions = submenuActions.slice(-2);
+  check(infrastructureActions[0].dataset.action === 'export-bicep' &&
+    infrastructureActions[1].dataset.action === 'export-arm' &&
+    infrastructureActions[0].previousElementSibling.matches('hr[role="separator"]'),
+  'Infrastructure exports are last in the menu behind a divider');
   check(submenuActions.length === 8 && submenuActions.every((button) => {
     const labelStyle = win.getComputedStyle(button.querySelector('.action-label'));
     return labelStyle.position !== 'absolute' && labelStyle.clipPath === 'none' && button.querySelector('.action-label').getBoundingClientRect().width > 1 && win.getComputedStyle(button.querySelector('.action-icon')).marginRight === '6px';

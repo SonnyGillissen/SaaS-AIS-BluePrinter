@@ -32,8 +32,6 @@
           <button type="button" data-action="export-menu" data-icon="export" aria-haspopup="true" aria-expanded="false" title="Export">Export &#9662;</button>
           <div class="menu-list" role="menu" hidden>
             <button type="button" role="menuitem" data-action="export-json" data-icon="code">Configuration package (.json)</button>
-            <button type="button" role="menuitem" data-action="export-bicep" data-icon="code">Bicep infrastructure</button>
-            <button type="button" role="menuitem" data-action="export-arm" data-icon="code">ARM infrastructure (.json)</button>
             <hr>
             <button type="button" role="menuitem" data-action="export-png" data-icon="image">PNG image</button>
             <button type="button" role="menuitem" data-action="export-pdf" data-icon="document">PDF document</button>
@@ -41,6 +39,9 @@
             <hr>
             <button type="button" role="menuitem" data-action="export-drawio" data-icon="diagram">draw.io / diagrams.net (.drawio)</button>
             <button type="button" role="menuitem" data-action="export-archimate" data-icon="diagram">ArchiMate exchange format (.xml)</button>
+            <hr role="separator">
+            <button type="button" role="menuitem" data-action="export-bicep" data-icon="code">Bicep infrastructure</button>
+            <button type="button" role="menuitem" data-action="export-arm" data-icon="code">ARM infrastructure (.json)</button>
           </div>
         </div>
       </div>
@@ -159,6 +160,7 @@
   <script src="js/export/package.js"></script>
   <script src="js/export/infrastructure.js"></script>
   <script src="js/export/embedded.js"></script>
+  <script src="js/export/zip.js"></script>
   <script src="js/export/drawio.js"></script>
   <script src="js/export/archimate.js"></script>
   <script src="js/export/raster.js"></script>
