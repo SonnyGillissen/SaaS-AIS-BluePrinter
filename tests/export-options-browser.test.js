@@ -77,7 +77,7 @@ async function browserChecks() {
   const exportMenuButton = doc.querySelector('[data-action="export-menu"]');
   exportMenuButton.click();
   const submenuActions = Array.from(doc.querySelectorAll('.menu-list [role="menuitem"]'));
-  check(submenuActions.length === 6 && submenuActions.every((button) => {
+  check(submenuActions.length === 8 && submenuActions.every((button) => {
     const labelStyle = win.getComputedStyle(button.querySelector('.action-label'));
     return labelStyle.position !== 'absolute' && labelStyle.clipPath === 'none' && button.querySelector('.action-label').getBoundingClientRect().width > 1 && win.getComputedStyle(button.querySelector('.action-icon')).marginRight === '6px';
   }), 'Export submenu retains visible labels and icon spacing while toolbar labels are hidden');
