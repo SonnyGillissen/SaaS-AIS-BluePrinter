@@ -55,6 +55,23 @@ test('native blueprint imports still use the embedded package reader', async () 
   assert.equal(result.project.meta.id, project.meta.id);
 });
 
+test('ARM imports arrange sibling resources for immediate canvas use', () => {
+  const result = AISBP.Infrastructure.importTemplate({
+    $schema: 'https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#',
+    contentVersion: '1.0.0.0',
+    resources: ['first', 'second'].map((name) => ({
+      type: 'Microsoft.Network/networkSecurityGroups', apiVersion: '2023-11-01',
+      name, location: 'westeurope', properties: {}
+    }))
+  });
+  const siblings = Object.values(result.project.nodes).filter((node) => node.type === 'nsg');
+  assert.equal(siblings.length, 2);
+  const geometry = AISBP.Layout.compute(result.project);
+  const [first, second] = siblings.map((node) => geometry.rects[node.id]);
+  assert.ok(first.x + first.w <= second.x || second.x + second.w <= first.x ||
+    first.y + first.h <= second.y || second.y + second.h <= first.y);
+});
+
 test('infrastructure downloads require individual clicks and warnings use text nodes', async () => {
   const downloads = [];
   let dialog;

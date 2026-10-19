@@ -552,6 +552,7 @@
     if (template.outputs) warn('Template outputs are not imported or executed.');
     if (template.functions) warn('User-defined ARM functions are unsupported and are not executed.');
     if (template.languageVersion) warn('Advanced ARM language features are not fully supported.');
+    A.Layout.autoLayout(project);
     return { project, warnings };
   }
   A.Infrastructure = { exportProject, importTemplate, isTemplate };
