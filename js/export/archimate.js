@@ -69,6 +69,7 @@
     nodes.forEach((node) => {
       const def = Catalog.get(node.type);
       const r = g.rects[node.id];
+      const attributes = Model.effectiveAttributes(project, node.id);
       let props = prop('Azure type', def ? def.label : node.type);
       if (def && def.annotation) {
         props += prop('Annotation content', AISBP.Annotations.plainText(node));
@@ -76,7 +77,7 @@
       }
       if (def && def.provider) props += prop('Resource provider', def.provider);
       (def ? def.attributes : []).forEach((a) => {
-        const v = Layout.formatValue(a, node.attributes[a.key]);
+        const v = Layout.formatValue(a, attributes[a.key]);
         if (v && a.key !== 'description') props += prop(a.label, v);
       });
       const links = Layout.networkLabel(project, node);

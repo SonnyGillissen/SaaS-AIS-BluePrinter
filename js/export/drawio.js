@@ -70,9 +70,10 @@
     const def = Catalog.get(node.type);
     let s = ' azureType="' + esc(def ? def.label : node.type) + '"';
     if (def && def.provider) s += ' resourceProvider="' + esc(def.provider) + '"';
-    Object.keys(node.attributes || {}).forEach((k) => {
+    const attributes = Model.effectiveAttributes(project, node.id);
+    Object.keys(attributes).forEach((k) => {
       if (RESERVED.has(k) || !/^[A-Za-z_][A-Za-z0-9_.-]*$/.test(k)) return;
-      const v = node.attributes[k];
+      const v = attributes[k];
       if (v === '' || v === undefined || v === '(inherit)') return;
       s += ' ' + k + '="' + esc(v) + '"';
     });

@@ -104,8 +104,13 @@
         }
         case 'textarea':
           return field(attr.label, textArea(id, value, set), { eye: eye(node, attr.key) });
-        default:
-          return field(attr.label, textInput(id, value, set), { eye: eye(node, attr.key) });
+        default: {
+          const inherited = attr.tenantSource && Model.inheritedTenantAttributes(store.project, node.id)[attr.key];
+          return field(attr.label, textInput(id, value, set, { placeholder: inherited ? '(inherit: ' + inherited + ')' : '' }), {
+            eye: eye(node, attr.key),
+            help: inherited ? 'Inherited from Azure Tenant: ' + inherited + '. Leave blank to inherit; enter a value to override.' : ''
+          });
+        }
       }
     }
 

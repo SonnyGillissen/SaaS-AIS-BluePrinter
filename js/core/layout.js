@@ -84,8 +84,9 @@
     if (level === 'high') return [];
     const def = Catalog.get(node.type);
     const out = [];
+    const attributes = Model.effectiveAttributes(project, node.id);
     (def ? def.attributes : []).forEach((attr) => {
-      const value = formatValue(attr, node.attributes ? node.attributes[attr.key] : undefined);
+      const value = formatValue(attr, attributes[attr.key]);
       if (!value) return;
       if (level === 'detailed' || isAttributeShown(project, node, attr.key)) out.push({ key: attr.key, label: attr.label.replace(/\s*\(.*\)$/, ''), value });
     });

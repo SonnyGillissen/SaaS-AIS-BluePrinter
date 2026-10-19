@@ -104,6 +104,27 @@ test('Key Vault tenant and mapped settings round-trip through ARM import', () =>
   assert.ok(Object.values(again.parameters.parameters).some((p) => p.value === tenantId));
 });
 
+test('ARM and Bicep use effective Key Vault tenant IDs without deploying tenant context elsewhere', () => {
+  const { project, sub, nodes: [vault] } = smallProject(A, ['key-vault']);
+  const tenantId = '12345678-1234-1234-1234-123456789abc';
+  const otherId = '87654321-4321-4321-4321-cba987654321';
+  const tenant = Model.addNode(project, 'azure-tenant', null, {
+    attributes: { tenantId, primaryDomain: 'tenant.example' }
+  });
+  Model.reparent(project, sub.id, tenant.id);
+  for (const ownId of ['', ' ', '(inherit)', otherId]) {
+    Model.updateNode(project, vault.id, { attributes: { tenantId: ownId } });
+    for (const format of ['arm', 'bicep']) {
+      const out = I.exportProject(project, format);
+      const parameters = JSON.parse(out.files.find((f) => f.name.endsWith('.parameters.json')).content).parameters;
+      const entry = Object.entries(parameters).find(([key]) => key.endsWith('_tenantId'));
+      assert.equal(entry[1].value, ownId === otherId ? otherId : tenantId);
+      assert.ok(out.files.every((f) => !f.content.includes('tenant.example')));
+      assert.ok(!out.warnings.some((w) => /not mapped.*tenantDomain|tenantDomain.*not mapped/.test(w)));
+    }
+  }
+});
+
 test('Key Vault access policies are required explicitly and cannot be invented from custom data', () => {
   const { project, nodes } = smallProject(A, ['key-vault']);
   Object.assign(nodes[0].attributes, { rbacAuthorization: 'false', purgeProtection: false, publicNetworkAccess: 'Enabled' });

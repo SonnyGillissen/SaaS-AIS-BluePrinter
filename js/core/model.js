@@ -229,6 +229,33 @@
     return '';
   }
 
+  /** Tenant defaults for applicable attributes, resolved from the containing Azure Tenant. */
+  function inheritedTenantAttributes(project, id) {
+    const node = getNode(project, id);
+    const def = node && Catalog.get(node.type);
+    const tenant = node && ancestors(project, id).find((a) => a.type === 'azure-tenant');
+    const out = {};
+    if (!def || !tenant) return out;
+    def.attributes.forEach((attr) => {
+      if (!attr.tenantSource) return;
+      const value = (tenant.attributes || {})[attr.tenantSource];
+      if (typeof value === 'string' && value.trim() && value !== '(inherit)') out[attr.key] = value;
+    });
+    return out;
+  }
+
+  /** Resolve tenant defaults without materializing them in the saved node attributes. */
+  function effectiveAttributes(project, id) {
+    const node = getNode(project, id);
+    const out = Object.assign({}, node && node.attributes);
+    const inherited = inheritedTenantAttributes(project, id);
+    Object.keys(inherited).forEach((key) => {
+      const own = out[key];
+      if (own === undefined || own === null || (typeof own === 'string' && (!own.trim() || own === '(inherit)'))) out[key] = inherited[key];
+    });
+    return out;
+  }
+
   /** Valid manual container size (see node.w / node.h). */
   const validSize = (v) => Number.isFinite(v) && v > 0 && v <= 100000;
 
@@ -820,6 +847,8 @@
   }
 
   AISBP.Model = {
+    inheritedTenantAttributes,
+    effectiveAttributes,
     FORMAT,
     VERSION,
     CONNECTION_KINDS,

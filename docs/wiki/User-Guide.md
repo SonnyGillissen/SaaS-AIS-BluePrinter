@@ -29,6 +29,16 @@ Management groups and subscriptions can also be placed directly at the top level
 systems, on-premises systems and users can be placed at the top level or inside an Azure Tenant. The
 [Resource catalog](Resource-Catalog.md) lists which parents each type accepts.
 
+Set **Tenant ID** and **Primary domain** on an Azure Tenant to provide defaults for all Azure
+management groups, subscriptions, resource groups and resources below it, including nested child
+resources. Their **Tenant ID** and **Tenant domain** fields inherit these values when blank;
+the properties panel shows the inherited defaults. Enter an explicit value to override a field,
+or clear it to resume inheritance. External objects and annotations do not inherit tenant fields.
+Inherited values update when the tenant changes or an object moves to another tenant; they are
+not copied into each object's saved attributes. Use the eye toggles to show them on the diagram.
+Draw.io and ArchiMate include the resolved values as metadata. Infrastructure exports use the
+Tenant ID where required (such as Key Vault), not as an extra ARM property on unrelated resources.
+
 There are several ways to add objects:
 
 - **Click** a palette item. It's added to the selected object, the nearest container of the

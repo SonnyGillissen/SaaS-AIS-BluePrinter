@@ -927,6 +927,16 @@
     const seen = new Set(own.map((a) => a.key));
     // Common attributes come first, but an own attribute with the same key wins.
     t.attributes = common.filter((a) => !seen.has(a.key)).concat(own);
+    if (t.azure) {
+      [
+        text('tenantId', 'Tenant ID', { tenantSource: 'tenantId' }),
+        text('tenantDomain', 'Tenant domain', { tenantSource: 'primaryDomain' })
+      ].forEach((attr) => {
+        const existing = t.attributes.find((a) => a.key === attr.key);
+        if (existing) existing.tenantSource = attr.tenantSource;
+        else t.attributes.push(attr);
+      });
+    }
   });
 
   /** @returns {object|undefined} the type definition. */
