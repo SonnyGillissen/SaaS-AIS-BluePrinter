@@ -262,10 +262,13 @@
       const c = project.connections[id];
       if (!rects[c.from] || !rects[c.to] || rects[c.from].hidden || rects[c.to].hidden) return;
       Model.cleanWaypoints(c.waypoints).forEach((pt) => boundsRects.push({ x: pt.x, y: pt.y, w: 0, h: 0 }));
-      // Fixed edge normals may require detours outside the node/waypoint bounds.
-      if (diagram.connector === 'orthogonal' && (c.sourceAnchor || c.targetAnchor) && AISBP.Render) {
-        const path = AISBP.Render.connectorPath(rects[c.from], rects[c.to], diagram.connector, c.waypoints, c.sourceAnchor, c.targetAnchor);
-        path.vertices.forEach((pt) => boundsRects.push({ x: pt.x, y: pt.y, w: 0, h: 0 }));
+      // Automatic obstacle avoidance and fixed anchors may route outside the node bounds.
+      if (diagram.connector === 'orthogonal' && AISBP.Render && AISBP.Render.connectionPath) {
+        const path = AISBP.Render.connectionPath(project, c, { rects });
+        if (path) {
+          path.vertices.forEach((pt) => boundsRects.push({ x: pt.x, y: pt.y, w: 0, h: 0 }));
+          if (path.labelBounds) boundsRects.push(path.labelBounds);
+        }
       }
     });
     return { rects, bounds: boundsOf(boundsRects), names: nm, childIndex };
@@ -393,14 +396,43 @@
     // the subtree of the node being placed is measured (sizes only depend on the subtree).
     const childIndex = compute(project, names).childIndex;
     const measure = (node) => compute(project, names, { root: node.id, childIndex }).rects[node.id];
+    const flowOrder = (kids) => {
+      const owner = new Map();
+      kids.forEach((kid) => {
+        owner.set(kid.id, kid.id);
+        Model.descendants(project, kid.id).forEach((node) => owner.set(node.id, kid.id));
+      });
+      const edges = new Map(kids.map((kid) => [kid.id, new Set()]));
+      const incoming = new Map(kids.map((kid) => [kid.id, 0]));
+      Object.values(project.connections).forEach((c) => {
+        if (!['flow', 'trigger'].includes(c.kind) || c.direction === 'bidirectional') return;
+        const from = owner.get(c.from), to = owner.get(c.to);
+        if (!from || !to || from === to || edges.get(from).has(to)) return;
+        edges.get(from).add(to);
+        incoming.set(to, incoming.get(to) + 1);
+      });
+      const pending = kids.slice(), ordered = [];
+      while (pending.length) {
+        // Cycles keep their creation order instead of making tidy-up unstable.
+        let index = pending.findIndex((kid) => incoming.get(kid.id) === 0);
+        if (index < 0) index = 0;
+        const kid = pending.splice(index, 1)[0];
+        ordered.push(kid);
+        edges.get(kid.id).forEach((id) => incoming.set(id, incoming.get(id) - 1));
+      }
+      return { kids: ordered, connected: Array.from(edges.values()).some((set) => set.size) };
+    };
     const layoutChildren = (parentId, originX, originY, headerH) => {
-      const kids = Model.children(project, parentId);
+      const flow = flowOrder(Model.children(project, parentId));
+      const kids = flow.kids;
+      // Keep root-level producers, the Azure hierarchy and consumers in one flow row.
+      const rowWidth = !parentId && flow.connected ? Infinity : maxRowWidth;
       let cx = originX;
       let cy = originY + headerH;
       let rowH = 0;
       kids.forEach((kid) => {
         const size = place(kid, cx, cy);
-        if (cx > originX && cx + size.w - originX > maxRowWidth) {
+        if (cx > originX && cx + size.w - originX > rowWidth) {
           // wrap to the next row
           Model.moveNodes(project, [kid.id], originX - cx, rowH + GAP_Y);
           cy += rowH + GAP_Y;

@@ -22,7 +22,9 @@
   const storage = Storage.create(config);
 
   function newProject(sample) {
-    return Model.createProject({ name: sample ? 'Sample integration landing zone' : 'New integration blueprint', settings: Model.sanitizeSettings(config.defaults || {}), sample });
+    const project = Model.createProject({ name: sample ? 'Sample integration landing zone' : 'New integration blueprint', settings: Model.sanitizeSettings(config.defaults || {}), sample });
+    if (sample) Layout.autoLayout(project);
+    return project;
   }
 
   const store = Store.createStore(newProject(false));
@@ -270,7 +272,7 @@
     },
 
     loadSample() {
-      store.change('sample', (p) => { Model.addSample(p); });
+      store.change('sample', (p) => { Model.addSample(p); Layout.autoLayout(p); });
       root.requestAnimationFrame(() => canvas.fit());
     },
 

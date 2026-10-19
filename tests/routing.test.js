@@ -60,7 +60,7 @@ test('routing bounds and diagram exports include edited points, without editor h
   assert.ok(document.svg.includes('marker-start=') && document.svg.includes('marker-end='));
   assert.ok(!document.svg.includes('data-handle='));
   const drawio = DrawIo.toDrawio(project, { embedDiagram: false });
-  assert.ok(drawio.includes('<Array as="points"><mxPoint x="' + (-200 - g.bounds.x + 40) + '" y="' + (900 - g.bounds.y + 40) + '"/>'));
+  assert.ok(drawio.includes('<mxPoint x="' + (-200 - g.bounds.x + 40) + '" y="' + (900 - g.bounds.y + 40) + '"/>'));
   const archimate = ArchiMate.toArchiMate(project, { embedDiagram: false });
   assert.ok(archimate.includes('<bendpoint x="' + Math.round(-200 + 20 - g.bounds.x) + '" y="' + Math.round(900 + 20 - g.bounds.y) + '"/>'));
 });
@@ -370,4 +370,185 @@ test('anchored detours are included in fit and export bounds', () => {
     assert.ok(p.y >= g.bounds.y && p.y <= g.bounds.y + g.bounds.h);
   }
   assert.ok(Render.renderDocument(project, { margin: 0, embedDiagram: false }).svg.includes('d="' + route.d + '"'));
+});
+
+function assertAvoids(route, obstacles) {
+  for (let i = 1; i < route.vertices.length; i++) {
+    const p = route.vertices[i - 1], q = route.vertices[i];
+    for (const r of obstacles) {
+      const crosses = p.x === q.x ?
+        p.x > r.x && p.x < r.x + r.w && Math.max(p.y, q.y) > r.y && Math.min(p.y, q.y) < r.y + r.h :
+        p.y > r.y && p.y < r.y + r.h && Math.max(p.x, q.x) > r.x && Math.min(p.x, q.x) < r.x + r.w;
+      assert.ok(!crosses, 'Route avoids obstacle interior: ' + JSON.stringify(r));
+    }
+  }
+}
+
+function assertLabelClear(route, obstacles) {
+  const label = route.labelBounds;
+  assert.ok(label);
+  for (const r of obstacles) {
+    assert.ok(label.x + label.w <= r.x || label.x >= r.x + r.w ||
+      label.y + label.h <= r.y || label.y >= r.y + r.h, 'Label is not underneath a resource or header');
+  }
+}
+
+function routingScene(rectangles) {
+  const project = Model.createProject();
+  const rects = {};
+  rectangles.forEach((r, i) => { rects[String(i)] = Object.assign({ id: String(i) }, r); });
+  const connection = { from: '0', to: '1', label: '', attributes: {}, waypoints: [] };
+  return { project, connection, geometry: { rects } };
+}
+
+test('tidied sample avoids Logic App headers, the queue and obscured send-order labels', () => {
+  const project = Model.createProject({ sample: true });
+  Layout.autoLayout(project);
+  const before = JSON.stringify(project);
+  const geometry = Layout.compute(project);
+  for (const c of Object.values(project.connections)) {
+    const path = Render.connectionPath(project, c, geometry);
+    const blocks = Object.values(geometry.rects).filter((r) => !r.hidden && r.w).map((r) =>
+      Object.assign({}, r, { h: r.container ? r.headerH : r.h }));
+    assertAvoids(path, blocks.filter((r) => r.id !== c.from && r.id !== c.to));
+    assertLabelClear(path, blocks);
+    assertOrthogonalRoute(Object.assign({ handles: [] }, path), []);
+    assert.deepEqual(Render.connectionPath(project, c, geometry), path, 'Routing is deterministic');
+    assert.ok(Render.renderDocument(project, { embedDiagram: false }).svg.includes('d="' + path.d + '"'));
+    if (c.label === 'send order') {
+      assert.equal(path.labelText, 'send order \u00b7 AMQP');
+      assert.equal(path.labelWidth, path.labelText.length * 5.8 + 10);
+    }
+  }
+  assert.equal(JSON.stringify(project), before, 'Automatic routes never become user waypoints or anchors');
+});
+
+test('automatic attachment selection can change sides instead of crossing endpoint interiors', () => {
+  for (const sx of [-1, 1]) for (const sy of [-1, 1]) {
+    const mirror = (r) => ({ x: sx < 0 ? -r.x - r.w : r.x, y: sy < 0 ? -r.y - r.h : r.y, w: r.w, h: r.h });
+    const rectangles = [{ x: 0, y: 0, w: 100, h: 100 }, { x: 50, y: 10, w: 100, h: 100 }].map(mirror);
+    const { project, connection, geometry } = routingScene(rectangles);
+    const path = Render.connectionPath(project, connection, geometry);
+    assertAvoids(path, rectangles);
+    assertOrthogonalRoute(Object.assign({ handles: [] }, path), []);
+    assert.notEqual(path.d, Render.connectorPath(rectangles[0], rectangles[1], 'orthogonal').d);
+  }
+});
+
+test('visibility routing avoids unrelated leaves and headers while allowing container bodies', () => {
+  const { project, connection, geometry } = routingScene([
+    { x: 0, y: 100, w: 100, h: 100 },
+    { x: 700, y: 100, w: 100, h: 100 },
+    { x: 180, y: 60, w: 120, h: 180 },
+    { x: 380, y: 0, w: 120, h: 180 },
+    { x: 580, y: 100, w: 80, h: 100 },
+    { x: -40, y: -100, w: 900, h: 500, container: true, headerH: 70 },
+    { x: -50, y: -110, w: 920, h: 520, hidden: true }
+  ]);
+  const blocks = Object.values(geometry.rects).filter((r) => !r.hidden).map((r) =>
+    Object.assign({}, r, { h: r.container ? r.headerH : r.h }));
+  const path = Render.connectionPath(project, connection, geometry);
+  assertAvoids(path, blocks);
+  assertOrthogonalRoute(Object.assign({ handles: [] }, path), []);
+  assert.ok(path.vertices.every((p) => p.y > -30 && p.y < 400), 'Container body remains traversable');
+  geometry.rects['1'].hidden = true;
+  assert.equal(Render.connectionPath(project, connection, geometry), null);
+});
+
+test('obstacle detours retain fixed anchors and outward normals for every side pair', () => {
+  const { project, connection, geometry } = routingScene([
+    { x: 0, y: 0, w: 100, h: 100 },
+    { x: 500, y: 0, w: 100, h: 100 },
+    { x: 200, y: -80, w: 200, h: 260 }
+  ]);
+  for (const source of ['top', 'right', 'bottom', 'left']) for (const target of ['top', 'right', 'bottom', 'left']) {
+    connection.sourceAnchor = { side: source, offset: 0.3 };
+    connection.targetAnchor = { side: target, offset: 0.7 };
+    const path = Render.connectionPath(project, connection, geometry);
+    assert.deepEqual(path.start, Render.anchorPoint(geometry.rects['0'], connection.sourceAnchor));
+    assert.deepEqual(path.end, Render.anchorPoint(geometry.rects['1'], connection.targetAnchor));
+    assertAvoids(path, Object.values(geometry.rects));
+    assertOrthogonalRoute(Object.assign({ handles: [] }, path), []);
+    const normal = { top: [0, -1], right: [1, 0], bottom: [0, 1], left: [-1, 0] };
+    const first = path.vertices[1], last = path.vertices[path.vertices.length - 2];
+    assert.ok((first.x - path.start.x) * normal[source][0] + (first.y - path.start.y) * normal[source][1] > 0);
+    assert.ok((last.x - path.end.x) * normal[target][0] + (last.y - path.end.y) * normal[target][1] > 0);
+  }
+});
+
+test('scene routing keeps explicit waypoint geometry and editing handles unchanged', () => {
+  const { project, connection, geometry } = routingScene([
+    { x: 0, y: 0, w: 100, h: 100 },
+    { x: 500, y: 0, w: 100, h: 100 },
+    { x: 200, y: 100, w: 200, h: 200 }
+  ]);
+  connection.waypoints = Object.freeze([Object.freeze({ x: 300, y: 200 }), Object.freeze({ x: 450, y: 200 })]);
+  connection.sourceAnchor = { side: 'bottom', offset: 0.3 };
+  connection.label = 'Manual';
+  const expected = Render.connectorPath(geometry.rects['0'], geometry.rects['1'], 'orthogonal',
+    connection.waypoints, connection.sourceAnchor, connection.targetAnchor);
+  const actual = Render.connectionPath(project, connection, geometry);
+  assert.equal(actual.d, expected.d);
+  assert.deepEqual(actual.handles, expected.handles);
+  assertOrthogonalRoute(actual, connection.waypoints);
+});
+
+test('SVG, draw.io and ArchiMate serialize the same automatic route vertices', () => {
+  const project = Model.createProject();
+  const a = Model.addNode(project, 'external-system', null, { x: 0, y: 0 });
+  const b = Model.addNode(project, 'external-system', null, { x: 700, y: 0 });
+  Model.addNode(project, 'external-system', null, { x: 350, y: 0 });
+  const c = Model.addConnection(project, a.id, b.id, { label: 'Request', attributes: { protocol: 'HTTPS' } });
+  const geometry = Layout.compute(project);
+  const path = Render.connectionPath(project, c, geometry);
+  const drawio = DrawIo.toDrawio(project, { embedDiagram: false });
+  const archimate = ArchiMate.toArchiMate(project, { embedDiagram: false });
+  assert.ok(Render.renderDocument(project, { embedDiagram: false }).svg.includes('d="' + path.d + '"'));
+  for (const point of path.vertices.slice(1, -1)) {
+    assert.ok(drawio.includes('<mxPoint x="' + (point.x - geometry.bounds.x + 40) + '" y="' + (point.y - geometry.bounds.y + 40) + '"/>'));
+  }
+  for (const point of path.vertices) {
+    assert.ok(archimate.includes('<bendpoint x="' + Math.round(point.x + 20 - geometry.bounds.x) + '" y="' + Math.round(point.y + 20 - geometry.bounds.y) + '"/>'));
+  }
+  assert.ok(drawio.includes('source="n-' + a.id + '-route" target="n-' + b.id + '-route"'));
+  assert.ok(drawio.includes('edgeStyle=none;rounded=0;'));
+});
+
+test('large visibility grids fall back to deterministic obstacle-free channels', () => {
+  const rectangles = [{ x: 0, y: 0, w: 100, h: 100 }, { x: 2400, y: 0, w: 100, h: 100 }];
+  for (let i = 0; i < 180; i++) {
+    rectangles.push({ x: 200 + i * 9.1, y: -100 + (i % 20) * 37.3 + i * 0.01, w: 55 + i * 0.001, h: 60 + i * 0.002 });
+  }
+  const { project, connection, geometry } = routingScene(rectangles);
+  connection.label = 'Large scene';
+  const path = Render.connectionPath(project, connection, geometry);
+  assertOrthogonalRoute(Object.assign({ handles: [] }, path), []);
+  assertAvoids(path, rectangles);
+  assertLabelClear(path, rectangles);
+  assert.deepEqual(Render.connectionPath(project, connection, geometry), path);
+});
+
+test('draw.io resource groups move visible icons and attached routes together', () => {
+  const { project, rg, nodes } = smallProject(AISBP, ['function-app', 'key-vault']);
+  nodes[0].nameMode = 'custom';
+  nodes[0].name = 'Grouped function';
+  nodes[0].custom = [{ key: 'Owner', value: 'Integration team' }];
+  const c = Model.addConnection(project, nodes[0].id, nodes[1].id, { label: 'Read secret' });
+  const geometry = Layout.compute(project);
+  const xml = DrawIo.toDrawio(project, { embedDiagram: false });
+  for (const node of nodes) {
+    const id = 'n-' + node.id;
+    const group = xml.match(new RegExp('<object label="" id="' + id + '-route"[^>]*><mxCell style="group;"[^>]*>[\\s\\S]*?</mxCell></object>'));
+    const icon = xml.match(new RegExp('<object label="[^"]*" id="' + id + '"[^>]*><mxCell[^>]*>[\\s\\S]*?</mxCell></object>'));
+    assert.ok(group, 'Full-tile edge endpoint is a resource group');
+    assert.ok(group[0].includes('parent="n-' + rg.id + '"'), 'Group retains the Azure parent');
+    assert.ok(icon, 'Resource still has its labeled icon');
+    assert.ok(icon[0].includes('parent="' + id + '-route"'), 'Icon is a child of the edge endpoint, not an independent sibling');
+    assert.ok(icon[0].includes('movable=0;resizable=0;'), 'Icon cannot be moved independently of its resource group');
+    assert.ok(icon[0].includes('<mxGeometry x="' + (geometry.rects[node.id].w / 2 - Layout.ICON / 2) + '" y="10"'), 'Icon uses group-relative coordinates');
+  }
+  assert.equal((xml.match(/custom_Owner="Integration team"/g) || []).length, 1, 'Metadata belongs to the resource group, without duplicate tag or custom attributes');
+  assert.ok(xml.includes('Grouped function'));
+  assert.ok(xml.includes('id="e-' + c.id + '"'));
+  assert.ok(xml.includes('source="n-' + nodes[0].id + '-route" target="n-' + nodes[1].id + '-route"'));
 });

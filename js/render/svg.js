@@ -169,7 +169,7 @@
   }
 
   /** Compute a connection path, its label, editing handles and attachment positions. */
-  function connectorPath(a, b, kind, waypoints, sourceAnchor, targetAnchor) {
+  function connectorPath(a, b, kind, waypoints, sourceAnchor, targetAnchor, routing) {
     const source = Model.cleanAnchor(sourceAnchor);
     const target = Model.cleanAnchor(targetAnchor);
     let path;
@@ -181,9 +181,262 @@
       const pointRect = (r, anchor) => anchor ? Object.assign(anchorPoint(r, anchor), { w: 0, h: 0 }) : r;
       path = baseConnectorPath(pointRect(a, source), pointRect(b, target), kind, waypoints, !!(source || target));
     }
+    if (routing && kind === 'orthogonal') {
+      if (!Model.cleanWaypoints(waypoints).length) path = automaticRoute(a, b, source, target, routing, path);
+      path.label = routeLabel(path.vertices, routing.labelWidth || 0, routing.labelObstacles || routing.obstacles || []) || path.label;
+    }
     const numbers = path.d.match(/-?\d+(?:\.\d+)?(?:e[+-]?\d+)?/gi).map(Number);
     path.start = path.vertices ? path.vertices[0] : { x: numbers[0], y: numbers[1] };
     path.end = path.vertices ? path.vertices[path.vertices.length - 1] : { x: numbers[numbers.length - 2], y: numbers[numbers.length - 1] };
+    return path;
+  }
+
+  function crossesRect(p, q, r) {
+    return p.x === q.x ?
+      p.x > r.x && p.x < r.x + r.w && Math.max(p.y, q.y) > r.y && Math.min(p.y, q.y) < r.y + r.h :
+      p.y > r.y && p.y < r.y + r.h && Math.max(p.x, q.x) > r.x && Math.min(p.x, q.x) < r.x + r.w;
+  }
+
+  function compactRoute(vertices) {
+    const result = [];
+    vertices.forEach((p) => {
+      const last = result[result.length - 1];
+      if (last && last.x === p.x && last.y === p.y) return;
+      const prev = result[result.length - 2];
+      if (prev && ((prev.x === last.x && last.x === p.x) || (prev.y === last.y && last.y === p.y)) &&
+          (last.x - prev.x) * (p.x - last.x) + (last.y - prev.y) * (p.y - last.y) >= 0) result.pop();
+      result.push({ x: p.x, y: p.y });
+    });
+    return result;
+  }
+
+  /** A bounded visibility grid, searched once for all allowed endpoint sides. */
+  function automaticRoute(a, b, source, target, routing, fallback) {
+    const contains = (r, p) => p.x > r.x && p.x < r.x + r.w && p.y > r.y && p.y < r.y + r.h;
+    const blocks = (routing.obstacles || []).map((r) => ({ x: r.x - 10, y: r.y - 10, w: r.w + 20, h: r.h + 20 }));
+    const labelFits = (vertices) => !routing.labelWidth || !!routeLabel(vertices, routing.labelWidth, routing.labelObstacles || routing.obstacles || []);
+    // A container-to-descendant connection must be allowed to traverse its own body.
+    if (!a.container || !contains(a, center(b))) blocks.push(a);
+    if (!b.container || !contains(b, center(a))) blocks.push(b);
+    const clear = (p, q) => !blocks.some((r) => crossesRect(p, q, r));
+    if (fallback.vertices.slice(1).every((p, i) => clear(fallback.vertices[i], p)) && labelFits(fallback.vertices)) return fallback;
+    const sides = ['top', 'right', 'bottom', 'left'];
+    const ports = (r, anchor) => (anchor ? [anchor] : sides.map((side) => ({ side, offset: 0.5 }))).map((port) => {
+      const point = anchorPoint(r, port);
+      const dx = port.side === 'right' ? 1 : port.side === 'left' ? -1 : 0;
+      const dy = port.side === 'bottom' ? 1 : port.side === 'top' ? -1 : 0;
+      let length = 24;
+      blocks.forEach((block) => {
+        if (dx && point.y > block.y && point.y < block.y + block.h) {
+          const gap = dx > 0 ? block.x - point.x : point.x - block.x - block.w;
+          if (gap >= 0) length = Math.min(length, gap / 2);
+        }
+        if (dy && point.x > block.x && point.x < block.x + block.w) {
+          const gap = dy > 0 ? block.y - point.y : point.y - block.y - block.h;
+          if (gap >= 0) length = Math.min(length, gap / 2);
+        }
+      });
+      const stub = { x: point.x + dx * length, y: point.y + dy * length };
+      return { point, stub, length, direction: dx > 0 ? 0 : dy > 0 ? 1 : dx < 0 ? 2 : 3 };
+    }).filter((port) => clear(port.point, port.stub) && !blocks.some((r) => contains(r, port.stub)));
+    const starts = ports(a, source);
+    const ends = ports(b, target);
+    if (!starts.length || !ends.length) return fallback;
+    const all = starts.concat(ends).map((p) => p.stub);
+    const coordinates = (axis, size) => {
+      const values = all.map((p) => p[axis]);
+      blocks.forEach((r) => values.push(r[axis], r[axis] + r[size]));
+      values.push(Math.min(...values) - 24, Math.max(...values) + 24);
+      return Array.from(new Set(values)).sort((x, y) => x - y);
+    };
+    const xs = coordinates('x', 'w');
+    const ys = coordinates('y', 'h');
+    const width = xs.length;
+    const count = width * ys.length;
+    const xIndex = new Map(xs.map((x, i) => [x, i]));
+    const yIndex = new Map(ys.map((y, i) => [y, i]));
+    const index = (p) => yIndex.get(p.y) * width + xIndex.get(p.x);
+    let vertices;
+    if (count <= 90000) {
+      const horizontal = new Uint8Array(count);
+      const vertical = new Uint8Array(count);
+      blocks.forEach((r) => {
+        const left = xIndex.get(r.x), right = xIndex.get(r.x + r.w);
+        const top = yIndex.get(r.y), bottom = yIndex.get(r.y + r.h);
+        for (let y = top + 1; y < bottom; y++) for (let x = left; x < right; x++) horizontal[y * width + x] = 1;
+        for (let y = top; y < bottom; y++) for (let x = left + 1; x < right; x++) vertical[y * width + x] = 1;
+      });
+      const distances = new Float64Array(count * 4).fill(Infinity);
+      const previous = new Int32Array(count * 4).fill(-1);
+      const origin = new Int8Array(count * 4).fill(-1);
+      const heap = [];
+      const push = (id, cost) => {
+        let i = heap.length;
+        heap.push({ id, cost });
+        while (i) {
+          const parent = (i - 1) >> 1;
+          if (heap[parent].cost <= cost) break;
+          heap[i] = heap[parent];
+          i = parent;
+        }
+        heap[i] = { id, cost };
+      };
+      const pop = () => {
+        const first = heap[0], last = heap.pop();
+        if (heap.length) {
+          let i = 0;
+          while (i * 2 + 1 < heap.length) {
+            let child = i * 2 + 1;
+            if (child + 1 < heap.length && heap[child + 1].cost < heap[child].cost) child++;
+            if (heap[child].cost >= last.cost) break;
+            heap[i] = heap[child];
+            i = child;
+          }
+          heap[i] = last;
+        }
+        return first;
+      };
+      starts.forEach((p, i) => {
+        const id = index(p.stub) * 4 + p.direction;
+        if (p.length < distances[id]) {
+          distances[id] = p.length;
+          origin[id] = i;
+          push(id, p.length);
+        }
+      });
+      const goals = new Map();
+      ends.forEach((p, i) => {
+        const id = index(p.stub);
+        if (!goals.has(id)) goals.set(id, []);
+        goals.get(id).push(i);
+      });
+      let best = Infinity, finish = -1, endPort, geometricBest = Infinity, geometricRoute;
+      const trace = (id, port) => {
+        const result = [port.point];
+        const startPort = starts[origin[id]];
+        for (; id !== -1; id = previous[id]) {
+          const cell = id >> 2;
+          result.push({ x: xs[cell % width], y: ys[Math.floor(cell / width)] });
+        }
+        result.push(startPort.point);
+        return compactRoute(result.reverse());
+      };
+      while (heap.length) {
+        const current = pop();
+        if (current.cost !== distances[current.id]) continue;
+        if (current.cost > best) break;
+        const cell = current.id >> 2, direction = current.id % 4;
+        const x = cell % width, y = Math.floor(cell / width);
+        (goals.get(cell) || []).forEach((i) => {
+          const incoming = (ends[i].direction + 2) % 4;
+          if (ends[i].length && direction === ends[i].direction) return;
+          const cost = current.cost + ends[i].length + (direction === incoming ? 0 : 20);
+          const route = trace(current.id, ends[i]);
+          if (cost < geometricBest) { geometricBest = cost; geometricRoute = route; }
+          if (cost < best && labelFits(route)) { best = cost; finish = current.id; endPort = ends[i]; }
+        });
+        const visit = (next, nextDirection, length, blocked) => {
+          if (blocked || nextDirection === (direction + 2) % 4) return;
+          const id = next * 4 + nextDirection;
+          const cost = current.cost + length + (direction === nextDirection ? 0 : 20);
+          if (cost >= distances[id]) return;
+          distances[id] = cost;
+          previous[id] = current.id;
+          origin[id] = origin[current.id];
+          push(id, cost);
+        };
+        if (x) visit(cell - 1, 2, xs[x] - xs[x - 1], horizontal[cell - 1]);
+        if (x + 1 < width) visit(cell + 1, 0, xs[x + 1] - xs[x], horizontal[cell]);
+        if (y) visit(cell - width, 3, ys[y] - ys[y - 1], vertical[cell - width]);
+        if (y + 1 < ys.length) visit(cell + width, 1, ys[y + 1] - ys[y], vertical[cell]);
+      }
+      if (finish !== -1) {
+        vertices = trace(finish, endPort);
+      } else vertices = geometricRoute;
+    } else {
+      // Large diagrams use bounded channel candidates rather than allocating an unbounded grid.
+      let best = Infinity;
+      starts.forEach((s) => ends.forEach((t) => {
+        const consider = (middle) => {
+          const route = compactRoute([s.point, s.stub].concat(middle, [t.stub, t.point]));
+          if (!route.slice(1).every((p, i) => clear(route[i], p)) || !labelFits(route)) return;
+          if (route.slice(2).some((p, i) => (route[i + 1].x - route[i].x) * (p.x - route[i + 1].x) +
+              (route[i + 1].y - route[i].y) * (p.y - route[i + 1].y) < 0)) return;
+          const cost = route.slice(1).reduce((sum, p, i) => sum + Math.abs(p.x - route[i].x) + Math.abs(p.y - route[i].y) + 20, 0);
+          if (cost < best) { best = cost; vertices = route; }
+        };
+        xs.forEach((x) => consider([{ x, y: s.stub.y }, { x, y: t.stub.y }]));
+        ys.forEach((y) => consider([{ x: s.stub.x, y }, { x: t.stub.x, y }]));
+      }));
+    }
+    if (!vertices) return fallback;
+    vertices = compactRoute(vertices);
+    return {
+      d: vertices.map((p, i) => !i ? 'M' + p.x + ' ' + p.y : p.x === vertices[i - 1].x ? 'V' + p.y : 'H' + p.x).join(' '),
+      vertices,
+      label: fallback.label
+    };
+  }
+
+  /** Subtract blocked label intervals on each real segment, then prefer the route's middle. */
+  function routeLabel(vertices, width, obstacles) {
+    const lengths = vertices.slice(1).map((p, i) => Math.abs(p.x - vertices[i].x) + Math.abs(p.y - vertices[i].y));
+    const total = lengths.reduce((sum, n) => sum + n, 0);
+    let traversed = 0, best, bestScore = Infinity;
+    vertices.slice(1).forEach((q, i) => {
+      const p = vertices[i], length = lengths[i];
+      if (!length) return;
+      const horizontal = p.y === q.y;
+      const axis = horizontal ? 'x' : 'y';
+      const fixed = horizontal ? 'y' : 'x';
+      const low = Math.min(p[axis], q[axis]), high = Math.max(p[axis], q[axis]);
+      const half = horizontal ? width / 2 : 9;
+      const crossHalf = horizontal ? 9 : width / 2;
+      let intervals = [[low, high]];
+      obstacles.forEach((r) => {
+        const size = horizontal ? r.h : r.w;
+        if (p[fixed] + crossHalf <= r[fixed] || p[fixed] - crossHalf >= r[fixed] + size) return;
+        const start = r[axis] - half - 2;
+        const end = r[axis] + (horizontal ? r.w : r.h) + half + 2;
+        intervals = intervals.flatMap(([a, b]) => end <= a || start >= b ? [[a, b]] :
+          (start > a ? [[a, start]] : []).concat(end < b ? [[end, b]] : []));
+      });
+      const ideal = p[axis] + Math.sign(q[axis] - p[axis]) * (total / 2 - traversed);
+      // Prefer a label fitting within one straight segment over one straddling an elbow.
+      intervals.forEach(([a, b]) => {
+        const insetA = Math.max(a, low + half), insetB = Math.min(b, high - half);
+        const fits = insetA <= insetB;
+        const position = Math.max(fits ? insetA : a, Math.min(fits ? insetB : b, ideal));
+        const score = Math.abs(traversed + Math.abs(position - p[axis]) - total / 2) + (fits ? 0 : total + 1);
+        if (score < bestScore) {
+          bestScore = score;
+          best = horizontal ? { x: position, y: p.y } : { x: p.x, y: position };
+        }
+      });
+      traversed += length;
+    });
+    return best || null;
+  }
+
+  /** Shared scene-aware route used by the editor, bounds and all diagram exports. */
+  function connectionPath(project, c, geometry) {
+    const a = endRect(geometry, c.from), b = endRect(geometry, c.to);
+    if (!a || !b) return null;
+    const obstacles = [], labelObstacles = [];
+    Object.keys(geometry.rects).forEach((id) => {
+      const r = geometry.rects[id];
+      if (r.hidden || !r.w || !r.h) return;
+      const block = { x: r.x, y: r.y, w: r.w, h: r.container ? Math.min(r.h, r.headerH || Layout.HEADER) : r.h };
+      labelObstacles.push(block);
+      if (id !== c.from && id !== c.to) obstacles.push(block);
+    });
+    const labelText = Layout.truncate([c.label, c.attributes && c.attributes.protocol && c.attributes.protocol !== c.label ? c.attributes.protocol : ''].filter(Boolean).join(' \u00b7 '), 40);
+    const labelWidth = labelText && project.settings.diagram.showConnectionLabels !== false ? labelText.length * 5.8 + 10 : 0;
+    const path = connectorPath(a, b, project.settings.diagram.connector || 'orthogonal', c.waypoints, c.sourceAnchor, c.targetAnchor,
+      { obstacles, labelObstacles, labelWidth });
+    path.labelText = labelText;
+    path.labelWidth = labelWidth;
+    if (labelWidth) path.labelBounds = { x: path.label.x - labelWidth / 2, y: path.label.y - 9, w: labelWidth, h: 16 };
     return path;
   }
 
@@ -521,7 +774,7 @@
     const b = endRect(geometry, c.to);
     if (!a || !b) return '';
     const kind = Model.CONNECTION_KINDS.find((k) => k.id === c.kind) || Model.CONNECTION_KINDS[0];
-    const path = connectorPath(a, b, project.settings.diagram.connector || 'orthogonal', c.waypoints, c.sourceAnchor, c.targetAnchor);
+    const path = connectionPath(project, c, geometry);
     const selected = o.selection && o.selection.conns.has(c.id);
     const color = selected ? st.selection : st.edge;
     const p = o.idPrefix || '';
@@ -536,10 +789,9 @@
     s += '<title>' + esc(title) + '</title>';
     if (!o.forExport) s += '<path d="' + path.d + '" fill="none" stroke="transparent" stroke-width="12" class="hit"/>';
     s += '<path d="' + path.d + '" fill="none" stroke="' + color + '" stroke-width="' + (selected ? 2.5 : 1.6) + '"' + (kind.dashed ? ' stroke-dasharray="6 4"' : '') + markerEnd + markerStart + '/>';
-    const labelText = [c.label, c.attributes && c.attributes.protocol && c.attributes.protocol !== c.label ? c.attributes.protocol : ''].filter(Boolean).join(' \u00b7 ');
-    if (labelText && project.settings.diagram.showConnectionLabels !== false) {
-      const t = Layout.truncate(labelText, 40);
-      const w = t.length * 5.8 + 10;
+    if (path.labelWidth) {
+      const t = path.labelText;
+      const w = path.labelWidth;
       s += '<rect x="' + (path.label.x - w / 2) + '" y="' + (path.label.y - 9) + '" width="' + w + '" height="16" rx="3" fill="' + st.edgeLabelBg + '" opacity="0.92"/>';
       s += '<text x="' + path.label.x + '" y="' + (path.label.y + 3) + '" text-anchor="middle" font-size="10" fill="' + st.edgeText + '">' + esc(t) + '</text>';
     }
@@ -611,7 +863,7 @@
     return { svg: s, width, height };
   }
 
-  AISBP.Render = { STYLES, CONNECTORS, style, editorStyle, center, borderPoint, anchorPoint, nearestAnchor, connectorPath, defs, renderContent, renderDocument, background };
+  AISBP.Render = { STYLES, CONNECTORS, style, editorStyle, center, borderPoint, anchorPoint, nearestAnchor, connectorPath, connectionPath, defs, renderContent, renderDocument, background };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = AISBP.Render;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

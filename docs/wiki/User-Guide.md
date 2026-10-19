@@ -45,6 +45,10 @@ corner; it never shrinks below its contents. Drag objects to rearrange them. Whi
 container keeps its current boundary, so an object dropped anywhere inside its own container stays
 there; dropping it on another container moves it there (if allowed). **Tidy up** arranges
 everything automatically and resets manually resized containers to the size they need.
+It orders sibling groups by directed data flows and triggers where possible, keeping
+external producers to the left of the Azure hierarchy and consumers to the right.
+Cycles retain a deterministic order; this does not change the hierarchy or saved routing points.
+Loading the sample also applies this layout so resource sizes follow the current detail settings.
 
 ## Text blocks and tables
 
@@ -157,6 +161,11 @@ Connections start with an automatic route. To adjust a line or arrow afterward, 
 and drag one of its routing handles**. Small filled handles add points; larger outlined
 handles move existing points. You can add several points to route around objects, using any
 connector style (orthogonal, straight or curved).
+
+Automatic orthogonal routes avoid unrelated resource tiles and container headers where a
+clear path is available. Labels are placed on visible path segments rather than through
+resource tiles. Saved routing points and endpoint attachments remain under your control;
+use **Reset route** to return a manually routed connection to automatic routing.
 
 **Drag a square endpoint handle** (source or arrow end) to snap it to the nearest edge of
 its own object, without reconnecting to another object. The attachment is saved as an edge

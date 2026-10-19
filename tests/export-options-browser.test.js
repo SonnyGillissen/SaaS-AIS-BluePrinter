@@ -750,6 +750,21 @@ async function browserChecks() {
   annotationFrame.style.cssText = 'width:1440px;height:900px';
   await pause();
   check(win.getComputedStyle(doc.getElementById('resource-sidebar')).display === 'flex' && win.getComputedStyle(doc.getElementById('properties-sidebar')).display === 'flex' && win.getComputedStyle(doc.getElementById('main-toolbar')).display === 'flex', 'Desktop restores both sidebars and the full toolbar');
+  await A.app.actions.newProject(false);
+  doc.querySelector('[data-action="sample"]').click();
+  await pause();
+  const sampleRect = (type) => {
+    const node = Object.values(store.project.nodes).find((n) => n.type === type);
+    return A.Layout.compute(store.project).rects[node.id];
+  };
+  check(sampleRect('users').x + sampleRect('users').w < sampleRect('management-group').x &&
+    sampleRect('management-group').x + sampleRect('management-group').w < sampleRect('on-premises-system').x,
+  'Loading the sample places external participants on the correct sides of the integration flow');
+  const samplePositions = JSON.stringify(Object.values(store.project.nodes).map((n) => [n.x, n.y]));
+  doc.querySelector('[data-action="tidy"]').click();
+  await pause();
+  check(JSON.stringify(Object.values(store.project.nodes).map((n) => [n.x, n.y])) === samplePositions,
+    'Tidy up keeps the freshly loaded sample layout stable');
   return results;
 }
 
