@@ -701,6 +701,7 @@
       label: 'Key Vault', category: 'security', icon: I.keyVault, abbr: 'kv', provider: 'Microsoft.KeyVault/vaults',
       parents: RG, archimate: 'SystemSoftware', rule: R.keyVault,
       attributes: [
+        text('tenantId', 'Tenant ID'),
         select('sku', 'SKU', ['Standard', 'Premium'], { default: 'Standard', show: true }),
         bool('rbacAuthorization', 'Azure RBAC authorization', { default: true }),
         num('softDeleteRetentionDays', 'Soft-delete retention (days)', { default: 90 }),

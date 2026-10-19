@@ -4,6 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const os = require('node:os');
 const { spawnSync } = require('node:child_process');
 const { AISBP: A, smallProject } = require('./helpers');
 const { Infrastructure: I, Model } = A;
@@ -58,6 +59,224 @@ test('infrastructure exports supported resources with fixed stable APIs and requ
   assert.match(out.warnings.join('\n'), /Secure baseline/);
 });
 const own = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+
+test('Key Vault exports a safe parameterized vault instead of an empty deployment', () => {
+  const { project, nodes } = smallProject(A, ['key-vault']);
+  delete nodes[0].attributes.publicNetworkAccess;
+  const out = arm(project);
+  assert.equal(out.template.resources.length, 1);
+  const vault = out.template.resources[0];
+  assert.equal(vault.type, 'Microsoft.KeyVault/vaults');
+  assert.equal(vault.apiVersion, '2023-07-01');
+  assert.match(vault.properties, /'tenantId', parameters\('r\d+_tenantId'\)/);
+  const parameters = out.parameters.parameters;
+  const bySuffix = (suffix) => Object.entries(parameters).find(([k]) => k.endsWith('_' + suffix))?.[1].value;
+  assert.equal(bySuffix('tenantId'), undefined);
+  assert.deepEqual(bySuffix('sku'), { family: 'A', name: 'standard' });
+  assert.deepEqual(bySuffix('properties'), {
+    enableRbacAuthorization: true, accessPolicies: [], enableSoftDelete: true,
+    softDeleteRetentionInDays: 90, enablePurgeProtection: true, publicNetworkAccess: 'Disabled',
+    networkAcls: { bypass: 'None', defaultAction: 'Deny', ipRules: [], virtualNetworkRules: [] }
+  });
+  assert.ok(!out.warnings.some((w) => /Skipped:|Empty deployment/.test(w)));
+  assert.match(out.warnings.join('\n'), /Required parameter r\d+_tenantId has no value/);
+  const instructions = out.files.find((f) => f.name.endsWith('.instructions.txt')).content;
+  assert.match(instructions, /microsoft.keyvault\/2023-07-01\/vaults/);
+  assert.match(instructions, /never keys, secrets or certificates/);
+});
+
+test('Key Vault tenant and mapped settings round-trip through ARM import', () => {
+  const { project, sub, nodes } = smallProject(A, ['key-vault']);
+  const tenantId = '12345678-1234-1234-1234-123456789abc';
+  const tenant = Model.addNode(project, 'azure-tenant', null, { attributes: { tenantId } });
+  sub.parentId = tenant.id;
+  Object.assign(nodes[0].attributes, { sku: 'Premium', softDeleteRetentionDays: 14 });
+  const out = arm(project);
+  assert.ok(Object.values(out.parameters.parameters).some((p) => p.value === tenantId));
+  const imported = I.importTemplate(out.template, out.parameters);
+  const vault = nodesOf(imported.project, 'key-vault')[0];
+  assert.equal(vault.attributes.tenantId, tenantId);
+  assert.equal(vault.attributes.sku, 'Premium');
+  assert.equal(vault.attributes.softDeleteRetentionDays, 14);
+  assert.equal(vault.attributes.rbacAuthorization, true);
+  assert.equal(vault.attributes.purgeProtection, true);
+  const again = arm(imported.project);
+  assert.ok(Object.values(again.parameters.parameters).some((p) => p.value === tenantId));
+});
+
+test('Key Vault access policies are required explicitly and cannot be invented from custom data', () => {
+  const { project, nodes } = smallProject(A, ['key-vault']);
+  Object.assign(nodes[0].attributes, { rbacAuthorization: 'false', purgeProtection: false, publicNetworkAccess: 'Enabled' });
+  nodes[0].custom = [{ key: 'secret', value: 'DO_NOT_EXPORT_VAULT_CONTENT' }];
+  nodes[0].attributes.accessPolicies = 'DO_NOT_EXPORT_VAULT_CONTENT';
+  const out = arm(project);
+  const [key, def] = Object.entries(out.template.parameters).find(([k]) => k.endsWith('_accessPolicies'));
+  assert.equal(def.type, 'array');
+  assert.ok(!own(out.parameters.parameters, key));
+  const props = Object.entries(out.parameters.parameters).find(([k]) => k.endsWith('_properties'))[1].value;
+  assert.equal(props.enableRbacAuthorization, false);
+  assert.ok(!own(props, 'accessPolicies'));
+  assert.ok(!own(props, 'enablePurgeProtection'));
+  assert.equal(props.publicNetworkAccess, 'Enabled');
+  assert.equal(props.networkAcls.defaultAction, 'Deny');
+  assert.ok(out.files.every((f) => !f.content.includes('DO_NOT_EXPORT_VAULT_CONTENT')));
+  assert.match(out.warnings.join('\n'), /cannot be disabled once enabled/);
+  assert.match(out.warnings.join('\n'), /Access-policy authorization requires/);
+});
+
+test('Key Vault invalid tenant, SKU, boolean and retention settings require correction', () => {
+  for (const attributes of [
+    { tenantId: '[tenant().tenantId]', sku: 'Unsupported' },
+    { tenantId: 'AccountKey=OMITTED_VAULT_TENANT', sku: 'Unsupported' },
+    { softDeleteRetentionDays: 6 }, { softDeleteRetentionDays: 91 },
+    { softDeleteRetentionDays: '7.5' }, { rbacAuthorization: 'yes' }, { purgeProtection: 'no' }
+  ]) {
+    const { project, nodes } = smallProject(A, ['key-vault']);
+    Object.assign(nodes[0].attributes, attributes);
+    const out = arm(project);
+    const suffix = attributes.sku ? 'sku' : 'properties';
+    const key = Object.keys(out.template.parameters).find((k) => k.endsWith('_' + suffix));
+    assert.ok(!own(out.parameters.parameters, key), JSON.stringify(attributes));
+    assert.ok(out.files.every((f) => !f.content.includes('OMITTED_VAULT_TENANT')));
+    assert.equal(out.template.resources.length, 1);
+  }
+});
+
+test('unsupported Azure resources are distinguished from diagram-only objects', () => {
+  const { project } = smallProject(A, ['function-app', 'external-system']);
+  const warnings = arm(project).warnings.join('\n');
+  assert.match(warnings, /unsupported resource type in infrastructure export \(Microsoft\.Web\/sites/);
+  assert.match(warnings, /This Azure resource needs a separate deployment definition; it is not diagram-only/);
+  assert.match(warnings, /Skipped: diagram-only object or resource without a supported ARM deployment mapping/);
+  assert.ok(!warnings.includes('unsupported resource or diagram-only object'));
+});
+
+test('Key Vault Bicep and parameter files compile and preserve nested properties', (t) => {
+  if (spawnSync('bicep', ['--version']).status !== 0) { t.skip('Bicep CLI is not installed.'); return; }
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'aisbp-vault-'));
+  try {
+    const { project, nodes } = smallProject(A, ['key-vault']);
+    nodes[0].attributes.tenantId = '12345678-1234-1234-1234-123456789abc';
+    const out = I.exportProject(project, 'bicep');
+    for (const f of out.files.filter((f) => /\.bicep(param)?$/.test(f.name))) fs.writeFileSync(path.join(directory, f.name), f.content);
+    const compile = (command, extension) => {
+      const file = out.files.find((f) => f.name.endsWith(extension));
+      const run = spawnSync('bicep', [command, path.join(directory, file.name), '--no-restore', '--stdout'], { encoding: 'utf8' });
+      assert.equal(run.status, 0, run.stderr);
+      return JSON.parse(run.stdout);
+    };
+    const compiled = compile('build', '.bicep');
+    const params = compile('build-params', '.bicepparam');
+    const supplied = typeof params.parametersJson === 'string' ? JSON.parse(params.parametersJson) : params.parametersJson || params;
+    assert.deepEqual(supplied.parameters, JSON.parse(out.files.find((f) => f.name.endsWith('.parameters.json')).content).parameters);
+    assert.equal(compiled.resources[0].type, 'Microsoft.KeyVault/vaults');
+    assert.ok(!own(compiled.resources[0], 'sku'));
+    assert.equal(nodesOf(I.importTemplate(compiled, supplied).project, 'key-vault')[0].attributes.tenantId, nodes[0].attributes.tenantId);
+  } finally {
+    fs.rmSync(directory, { recursive: true });
+  }
+});
+
+test('integration diagrams export Logic Apps and API Management instead of empty deployments', () => {
+  const { project, sub, nodes } = smallProject(A, ['logic-app-consumption', 'api-management', 'logic-app-standard']);
+  sub.attributes.subscriptionId = '12345678-1234-1234-1234-123456789abc';
+  nodes[1].attributes.publisherName = 'Example';
+  nodes[1].attributes.publisherEmail = 'publisher@example.test';
+  Model.addNode(project, 'logic-app-workflow', nodes[2].id, {});
+  const out = arm(project);
+  assert.deepEqual(new Set(out.template.resources.map((r) => r.type)), new Set([
+    'Microsoft.Logic/workflows', 'Microsoft.ApiManagement/service', 'Microsoft.Web/sites'
+  ]));
+  assert.ok(!out.warnings.some((w) => /Empty deployment|unsupported resource or diagram-only|Scope subscription ID/.test(w)));
+  assert.match(out.warnings.join('\n'), /Standard workflow application content must be deployed separately/);
+  const scope = JSON.parse(out.files.find((f) => f.name.endsWith('.deployment-scopes.json')).content);
+  assert.equal(scope.deployments[0].resourceCount, 3);
+  assert.equal(scope.deployments[0].subscriptionId, sub.attributes.subscriptionId);
+  const apim = out.template.resources.find((r) => r.type === 'Microsoft.ApiManagement/service');
+  assert.deepEqual(value(out, apim.sku), { name: 'Developer', capacity: 1 });
+  assert.match(apim.properties, /'publisherName', parameters\('r\d+_publisherName'\)/);
+  const host = out.template.resources.find((r) => r.type === 'Microsoft.Web/sites');
+  assert.equal(value(out, host.kind), 'functionapp,workflowapp');
+  assert.match(out.warnings.join('\n'), /Required parameter r\d+_serverFarmId has no value/);
+  const secure = Object.entries(out.template.parameters).filter(([, p]) => p.type === 'secureObject');
+  assert.equal(secure.length, 2);
+  secure.forEach(([key]) => assert.ok(!own(out.parameters.parameters, key)));
+  assert.equal(Object.values(out.parameters.parameters).find((p) => p.value.state)?.value.state, 'Enabled');
+  const imported = I.importTemplate(out.template, out.parameters);
+  for (const type of ['logic-app-consumption', 'logic-app-standard', 'api-management']) assert.equal(nodesOf(imported.project, type).length, 1);
+});
+
+test('integration exports require missing or sensitive configuration without leaking it', () => {
+  const { project, nodes } = smallProject(A, ['logic-app-consumption', 'logic-app-standard', 'api-management']);
+  nodes[0].attributes.definition = 'AccountKey=OMITTED_DEFINITION';
+  nodes[1].attributes.appServicePlan = 'AccountKey=OMITTED_PLAN';
+  nodes[1].attributes.storageAccount = 'AccountKey=OMITTED_STORAGE';
+  nodes[2].attributes.publisherName = 'AccountKey=OMITTED_PUBLISHER';
+  nodes[2].attributes.publisherEmail = '[unresolved()]';
+  nodes[2].attributes.sku = 'unknown';
+  const out = arm(project);
+  const required = Object.keys(out.template.parameters).filter((key) => !own(out.parameters.parameters, key));
+  for (const suffix of ['definition', 'siteConfig', 'serverFarmId', 'publisherName', 'publisherEmail', 'sku']) {
+    assert.ok(required.some((key) => key.endsWith('_' + suffix)), suffix);
+  }
+  assert.ok(out.files.every((f) => !f.content.includes('OMITTED_')));
+  const bicep = I.exportProject(project, 'bicep').files.find((f) => f.name.endsWith('.bicep')).content;
+  assert.match(bicep, /@secure\(\)\nparam r\d+_definition object/);
+  assert.match(bicep, /@secure\(\)\nparam r\d+_siteConfig object/);
+  assert.ok(!bicep.includes(' secureObject'));
+});
+
+test('Standard plan IDs and API Management tiers map explicitly without inventing networking', () => {
+  const { project, nodes } = smallProject(A, ['logic-app-standard', 'api-management']);
+  const plan = '/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/rg/providers/Microsoft.Web/serverfarms/plan';
+  nodes[0].attributes.appServicePlan = plan;
+  nodes[1].attributes.sku = 'Standard v2';
+  let out = arm(project);
+  assert.ok(Object.values(out.parameters.parameters).some((p) => p.value === plan));
+  const apim = out.template.resources.find((r) => r.type === 'Microsoft.ApiManagement/service');
+  assert.deepEqual(value(out, apim.sku), { name: 'StandardV2', capacity: 1 });
+  nodes[1].attributes.sku = 'Consumption';
+  out = arm(project);
+  assert.deepEqual(value(out, out.template.resources.find((r) => r.type === apim.type).sku), { name: 'Consumption', capacity: 0 });
+  nodes[0].attributes.vnetIntegration = true;
+  nodes[1].attributes.vnetMode = 'Internal';
+  out = arm(project);
+  const properties = Object.keys(out.template.parameters).filter((key) => key.endsWith('_properties'));
+  assert.equal(properties.length, 2);
+  properties.forEach((key) => assert.ok(!own(out.parameters.parameters, key)));
+  assert.match(out.warnings.join('\n'), /no public fallback/);
+});
+
+test('ARM import does not mistake other Microsoft.Web/sites kinds for Standard Logic Apps', () => {
+  const out = I.importTemplate(template([
+    resource('Microsoft.Web/sites', 'web', {}, { kind: 'app' }),
+    resource('Microsoft.Web/sites', 'function', {}, { kind: 'functionapp' }),
+    resource('Microsoft.Web/sites', 'logic', {}, { kind: 'functionapp,workflowapp' })
+  ]));
+  assert.equal(nodesOf(out.project, 'logic-app-standard').length, 1);
+  assert.equal(nodesOf(out.project, 'logic-app-standard')[0].name, 'logic');
+  assert.match(out.warnings.join('\n'), /only Logic App Standard workflowapp hosts/);
+});
+
+test('integration Bicep compiles with secure parameters and explicit missing values', (t) => {
+  if (spawnSync('bicep', ['--version']).status !== 0) { t.skip('Bicep CLI is not installed.'); return; }
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'aisbp-integration-'));
+  try {
+    const { project } = smallProject(A, ['logic-app-consumption', 'logic-app-standard', 'api-management']);
+    const out = I.exportProject(project, 'bicep');
+    const source = out.files.find((f) => f.name.endsWith('.bicep'));
+    const file = path.join(directory, source.name);
+    fs.writeFileSync(file, source.content);
+    const compiled = spawnSync('bicep', ['build', file, '--no-restore', '--stdout'], { encoding: 'utf8' });
+    assert.equal(compiled.status, 0, compiled.stderr);
+    const result = JSON.parse(compiled.stdout);
+    assert.equal(result.resources.length, 3);
+    assert.equal(Object.values(result.parameters).filter((p) => p.type === 'secureObject').length, 2);
+    assert.ok(!result.resources.some((r) => r.type.endsWith('/workflows') && r.type !== 'Microsoft.Logic/workflows'));
+  } finally {
+    fs.rmSync(directory, { recursive: true });
+  }
+});
 
 test('each RG/subscription stays separate, metadata is separate and scope is selectable at deployment time', () => {
   const { project, sub, rg } = smallProject(A, ['nsg']);
@@ -339,7 +558,7 @@ test('export warnings identify resources by resolved names instead of internal s
   rg.name = 'rg-orders-production';
   const out = arm(project);
   assert.ok(out.warnings.some((warning) => warning.startsWith('sb-orders-production: ')));
-  assert.ok(out.warnings.some((warning) => warning.startsWith('apim-orders-production: Skipped:')));
+  assert.ok(out.warnings.some((warning) => warning.startsWith('apim-orders-production: ')));
   assert.ok(out.warnings.some((warning) => warning.startsWith('rg-orders-production: ')));
   assert.ok(out.warnings.every((warning) => !/^r\d+ \(/.test(warning)));
   const instructions = out.files.find((file) => file.name.endsWith('.instructions.txt')).content;
@@ -352,11 +571,11 @@ test('warning names use safe labels or resource types when names are missing or 
   node.nameMode = 'custom';
   node.name = '';
   node.label = 'Orders API';
-  assert.ok(arm(project).warnings.some((warning) => warning.startsWith('Orders API: Skipped:')));
+  assert.ok(arm(project).warnings.some((warning) => warning.startsWith('Orders API: ')));
   node.name = 'AccountKey=DO_NOT_INCLUDE_IN_WARNINGS';
   node.label = node.name;
   const out = arm(project);
-  assert.ok(out.warnings.some((warning) => warning.startsWith('API Management: Skipped:')));
+  assert.ok(out.warnings.some((warning) => warning.startsWith('API Management: ')));
   assert.ok(out.files.every((file) => !file.content.includes('DO_NOT_INCLUDE_IN_WARNINGS')));
 });
 
