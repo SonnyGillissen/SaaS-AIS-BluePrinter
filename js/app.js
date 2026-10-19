@@ -271,6 +271,14 @@
       if (!rootId) root.requestAnimationFrame(() => canvas.fit());
     },
 
+    tidyAll() {
+      store.change('tidy all', (p) => {
+        Model.resetConnectionRoutes(p);
+        Layout.autoLayout(p);
+      });
+      root.requestAnimationFrame(() => canvas.fit());
+    },
+
     tidyArrows() {
       const count = store.change('tidy arrows', (p) => Model.resetConnectionRoutes(p));
       root.requestAnimationFrame(() => canvas.fit());
@@ -433,6 +441,46 @@
   const panelButtons = Array.from(doc.querySelectorAll('.workspace-nav [data-panel]'));
   const toolbarToggle = doc.getElementById('toolbar-toggle');
   const header = doc.querySelector('.app-header');
+  const toolbarMenus = ['export-menu', 'tidy-menu'].map((action) => {
+    const button = doc.querySelector('[data-action="' + action + '"]');
+    return { action, button, list: button.nextElementSibling };
+  });
+
+  function closeToolbarMenus() {
+    toolbarMenus.forEach((menu) => {
+      menu.list.hidden = true;
+      menu.button.setAttribute('aria-expanded', 'false');
+    });
+  }
+
+  function toggleToolbarMenu(menu, open) {
+    closeToolbarMenus();
+    menu.list.hidden = !open;
+    menu.button.setAttribute('aria-expanded', String(open));
+  }
+
+  toolbarMenus.forEach((menu) => {
+    menu.button.parentElement.addEventListener('keydown', (e) => {
+      const items = Array.from(menu.list.querySelectorAll('[role="menuitem"]'));
+      const index = items.indexOf(doc.activeElement);
+      if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key)) {
+        const wasHidden = menu.list.hidden;
+        toggleToolbarMenu(menu, true);
+        const next = e.key === 'Home' ? 0 : e.key === 'End' ? items.length - 1 :
+          wasHidden || index < 0 ? (e.key === 'ArrowUp' ? items.length - 1 : 0) :
+          (index + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length;
+        items[next].focus();
+      } else if (e.key === 'Escape' && !menu.list.hidden) {
+        toggleToolbarMenu(menu, false);
+        menu.button.focus();
+      } else return;
+      e.preventDefault();
+      e.stopPropagation();
+    });
+    menu.button.parentElement.addEventListener('focusout', (e) => {
+      if (!menu.button.parentElement.contains(e.relatedTarget)) toggleToolbarMenu(menu, false);
+    });
+  });
 
   function showPanel(panel) {
     workspace.dataset.panel = panel;
@@ -445,7 +493,7 @@
   function showTools(open) {
     header.classList.toggle('tools-open', open);
     toolbarToggle.setAttribute('aria-expanded', String(open));
-    if (!open) toggleExportMenu(false);
+    if (!open) closeToolbarMenus();
   }
 
   panelButtons.forEach((button) => button.addEventListener('click', () => {
@@ -515,19 +563,13 @@
     doc.title = store.project.meta.name + ' \u2014 AIS BluePrinter';
   }
 
-  const exportMenuBtn = doc.querySelector('[data-action="export-menu"]');
-  const exportMenu = exportMenuBtn.nextElementSibling;
-  function toggleExportMenu(open) {
-    exportMenu.hidden = !open;
-    exportMenuBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
-  }
-
   const commands = {
     new: () => actions.newProject(false),
     projects: () => AISBP.Dialogs.openProjects(app),
     import: () => doc.getElementById('file-input').click(),
     azure: () => AISBP.AzureUi.open(app),
-    'export-menu': () => toggleExportMenu(exportMenu.hidden),
+    'export-menu': () => toggleToolbarMenu(toolbarMenus[0], toolbarMenus[0].list.hidden),
+    'tidy-menu': () => toggleToolbarMenu(toolbarMenus[1], toolbarMenus[1].list.hidden),
     'export-json': () => actions.exportAs('json'),
     'export-bicep': () => actions.exportAs('bicep'),
     'export-arm': () => actions.exportAs('arm'),
@@ -546,6 +588,7 @@
     'zoom-reset': () => canvas.zoomReset(),
     fit: () => canvas.fit(),
     tidy: () => actions.tidy(),
+    'tidy-all': () => actions.tidyAll(),
     'tidy-arrows': () => actions.tidyArrows(),
     options: () => AISBP.Dialogs.openOptions(app),
     help: () => AISBP.Dialogs.openHelp(app),
@@ -555,13 +598,18 @@
   doc.addEventListener('click', (e) => {
     const btn = e.target.closest('[data-action]');
     if (!btn || !commands[btn.getAttribute('data-action')]) {
-      if (!e.target.closest('.menu')) toggleExportMenu(false);
+      if (!e.target.closest('.menu')) closeToolbarMenus();
       return;
     }
     const action = btn.getAttribute('data-action');
-    if (action !== 'export-menu') toggleExportMenu(false);
+    const isMenuToggle = toolbarMenus.some((menu) => menu.action === action);
+    if (!isMenuToggle) {
+      const menu = toolbarMenus.find((item) => item.list.contains(btn));
+      closeToolbarMenus();
+      if (menu) menu.button.focus();
+    }
     commands[action]();
-    if (compactLayout.matches && action !== 'export-menu') showTools(false);
+    if (compactLayout.matches && !isMenuToggle) showTools(false);
   });
 
   doc.getElementById('file-input').addEventListener('change', (e) => {

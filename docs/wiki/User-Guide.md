@@ -43,20 +43,26 @@ Containers grow automatically to fit their contents. To make a container (manage
 subscription, resource group, …) larger, select it and drag the **resize grip** in its bottom-right
 corner; it never shrinks below its contents. Drag objects to rearrange them. While you drag, every
 container keeps its current boundary, so an object dropped anywhere inside its own container stays
-there; dropping it on another container moves it there (if allowed). **Tidy up** arranges
-everything automatically and resets manually resized containers to the size they need.
-It orders sibling groups by directed data flows and triggers where possible, keeping
+there; dropping it on another container moves it there (if allowed). The **Tidy up** menu offers:
+
+- **Tidy all**: arrange resources and reset saved arrow bends and fixed endpoint attachments together.
+- **Tidy resources**: arrange resources and reset manually resized containers to the size they need,
+  preserving saved arrow bends and attachments.
+- **Tidy arrows**: reset saved arrow bends and fixed endpoint attachments without moving resources.
+
+Each action is undoable in one step. Resource arrangement
+orders sibling groups by directed data flows and triggers where possible, keeping
 external producers to the left of the Azure hierarchy and consumers to the right.
 Connected content is aligned on a common flow lane, with space for connection labels.
 Dependency-only supporting resources are placed below their consumers to keep the main path clear.
-Cycles retain a deterministic order; this does not change the hierarchy or saved routing points.
+Cycles retain a deterministic order; arranging resources does not change the hierarchy.
 Loading the sample also applies this layout so resource sizes follow the current detail settings.
 
-If an existing diagram still has awkward arrows after arranging resources, use **Tidy arrows**
-(the reset icon beside **Tidy up**). It clears all saved routing points and fixed endpoint
+If an existing diagram still has awkward arrows after arranging resources, use **Tidy up › Tidy arrows**.
+It clears all saved routing points and fixed endpoint
 attachments so the scene-aware router can choose fresh paths. Resource positions, connection
 endpoints, directions, labels and attributes are unchanged. **Undo** restores all manual routes
-in one step. Ordinary **Tidy up** continues to preserve manual routes.
+in one step. Choose **Tidy resources** to preserve manual routes when arranging resources.
 
 ## Text blocks and tables
 

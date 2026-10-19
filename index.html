@@ -65,8 +65,14 @@
         <button type="button" data-action="zoom-reset" id="zoom-label" title="Reset zoom (0)">100%</button>
         <button type="button" data-action="zoom-in" data-icon="zoom-in" data-icon-only title="Zoom in (+)" aria-label="Zoom in"></button>
         <button type="button" data-action="fit" data-icon="fit" title="Fit to screen (F)">Fit</button>
-        <button type="button" data-action="tidy" data-icon="tidy" title="Automatically arrange the blueprint">Tidy up</button>
-        <button type="button" data-action="tidy-arrows" data-icon="reset" data-icon-only title="Tidy arrows: reset all saved bends and endpoint attachments without moving resources (undoable)" aria-label="Tidy arrows"></button>
+        <div class="menu">
+          <button type="button" data-action="tidy-menu" data-icon="tidy" aria-haspopup="menu" aria-expanded="false" aria-controls="tidy-menu" title="Choose what to tidy">Tidy up ▾</button>
+          <div id="tidy-menu" class="menu-list" role="menu" aria-label="Tidy up" hidden>
+            <button type="button" role="menuitem" data-action="tidy-all" data-icon="diagram" title="Arrange resources and reset all arrow bends and attachments (undoable)">Tidy all</button>
+            <button type="button" role="menuitem" data-action="tidy" data-icon="tidy" title="Arrange resources while preserving saved arrow bends and attachments (undoable)">Tidy resources</button>
+            <button type="button" role="menuitem" data-action="tidy-arrows" data-icon="route" title="Reset all arrow bends and attachments without moving resources (undoable)">Tidy arrows</button>
+          </div>
+        </div>
       </div>
       <div class="group">
         <label class="select-label">Theme
