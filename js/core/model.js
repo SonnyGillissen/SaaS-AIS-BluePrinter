@@ -244,11 +244,26 @@
     return out;
   }
 
-  /** Resolve tenant defaults without materializing them in the saved node attributes. */
+  /** Subscription defaults for applicable attributes, resolved from the containing Subscription. */
+  function inheritedSubscriptionAttributes(project, id) {
+    const node = getNode(project, id);
+    const def = node && Catalog.get(node.type);
+    const subscription = node && ancestors(project, id).find((a) => a.type === 'subscription');
+    const out = {};
+    if (!def || !subscription) return out;
+    def.attributes.forEach((attr) => {
+      if (!attr.subscriptionSource) return;
+      const value = (subscription.attributes || {})[attr.subscriptionSource];
+      if (typeof value === 'string' && value.trim() && value !== '(inherit)') out[attr.key] = value;
+    });
+    return out;
+  }
+
+  /** Resolve hierarchy defaults without materializing them in the saved node attributes. */
   function effectiveAttributes(project, id) {
     const node = getNode(project, id);
     const out = Object.assign({}, node && node.attributes);
-    const inherited = inheritedTenantAttributes(project, id);
+    const inherited = Object.assign({}, inheritedTenantAttributes(project, id), inheritedSubscriptionAttributes(project, id));
     Object.keys(inherited).forEach((key) => {
       const own = out[key];
       if (own === undefined || own === null || (typeof own === 'string' && (!own.trim() || own === '(inherit)'))) out[key] = inherited[key];
@@ -848,6 +863,7 @@
 
   AISBP.Model = {
     inheritedTenantAttributes,
+    inheritedSubscriptionAttributes,
     effectiveAttributes,
     FORMAT,
     VERSION,

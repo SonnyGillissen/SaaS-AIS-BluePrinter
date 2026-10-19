@@ -39,6 +39,13 @@ not copied into each object's saved attributes. Use the eye toggles to show them
 Draw.io and ArchiMate include the resolved values as metadata. Infrastructure exports use the
 Tenant ID where required (such as Key Vault), not as an extra ARM property on unrelated resources.
 
+Set **Subscription ID** on a Subscription to provide the same blank-to-inherit behavior for
+its resource groups, resources and nested child resources. The properties panel shows the
+inherited ID; explicit values override it, and clearing a value resumes inheritance. Defaults
+follow the containing Subscription when its ID changes or resources move between subscriptions,
+without copying IDs into saved child attributes. Eye toggles and diagram export metadata use
+the resolved Subscription ID, just like the tenant fields.
+
 There are several ways to add objects:
 
 - **Click** a palette item. It's added to the selected object, the nearest container of the

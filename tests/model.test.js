@@ -91,6 +91,57 @@ test('tenant inheritance preserves explicit overrides and follows hierarchy chan
   assert.deepEqual(Model.inheritedTenantAttributes(p, vault.id), {});
 });
 
+test('Azure resources and nested children inherit Subscription ID without storing copies', () => {
+  const { project: p, sub, rg, nodes: [ns] } = smallProject(AISBP, ['service-bus-namespace']);
+  const topic = Model.addNode(p, 'service-bus-topic', ns.id, {});
+  const child = Model.addNode(p, 'service-bus-subscription', topic.id, {});
+  Model.updateNode(p, sub.id, { attributes: { subscriptionId: 'subscription-one' } });
+  for (const node of [rg, ns, topic, child]) {
+    assert.deepEqual(Model.inheritedSubscriptionAttributes(p, node.id), { subscriptionId: 'subscription-one' });
+    assert.equal(Model.effectiveAttributes(p, node.id).subscriptionId, 'subscription-one');
+    assert.equal(node.attributes.subscriptionId, undefined);
+    assert.equal(AISBP.Catalog.get(node.type).attributes.filter((a) => a.key === 'subscriptionId').length, 1);
+  }
+  const users = Model.addNode(p, 'users', null, {});
+  const annotation = Model.addNode(p, 'annotation-text', rg.id, {});
+  for (const node of [sub, users, annotation]) {
+    assert.deepEqual(Model.inheritedSubscriptionAttributes(p, node.id), {});
+  }
+  assert.deepEqual(Model.inheritedSubscriptionAttributes(p, 'missing'), {});
+  for (const type of ['azure-tenant', 'management-group', 'users', 'annotation-text']) {
+    assert.ok(!AISBP.Catalog.get(type).attributes.some((a) => a.key === 'subscriptionId'));
+  }
+  Model.updateNode(p, sub.id, { attributes: { subscriptionId: 'subscription-two' } });
+  assert.equal(Model.effectiveAttributes(p, child.id).subscriptionId, 'subscription-two');
+  for (const value of ['', '  ', '(inherit)']) {
+    Model.updateNode(p, sub.id, { attributes: { subscriptionId: value } });
+    assert.equal(Model.effectiveAttributes(p, child.id).subscriptionId, undefined);
+  }
+});
+
+test('Subscription ID inheritance preserves overrides and follows moves, paste and import', () => {
+  const { project: p, sub, rg, nodes: [vault] } = smallProject(AISBP, ['key-vault']);
+  Model.updateNode(p, sub.id, { attributes: { subscriptionId: 'subscription-one' } });
+  const other = Model.addNode(p, 'subscription', null, { attributes: { subscriptionId: 'subscription-two' } });
+  Model.updateNode(p, rg.id, { attributes: { subscriptionId: 'rg-override' } });
+  assert.equal(Model.effectiveAttributes(p, vault.id).subscriptionId, 'subscription-one');
+  Model.updateNode(p, vault.id, { attributes: { subscriptionId: 'explicit' } });
+  assert.equal(Model.effectiveAttributes(p, vault.id).subscriptionId, 'explicit');
+  Model.reparent(p, rg.id, other.id);
+  assert.equal(Model.effectiveAttributes(p, vault.id).subscriptionId, 'explicit');
+  for (const value of ['', '  ', '(inherit)']) {
+    Model.updateNode(p, vault.id, { attributes: { subscriptionId: value } });
+    assert.equal(Model.effectiveAttributes(p, vault.id).subscriptionId, 'subscription-two');
+  }
+  const clip = Model.extract(p, [rg.id], []);
+  const pasted = Model.paste(p, clip, sub.id);
+  const copy = pasted.nodeIds.map((id) => p.nodes[id]).find((n) => n.type === 'key-vault');
+  assert.equal(Model.effectiveAttributes(p, copy.id).subscriptionId, 'subscription-one');
+  const restored = Model.normalize(JSON.parse(JSON.stringify(p))).project;
+  assert.equal(Model.effectiveAttributes(restored, copy.id).subscriptionId, 'subscription-one');
+  assert.equal(Model.effectiveAttributes(restored, vault.id).subscriptionId, 'subscription-two');
+});
+
 test('containment rules are enforced (management group > subscription > resource group > resource)', () => {
   const p = Model.createProject();
   assert.throws(() => Model.addNode(p, 'function-app', null, {}), /cannot be placed/);

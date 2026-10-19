@@ -27,30 +27,37 @@ test('configuration package round-trips', () => {
   assert.deepEqual(project.settings, p.settings);
 });
 
-test('tenant defaults appear in diagram and export metadata but stay inherited in native packages', () => {
+test('tenant and subscription defaults appear in diagram and export metadata but stay inherited in native packages', () => {
   const { project: p, sub, nodes: [vault] } = smallProject(AISBP, ['key-vault']);
   const tenant = Model.addNode(p, 'azure-tenant', null, {
     attributes: { tenantId: 'inherited-tenant-id', primaryDomain: 'tenant.example' }
   });
   Model.reparent(p, sub.id, tenant.id);
+  Model.updateNode(p, sub.id, { attributes: { subscriptionId: 'inherited-subscription-id' } });
   p.settings.diagram.detailLevel = 'selected';
   assert.ok(!AISBP.Layout.visibleAttributes(p, vault).some((a) => a.key === 'tenantDomain'));
-  Model.updateNode(p, vault.id, { display: { tenantId: true, tenantDomain: true } });
+  Model.updateNode(p, vault.id, { display: { tenantId: true, tenantDomain: true, subscriptionId: true } });
   const attrs = AISBP.Layout.visibleAttributes(p, vault);
   assert.equal(attrs.find((a) => a.key === 'tenantId').value, 'inherited-tenant-id');
   assert.equal(attrs.find((a) => a.key === 'tenantDomain').value, 'tenant.example');
+  assert.equal(attrs.find((a) => a.key === 'subscriptionId').value, 'inherited-subscription-id');
+  assert.match(Render.renderDocument(p, {}).svg, /inherited-subscription-id/);
   assert.match(Render.renderDocument(p, {}).svg, /tenant\.example/);
   const drawio = DrawIo.toDrawio(p, { embedDiagram: false });
   const data = drawio.match(new RegExp('<object[^>]*id="n-' + vault.id + '-route"[^>]*>'))[0];
   assert.match(data, /tenantId="inherited-tenant-id"/);
   assert.match(data, /tenantDomain="tenant\.example"/);
+  assert.match(data, /subscriptionId="inherited-subscription-id"/);
   const archimate = ArchiMate.toArchiMate(p, { embedDiagram: false });
   const element = archimate.match(new RegExp('<element identifier="id-' + vault.id + '"[\\s\\S]*?</element>'))[0];
   assert.match(element, /inherited-tenant-id/);
   assert.match(element, /tenant\.example/);
+  assert.match(element, /inherited-subscription-id/);
   const restored = Package.fromJson(Package.toJson(p)).project;
   assert.equal(restored.nodes[vault.id].attributes.tenantId, undefined);
   assert.equal(restored.nodes[vault.id].attributes.tenantDomain, undefined);
+  assert.equal(restored.nodes[vault.id].attributes.subscriptionId, undefined);
+  assert.equal(Model.effectiveAttributes(restored, vault.id).subscriptionId, 'inherited-subscription-id');
   assert.equal(Model.effectiveAttributes(restored, vault.id).tenantDomain, 'tenant.example');
 });
 
