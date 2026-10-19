@@ -15,6 +15,10 @@
     nsg: ['Microsoft.Network/networkSecurityGroups', '2023-11-01'],
     'log-analytics': ['Microsoft.OperationalInsights/workspaces', '2022-10-01']
   };
+  const API_REFERENCES = Object.entries(TYPES).map(([type, spec]) => {
+    const parts = spec[0].toLowerCase().split('/');
+    return type + ': ' + spec[1] + ' — https://learn.microsoft.com/en-us/azure/templates/' + parts[0] + '/' + spec[1] + '/' + parts.slice(1).join('/');
+  }).join('\n');
   const own = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
   const object = (o) => !!o && typeof o === 'object' && !Array.isArray(o);
   const present = (v) => v !== undefined && v !== null && v !== '';
@@ -239,7 +243,7 @@
           const dns = list('dnsServers');
           if (dns.length && dns.every(ipVersion)) properties.dhcpOptions = { dnsServers: dns };
           else if (present(attrs.dnsServers)) { validProperties = false; warn(n, 'Invalid custom DNS server list.'); }
-          warn(n, 'The VNet address space and declared subnets are authoritative. Review what-if: unmanaged existing subnets/peerings must not be removed inadvertently.');
+          warn(n, 'The VNet address space and declared subnets are authoritative. Review what-if: unmanaged existing subnets/peerings must not be removed inadvertently. Only declared subnets are retained; the diagram must inventory every existing subnet before updating an existing VNet.');
         } else if (n.type === 'subnet') {
           const prefixes = list('addressPrefix');
           if (!prefixes.length || !prefixes.every(cidr)) { validProperties = false; warn(n, 'Valid IPv4/IPv6 subnet address prefix is required; no CIDR was invented.'); }
@@ -269,7 +273,10 @@
         if ((n.custom || []).length) warn(n, 'Custom properties are not exported, including preserved ARM expressions; review before deployment.');
         const symbol = ids.get(n.id);
         const rawName = nameOf(n);
-        const pn = param(n, 'name', 'string', typeof rawName === 'string' && rawName.trim() && !rawName.startsWith('[') && !credentialValue.test(rawName) ? rawName : undefined);
+        const rule = A.Catalog.get(n.type).rule;
+        const nameProblems = A.Naming.validateName(rawName, rule);
+        if (nameProblems.length) warn(n, 'Resource name fails catalog naming restrictions: ' + nameProblems.map((p) => p.startsWith('Invalid characters:') ? 'Invalid characters.' : p).join(' ') + ' Supply a valid name parameter; Azure availability/reserved-name checks are still required.');
+        const pn = param(n, 'name', 'string', !nameProblems.length && typeof rawName === 'string' && rawName.trim() && !rawName.startsWith('[') && !credentialValue.test(rawName) ? rawName : undefined);
         const props = param(n, 'properties', 'object', validProperties ? properties : undefined);
         const res = { type: spec[0], apiVersion: spec[1], name: pn.arm };
         const lines = [];
@@ -315,6 +322,7 @@
       });
       const standalone = records.filter((r) => r.n.type !== 'subnet');
       standalone.forEach((r) => resources.push(r.res));
+      if (!resources.length) warn(rg, 'Empty deployment: no supported deployable resources remain in this resource group. The empty files are scope placeholders only; do not deploy them.');
       const bResources = standalone.map((r) => 'resource ' + r.symbol + ' ' + literal(r.spec[0] + '@' + r.spec[1]) + ' = {\n' + r.lines.join('\n') + '\n}');
       const deploymentName = stem + (format === 'arm' ? '.json' : '.bicep');
       if (format === 'arm') files.push({ name: deploymentName, content: json({ $schema: SCHEMA, contentVersion: '1.0.0.0', parameters, resources }), mime: 'application/json' });
@@ -334,13 +342,19 @@
         warn(n, 'Sensitive or invalid suggested scope name omitted.');
         return null;
       };
-      scope.push({ template: deploymentName, parameters: stem + '.parameters.json', resourceGroup: scopeName(rg), subscription: scopeName(sub) });
+      const rawSubscriptionId = sub && sub.attributes && sub.attributes.subscriptionId;
+      const subscriptionId = typeof rawSubscriptionId === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rawSubscriptionId) ? rawSubscriptionId : null;
+      scope.push({ template: deploymentName, parameters: stem + '.parameters.json', resourceGroup: scopeName(rg), subscription: scopeName(sub), subscriptionId, resourceCount: resources.length });
+      if (!subscriptionId) warn(rg, 'Scope subscription ID is unknown or invalid; confirm the actual target subscription rather than relying on its display name.');
       if (!sub) warn(rg, 'No subscription boundary; select the target subscription explicitly.');
       if (Object.keys(rg.attributes || {}).some((k) => !['location', 'description', 'lock'].includes(k)) || present((rg.attributes || {}).lock) && rg.attributes.lock !== 'None' || (rg.tags || []).length) warn(rg, 'Resource-group settings/tags/locks are not deployed; groups must already exist.');
     });
     if (!groups.length) warnings.push('No resource groups were found; no deployment templates were generated.');
     files.push({ name: base + '.deployment-scopes.json', content: json({ format: 'aisbp-deployment-scopes', version: 1, deployments: scope }), mime: 'application/json' });
     files.push({ name: base + '.instructions.txt', content: 'Review all warnings and parameter values before deployment. This is a limited first-release export, not a full-fidelity blueprint backup.\nEach template is an independent resource-group-scoped deployment. Resource groups and subscriptions are NOT created. The separate deployment-scopes.json records suggested diagram boundaries, not executable ARM metadata. Select the correct existing subscription and resource group for EACH file; edit parameter values for the target environment. Deployment scope is selected by the deployment command, not by a resource-name parameter.\nARM: az deployment group create --subscription <subscription-id> --resource-group <existing-rg> --template-file <template.json> --parameters @<template.parameters.json>\nBicep: az deployment group create --subscription <subscription-id> --resource-group <existing-rg> --template-file <template.bicep> --parameters @<template.parameters.json>\nAlternatively use --parameters <template.bicepparam> with a recent Azure CLI/Bicep version. JSON parameters and .bicepparam are alternatives, not inputs to combine.\nAll template parameters are required. Missing values are intentionally absent from parameter files: supply them yourself; no placeholder credentials or invented required settings are provided. Use incremental mode and review Azure what-if before deployment. Do not use complete mode. Region, SKU availability, naming, CIDRs, policies and application compatibility need Azure validation. Parent ordering is emitted, but no permissions, role assignments or security links are inferred. Private endpoints, identities, diagnostic settings and advanced networking are unsupported.\n', mime: 'text/plain' });
+    const instructions = files.find((file) => file.name === base + '.instructions.txt');
+    instructions.content += '\nPinned API coverage and canonical Microsoft Learn references\nThese intentional first-release API pins are not a claim of Microsoft certification, exhaustive resource coverage, or complete standards compliance. Local compilation/tests do not replace Azure what-if, tenant-policy checks or deployment validation. Review these version-specific references manually when network access is available.\n' + API_REFERENCES + '\nCoverage limits: Standard StorageV2 only; NSGs without custom rules only; PerGB2018 workspaces only. VNet subnets are inline. Service Bus support covers namespaces, queues, topics and subscriptions, not subscription rules or authorization rules. Private endpoints, identities, diagnostics, advanced networking, direct Bicep import and Terraform are not supported.\nARM expressions: https://learn.microsoft.com/en-us/azure/azure-resource-manager/templates/template-expressions\nARM parameter files: https://learn.microsoft.com/en-us/azure/azure-resource-manager/templates/parameter-files\nBicep child resources: https://learn.microsoft.com/en-us/azure/azure-resource-manager/bicep/child-resource-name-type\n';
+    instructions.content += '\nExport warnings\n' + (warnings.length ? warnings.map((warning) => '- ' + warning).join('\n') : 'No export warnings.') + '\n';
     return { files, warnings };
   }
 

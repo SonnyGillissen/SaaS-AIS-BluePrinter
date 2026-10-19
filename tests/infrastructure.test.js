@@ -2,6 +2,9 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const { spawnSync } = require('node:child_process');
 const { AISBP: A, smallProject } = require('./helpers');
 const { Infrastructure: I, Model } = A;
 const schema = 'https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#';
@@ -81,6 +84,25 @@ test('each RG/subscription stays separate, metadata is separate and scope is sel
   assert.match(instructions, /Do not use complete mode/);
 });
 
+test('scope manifests identify known subscription IDs, reject invalid IDs and disclose empty deployments', () => {
+  const { project, sub } = smallProject(A, ['function-app']);
+  const subscriptionId = '12345678-1234-1234-1234-123456789abc';
+  sub.attributes.subscriptionId = subscriptionId;
+  let out = I.exportProject(project, 'arm');
+  let metadata = JSON.parse(out.files.find((f) => f.name.endsWith('.deployment-scopes.json')).content);
+  assert.equal(metadata.deployments[0].subscriptionId, subscriptionId);
+  assert.equal(metadata.deployments[0].resourceCount, 0);
+  assert.match(out.warnings.join('\n'), /Empty deployment.*do not deploy/);
+  const instructions = out.files.find((f) => f.name.endsWith('.instructions.txt')).content;
+  out.warnings.forEach((warning) => assert.ok(instructions.includes(warning)));
+  sub.attributes.subscriptionId = 'AccountKey=DO_NOT_EXPORT_INVALID_ID';
+  out = I.exportProject(project, 'arm');
+  metadata = JSON.parse(out.files.find((f) => f.name.endsWith('.deployment-scopes.json')).content);
+  assert.equal(metadata.deployments[0].subscriptionId, null);
+  assert.ok(out.files.every((file) => !file.content.includes('DO_NOT_EXPORT_INVALID_ID')));
+  assert.match(out.warnings.join('\n'), /Scope subscription ID is unknown or invalid/);
+});
+
 test('ARM hierarchy uses parent-only dependencies, never diagram graph connections', () => {
   const { project, nodes } = allResources();
   const [ns, storage] = nodes;
@@ -94,6 +116,78 @@ test('ARM hierarchy uses parent-only dependencies, never diagram graph connectio
   const subscription = children.find((r) => r.type.endsWith('/subscriptions'));
   assert.match(subscription.dependsOn[0], /Microsoft.ServiceBus\/namespaces\/topics/);
   assert.equal((subscription.name.match(/parameters\(/g) || []).length, 3);
+});
+
+test('VNet parent PUT includes all declared subnets and never emits separate subnet replacements', () => {
+  const { project, nodes } = smallProject(A, ['virtual-network']);
+  Model.addNode(project, 'subnet', nodes[0].id, { nameMode: 'custom', name: 'application', attributes: { addressPrefix: '10.0.1.0/24' } });
+  Model.addNode(project, 'subnet', nodes[0].id, { nameMode: 'custom', name: 'backend', attributes: { addressPrefix: '10.0.2.0/24' } });
+  const out = arm(project);
+  assert.equal(out.template.resources.length, 1);
+  const vnet = out.template.resources[0];
+  assert.equal(vnet.type, 'Microsoft.Network/virtualNetworks');
+  assert.match(vnet.properties, /^\[union\(/);
+  assert.match(vnet.properties, /createObject\('subnets', createArray\(/);
+  assert.equal((vnet.properties.match(/createObject\('name',/g) || []).length, 2);
+  assert.ok(!out.template.resources.some((r) => r.type.toLowerCase().endsWith('/subnets')));
+  const imported = I.importTemplate(out.template, out.parameters);
+  assert.deepEqual(new Map(nodesOf(imported.project, 'subnet').map((n) => [n.name, n.attributes.addressPrefix])), new Map([
+    ['application', '10.0.1.0/24'], ['backend', '10.0.2.0/24']
+  ]));
+  const bicep = I.exportProject(project, 'bicep');
+  const source = bicep.files.find((f) => f.name.endsWith('.bicep')).content;
+  assert.equal((source.match(/^resource /gm) || []).length, 1);
+  assert.match(source, /properties: union\(/);
+  assert.match(source, /subnets: \[/);
+  assert.ok(!source.includes("'Microsoft.Network/virtualNetworks/subnets@"));
+  for (const result of [out, bicep]) {
+    assert.match(result.warnings.join('\n'), /what-if: unmanaged existing subnets\/peerings/);
+    assert.match(result.files.find((f) => f.name.endsWith('.instructions.txt')).content, /what-if: unmanaged existing subnets\/peerings/);
+  }
+});
+
+test('export-generated empty-subnet json/union/createObject expressions resolve without placeholders', () => {
+  const { project } = smallProject(A, ['virtual-network']);
+  const out = arm(project);
+  assert.match(out.template.resources[0].properties, /createObject\('subnets', json\('\[\]'\)\)/);
+  const imported = I.importTemplate(out.template, out.parameters);
+  assert.equal(nodesOf(imported.project, 'virtual-network')[0].attributes.addressSpace, '10.0.0.0/16');
+  assert.equal(nodesOf(imported.project, 'subnet').length, 0);
+  assert.ok(!imported.warnings.some((warning) => warning.includes('expression preserved')));
+  assert.match(out.warnings.join('\n'), /Only declared subnets are retained; the diagram must inventory every existing subnet/);
+});
+
+test('installed Bicep compiler output and parameters round-trip every supported resource kind', (t) => {
+  const available = spawnSync('bicep', ['--version'], { encoding: 'utf8' });
+  if (available.status !== 0) { t.skip('Bicep CLI is not installed; pure JavaScript export/import regressions still run.'); return; }
+  const directory = path.join(__dirname, '..', '.infrastructure-test-fixtures-' + process.pid);
+  fs.mkdirSync(directory);
+  try {
+    const { project } = allResources();
+    const out = I.exportProject(project, 'bicep');
+    for (const file of out.files.filter((f) => /\.bicep(param)?$/.test(f.name))) fs.writeFileSync(path.join(directory, file.name), file.content);
+    function compile(command, extension) {
+      const file = out.files.find((f) => f.name.endsWith(extension));
+      const run = spawnSync('bicep', [command, path.join(directory, file.name), '--no-restore', '--stdout'], { encoding: 'utf8', maxBuffer: 8 * 1024 * 1024 });
+      assert.equal(run.status, 0, run.stderr || String(run.error));
+      return JSON.parse(run.stdout);
+    }
+    const compiledTemplate = compile('build', '.bicep');
+    const compiled = compile('build-params', '.bicepparam');
+    const compiledParameters = typeof compiled.parametersJson === 'string' ? JSON.parse(compiled.parametersJson) : compiled.parametersJson || compiled;
+    assert.deepEqual(compiledParameters.parameters, JSON.parse(out.files.find((f) => f.name.endsWith('.parameters.json')).content).parameters);
+    const imported = I.importTemplate(compiledTemplate, compiledParameters);
+    for (const type of ['service-bus-namespace', 'service-bus-queue', 'service-bus-topic', 'service-bus-subscription', 'storage-account', 'virtual-network', 'subnet', 'nsg', 'log-analytics']) {
+      const expected = nodesOf(project, type).map((n) => A.Naming.resolveName(project, n));
+      assert.deepEqual(nodesOf(imported.project, type).map((n) => n.name), expected, type);
+    }
+    assert.equal(compiledTemplate.resources.length, 8);
+    assert.ok(!compiledTemplate.resources.some((r) => r.type.toLowerCase().endsWith('/subnets')));
+    assert.equal(nodesOf(imported.project, 'subnet')[0].attributes.addressPrefix, '10.0.1.0/24');
+    assert.ok(!imported.warnings.some((warning) => warning.includes('expression preserved')));
+  } finally {
+    fs.rmSync(directory, { recursive: true });
+  }
 });
 
 test('Bicep emits full child types, parent symbols and separate parameter files', () => {
@@ -113,6 +207,27 @@ test('Bicep emits full child types, parent symbols and separate parameter files'
   assert.ok(out.files.some((f) => f.name.endsWith('.parameters.json')));
   assert.ok(!main.includes('blueprint'));
   assert.ok(!main.includes('westeurope'));
+});
+
+test('instructions disclose pinned API coverage, canonical references and validation limitations', () => {
+  const { project } = allResources();
+  const out = I.exportProject(project, 'arm');
+  const instructions = out.files.find((f) => f.name.endsWith('.instructions.txt')).content;
+  for (const path of [
+    'microsoft.servicebus/2021-11-01/namespaces',
+    'microsoft.servicebus/2021-11-01/namespaces/queues',
+    'microsoft.servicebus/2021-11-01/namespaces/topics',
+    'microsoft.servicebus/2021-11-01/namespaces/topics/subscriptions',
+    'microsoft.storage/2023-05-01/storageaccounts',
+    'microsoft.network/2023-11-01/virtualnetworks',
+    'microsoft.network/2023-11-01/virtualnetworks/subnets',
+    'microsoft.network/2023-11-01/networksecuritygroups',
+    'microsoft.operationalinsights/2022-10-01/workspaces'
+  ]) assert.ok(instructions.includes('https://learn.microsoft.com/en-us/azure/templates/' + path), path);
+  assert.match(instructions, /not a claim of Microsoft certification/);
+  assert.match(instructions, /complete standards compliance/);
+  assert.match(instructions, /direct Bicep import and Terraform are not supported/);
+  assert.match(instructions, /NSGs without custom rules only/);
 });
 
 test('Bicep escapes quotes, backslashes, controls and interpolation in parameter values', () => {
@@ -146,6 +261,41 @@ test('ARM template literals escape [ with [[, but parameter values retain both b
     { key: 'escaped', value: '[literal]' },
     { key: 'passed', value: '[[both-brackets]' }
   ]);
+});
+
+test('external object parameter values are not recursively evaluated or unescaped', () => {
+  const literalTags = { single: "[concat('not', 'executed')]", double: '[[both-brackets]' };
+  const out = I.importTemplate(template([
+    resource('Microsoft.Network/networkSecurityGroups', 'nsg', {}, { tags: "[parameters('tags')]" })
+  ], { parameters: { tags: { type: 'object' } } }), { parameters: { tags: { value: literalTags } } });
+  assert.deepEqual(Object.fromEntries(nodesOf(out.project, 'nsg')[0].tags.map((t) => [t.key, t.value])), literalTags);
+});
+
+test('Naming.resolveName returns a string and exports use that string directly', () => {
+  const { project, nodes } = smallProject(A, ['nsg']);
+  const conventionName = A.Naming.resolveName(project, nodes[0]);
+  assert.equal(typeof conventionName, 'string');
+  assert.ok(conventionName.length > 0);
+  let out = arm(project);
+  assert.equal(value(out, out.template.resources[0].name), conventionName);
+  Model.updateNode(project, nodes[0].id, { nameMode: 'custom', name: 'custom-nsg' });
+  assert.equal(A.Naming.resolveName(project, nodes[0]), 'custom-nsg');
+  out = arm(project);
+  assert.equal(value(out, out.template.resources[0].name), 'custom-nsg');
+});
+
+test('catalog naming restrictions omit invalid resource-name values and persist all warnings', () => {
+  const { project, nodes } = smallProject(A, ['storage-account', 'service-bus-namespace', 'nsg']);
+  for (const node of nodes) Model.updateNode(project, node.id, { nameMode: 'custom', name: 'BAD NAME?' });
+  const out = arm(project);
+  for (const r of out.template.resources) {
+    const parameterName = /parameters\('([^']+)'\)/.exec(r.name)[1];
+    assert.ok(!own(out.parameters.parameters, parameterName));
+  }
+  const instructions = out.files.find((f) => f.name.endsWith('.instructions.txt')).content;
+  assert.equal(out.warnings.filter((warning) => warning.includes('fails catalog naming restrictions')).length, 3);
+  out.warnings.forEach((warning) => assert.ok(instructions.includes(warning)));
+  assert.ok(!instructions.includes('BAD NAME?'));
 });
 
 test('unsupported objects, unscoped resources, ignored settings and security features warn explicitly', () => {
@@ -330,6 +480,29 @@ test('ARM export/import round-trips supported hierarchy, values and tags without
   assert.equal(imported.project.nodes[sub.parentId].type, 'service-bus-topic');
   assert.match(imported.warnings.join('\n'), /not lossless/);
   assert.equal(nodesOf(imported.project, 'resource-group')[0].attributes.location, undefined);
+});
+
+test('ARM imports are automatically arranged without overlapping sibling resources', () => {
+  const { project } = I.importTemplate(template([
+    resource('Microsoft.Network/networkSecurityGroups', 'first-nsg'),
+    resource('Microsoft.Network/networkSecurityGroups', 'second-nsg'),
+    resource('Microsoft.Storage/storageAccounts', 'exampleaccount'),
+    resource('Microsoft.ServiceBus/namespaces', 'message-bus', {}, {
+      resources: [resource('queues', 'first-queue'), resource('queues', 'second-queue')]
+    })
+  ]));
+  const nodes = Object.values(project.nodes);
+  const { rects } = A.Layout.compute(project);
+  assert.ok(nodes.every((node) => Number.isFinite(node.x) && Number.isFinite(node.y)));
+  assert.ok(new Set(nodes.map((node) => node.x + ',' + node.y)).size > 1);
+  for (let i = 0; i < nodes.length; i++) {
+    for (let j = i + 1; j < nodes.length; j++) {
+      if (nodes[i].parentId !== nodes[j].parentId) continue;
+      const left = rects[nodes[i].id], right = rects[nodes[j].id];
+      const overlap = left.x < right.x + right.w && right.x < left.x + left.w && left.y < right.y + right.h && right.y < left.y + left.h;
+      assert.equal(overlap, false, 'Sibling resources overlap: ' + nodes[i].name + ' / ' + nodes[j].name);
+    }
+  }
 });
 
 test('import safely resolves defaults, parameter overrides, variables, concat, format and object/index access', () => {
