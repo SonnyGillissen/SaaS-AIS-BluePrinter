@@ -182,6 +182,7 @@ a { color: var(--c-primary); }
 .menu-list button { display: block; width: 100%; text-align: left; color: var(--c-text) !important; padding: 6px 10px; }
 .menu-list button:hover { background: var(--c-hover) !important; }
 .menu-list hr { border: 0; border-top: 1px solid var(--c-border); margin: 4px 0; }
+#tidy-menu { left: auto; right: 0; min-width: 180px; }
 
 /* ---------------------------------------------------------------- workspace */
 .workspace {

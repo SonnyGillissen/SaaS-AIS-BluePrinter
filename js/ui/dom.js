@@ -27,6 +27,7 @@
     'zoom-in': 'M21 21l-5-5 M11 3a8 8 0 1 0 0 16 8 8 0 0 0 0-16 M7 11h8 M11 7v8',
     fit: 'M8 3H3v5 M16 3h5v5 M21 16v5h-5 M8 21H3v-5',
     tidy: 'M3 3h7v7H3Z M14 3h7v7h-7Z M3 14h7v7H3Z M14 14h7v7h-7Z',
+    route: 'M3 18h8V6h10 M17 2l4 4-4 4 M3 15v6',
     settings: 'M4 7h16 M4 17h16 M8 4v6 M16 14v6',
     help: 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20 M9 9a3 3 0 0 1 6 0c0 2-3 2-3 5 M12 17h.01',
     code: 'M8 5l-6 7 6 7 M16 5l6 7-6 7 M14 3l-4 18',

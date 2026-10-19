@@ -76,12 +76,33 @@ async function browserChecks() {
   check(copyButton.textContent === 'Copy' && copyButton.title === 'Copy (Ctrl+C)' && A.Storage.loadPrefs().showActionLabels === false, 'Hidden labels retain names, shortcut tooltips and a persisted preference');
   const exportMenuButton = doc.querySelector('[data-action="export-menu"]');
   exportMenuButton.click();
-  const submenuActions = Array.from(doc.querySelectorAll('.menu-list [role="menuitem"]'));
-  check(submenuActions.length === 6 && submenuActions.every((button) => {
+  const submenuActions = Array.from(exportMenuButton.nextElementSibling.querySelectorAll('[role="menuitem"]'));
+  const infrastructureActions = submenuActions.slice(-2);
+  check(infrastructureActions[0].dataset.action === 'export-bicep' &&
+    infrastructureActions[1].dataset.action === 'export-arm' &&
+    infrastructureActions[0].previousElementSibling.matches('hr[role="separator"]'),
+  'Infrastructure exports are last in the menu behind a divider');
+  check(submenuActions.length === 8 && submenuActions.every((button) => {
     const labelStyle = win.getComputedStyle(button.querySelector('.action-label'));
     return labelStyle.position !== 'absolute' && labelStyle.clipPath === 'none' && button.querySelector('.action-label').getBoundingClientRect().width > 1 && win.getComputedStyle(button.querySelector('.action-icon')).marginRight === '6px';
   }), 'Export submenu retains visible labels and icon spacing while toolbar labels are hidden');
   exportMenuButton.click();
+  const tidyMenuButton = doc.querySelector('[data-action="tidy-menu"]');
+  const tidyMenu = doc.getElementById('tidy-menu');
+  tidyMenuButton.click();
+  const tidyItems = Array.from(tidyMenu.querySelectorAll('[role="menuitem"]'));
+  check(tidyItems.map((item) => item.textContent).join('|') === 'Tidy all|Tidy resources|Tidy arrows' &&
+    tidyItems.every((item) => item.querySelector('.action-icon') &&
+      win.getComputedStyle(item.querySelector('.action-label')).clipPath === 'none' &&
+      item.querySelector('.action-label').getBoundingClientRect().width > 1),
+  'Tidy submenu has distinct labelled icons, including when toolbar labels are hidden');
+  exportMenuButton.click();
+  check(tidyMenu.hidden && tidyMenuButton.getAttribute('aria-expanded') === 'false',
+    'Opening Export closes Tidy up and updates its expanded state');
+  tidyMenuButton.click();
+  check(exportMenuButton.nextElementSibling.hidden && !tidyMenu.hidden, 'Opening Tidy up closes Export');
+  doc.querySelector('.brand').click();
+  check(tidyMenu.hidden && tidyMenuButton.getAttribute('aria-expanded') === 'false', 'Outside click dismisses Tidy up');
   check(Object.keys(prefsBeforeLabels).every((key) => A.Storage.loadPrefs()[key] === prefsBeforeLabels[key]) && JSON.stringify(A.app.store.project) === projectBeforeLabels, 'Label preference preserves other preferences and does not modify the blueprint');
   A.Dom.setActionLabels(true);
   await new Promise((resolve, reject) => {
@@ -142,6 +163,10 @@ async function browserChecks() {
       const menuBounds = doc.querySelector('.menu-list').getBoundingClientRect();
       check(menuBounds.left >= 0 && menuBounds.right <= width, 'Desktop export menu stays on screen at ' + width + ' with ' + mode + ' labels');
       exportMenuButton.click();
+      tidyMenuButton.click();
+      const tidyBounds = tidyMenu.getBoundingClientRect();
+      check(tidyBounds.left >= 0 && tidyBounds.right <= width, 'Desktop tidy menu stays on screen at ' + width + ' with ' + mode + ' labels');
+      tidyMenuButton.click();
     }
   }
   labelsSelect.value = 'hide';
@@ -732,6 +757,15 @@ async function browserChecks() {
     check(menuBounds.left >= 0 && menuBounds.right <= width, 'Export menu remains on screen at ' + width);
     key(tools, 'Escape');
     check(tools.getAttribute('aria-expanded') === 'false', 'Escape closes tools at ' + width);
+    tools.click();
+    tidyMenuButton.click();
+    const tidyBounds = tidyMenu.getBoundingClientRect();
+    check(tools.getAttribute('aria-expanded') === 'true' && !tidyMenu.hidden &&
+      tidyBounds.left >= 0 && tidyBounds.right <= width,
+    'Tidy submenu opens inside compact tools and stays on screen at ' + width);
+    doc.querySelector('[data-action="tidy-arrows"]').click();
+    check(tidyMenu.hidden && tools.getAttribute('aria-expanded') === 'false',
+      'Selecting a tidy action closes compact tools at ' + width);
     check(panelButton('palette').getBoundingClientRect().height >= 44, 'Touch controls have finger-sized targets at ' + width + ': ' + panelButton('palette').getBoundingClientRect().height + ', ' + win.getComputedStyle(panelButton('palette')).minHeight + ', ' + win.matchMedia('(pointer: coarse)').matches);
     doc.querySelector('[data-action="help"]').click();
     const mobileDialog = doc.querySelector('dialog[open]');
@@ -745,6 +779,78 @@ async function browserChecks() {
   annotationFrame.style.cssText = 'width:1440px;height:900px';
   await pause();
   check(win.getComputedStyle(doc.getElementById('resource-sidebar')).display === 'flex' && win.getComputedStyle(doc.getElementById('properties-sidebar')).display === 'flex' && win.getComputedStyle(doc.getElementById('main-toolbar')).display === 'flex', 'Desktop restores both sidebars and the full toolbar');
+  await A.app.actions.newProject(false);
+  doc.querySelector('[data-action="sample"]').click();
+  await pause();
+  const sampleRect = (type) => {
+    const node = Object.values(store.project.nodes).find((n) => n.type === type);
+    return A.Layout.compute(store.project).rects[node.id];
+  };
+  check(sampleRect('users').x + sampleRect('users').w < sampleRect('management-group').x &&
+    sampleRect('management-group').x + sampleRect('management-group').w < sampleRect('on-premises-system').x,
+  'Loading the sample places external participants on the correct sides of the integration flow');
+  const samplePositions = JSON.stringify(Object.values(store.project.nodes).map((n) => [n.x, n.y]));
+  doc.querySelector('[data-action="tidy"]').click();
+  await pause();
+  check(JSON.stringify(Object.values(store.project.nodes).map((n) => [n.x, n.y])) === samplePositions,
+    'Tidy up keeps the freshly loaded sample layout stable');
+  store.change('saved arrow edits', (p) => {
+    Object.values(p.connections).forEach((c) => A.Model.updateConnection(p, c.id, {
+      waypoints: [{ x: -500, y: 900 }],
+      sourceAnchor: { side: 'top', offset: 0.2 }, targetAnchor: { side: 'bottom', offset: 0.8 }
+    }));
+  });
+  const savedArrows = JSON.stringify(store.project.connections);
+  const arrowPositions = JSON.stringify(store.project.nodes);
+  tidyMenuButton.focus();
+  tidyMenuButton.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+  check(doc.activeElement === tidyItems[0] && !tidyMenu.hidden, 'ArrowDown opens Tidy up and focuses its first item');
+  tidyItems[0].dispatchEvent(new win.KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }));
+  check(doc.activeElement === tidyItems[2], 'Tidy menu keyboard navigation wraps to the last item');
+  tidyItems[2].dispatchEvent(new win.KeyboardEvent('keydown', { key: 'Home', bubbles: true }));
+  check(doc.activeElement === tidyItems[0], 'Home focuses the first tidy action');
+  tidyItems[0].dispatchEvent(new win.KeyboardEvent('keydown', { key: 'End', bubbles: true }));
+  check(doc.activeElement === tidyItems[2], 'End focuses the last tidy action');
+  tidyItems[2].dispatchEvent(new win.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+  check(tidyMenu.hidden && doc.activeElement === tidyMenuButton, 'Escape dismisses Tidy up and restores trigger focus');
+  tidyMenuButton.click();
+  tidyItems[0].focus();
+  doc.querySelector('[data-action="fit"]').focus();
+  check(tidyMenu.hidden, 'Moving focus outside the tidy menu dismisses it');
+  check(JSON.stringify(store.project.nodes) === arrowPositions && JSON.stringify(store.project.connections) === savedArrows,
+    'Tidy menu navigation does not move selected resources or change routing');
+  tidyMenuButton.click();
+  doc.querySelector('[data-action="tidy-arrows"]').click();
+  await pause();
+  check(tidyMenu.hidden && tidyMenuButton.getAttribute('aria-expanded') === 'false', 'Choosing a tidy action closes its submenu');
+  check(Object.values(store.project.connections).every((c) => !c.waypoints.length && !c.sourceAnchor && !c.targetAnchor),
+    'Tidy arrows clears saved bends and attachments via the toolbar');
+  check(JSON.stringify(store.project.nodes) === arrowPositions, 'Tidy arrows leaves resource positions untouched');
+  store.undo();
+  check(JSON.stringify(store.project.connections) === savedArrows, 'One undo restores all saved arrow routing');
+  store.change('move resource', (p) => { Object.values(p.nodes)[0].x += 317; });
+  const beforeAll = JSON.stringify(store.project);
+  const nodesBeforeAll = JSON.stringify(store.project.nodes);
+  const historyBeforeAll = store.past.length;
+  tidyMenuButton.click();
+  doc.querySelector('[data-action="tidy-all"]').click();
+  await pause();
+  check(JSON.stringify(store.project.nodes) !== nodesBeforeAll &&
+    Object.values(store.project.connections).every((c) => !c.waypoints.length && !c.sourceAnchor && !c.targetAnchor),
+  'Tidy all arranges resources and resets arrow routing together');
+  check(store.past.length === historyBeforeAll + 1, 'Tidy all records exactly one undo step');
+  const afterAll = JSON.stringify(store.project);
+  store.undo();
+  check(JSON.stringify(store.project) === beforeAll, 'One undo restores both resource positions and arrow edits');
+  store.redo();
+  check(JSON.stringify(store.project) === afterAll, 'Redo restores the complete tidy result');
+  store.undo();
+  tidyMenuButton.click();
+  doc.querySelector('[data-action="tidy"]').click();
+  await pause();
+  check(JSON.stringify(store.project.nodes) !== nodesBeforeAll &&
+    JSON.stringify(store.project.connections) === savedArrows,
+  'Tidy resources arranges nodes without resetting saved arrow routing');
   return results;
 }
 

@@ -10,15 +10,94 @@ Configuration package (JSON) exports download directly and always contain the fu
 | Format | File | Use it for |
 |---|---|---|
 | **Configuration package** | `*.aisbp.json` | Backups, sharing, version control, re-importing (see [Configuration package](Configuration-Package.md)) |
+| **Bicep infrastructure** | `*.bicep` + `*.bicepparam` | Parameterized deployment definitions for the supported Azure resource subset |
+| **ARM infrastructure** | `*.json` + `*.parameters.json` | Parameterized ARM deployment definitions; also importable |
 | **PNG** | `*.png` | Documents, wikis, slides (rendered at 2× resolution) |
 | **PDF** | `*.pdf` | Printing and sharing. Page size: *fit to diagram*, A4, A3 or Letter (*Options › Diagram*). |
 | **SVG** | `*.svg` | Lossless vector image for web pages and further editing |
 | **draw.io** | `*.drawio` | Further editing in [draw.io / diagrams.net](https://app.diagrams.net/) (web, desktop, VS Code extension) |
 | **ArchiMate** | `*.archimate.xml` | Enterprise architecture tools: Archi, BiZZdesign, Sparx EA, MEGA, … |
 
-Exports use the current display style, detail level and attribute selection, except draw.io and
+Diagram exports use the current display style, detail level and attribute selection, except draw.io and
 ArchiMate, which always include *all* attributes as data. Selection handles and validation
 markers are left out.
+
+## Infrastructure export and import
+
+**Bicep infrastructure** and **ARM infrastructure** export deployment definitions, not pictures.
+These actions are grouped at the bottom of the Export menu, below a divider.
+The download dialog lists limitations and offers **Download all as ZIP**, containing every
+deployment template, parameter file, scope manifest and instructions file for the selected
+format and all resource groups. Extract the ZIP before deploying. ZIPs are created locally
+in your browser without uploading files. Individual file download buttons remain available.
+Download the template and its parameter file into the same directory. Review every note:
+unsupported resources and settings are not silently converted into deployment instructions.
+Warnings identify resources by their resolved diagram names rather than internal identifiers.
+
+### Export coverage
+
+| Resources | Pinned API | First-release boundaries |
+|---|---|---|
+| Service Bus namespace, queue, topic, topic subscription | `2021-11-01` | Basic/Standard/Premium tier checks; no authorization rules, filters or private endpoints |
+| Storage account | `2023-05-01` | Standard StorageV2 only; no data-plane content or child services |
+| Virtual network, subnet, network security group | `2023-11-01` | Address spaces/prefixes and selected settings; free-text NSG rules and subnet security associations need manual configuration |
+| Log Analytics workspace | `2022-10-01` | PerGB2018 only; no capacity reservation or diagnostic settings |
+
+Other catalog resources are reported as unsupported. Properties are mapped explicitly,
+not copied blindly from the diagram. Missing mandatory configuration produces a required
+parameter without a supplied value rather than an invented deployment value.
+Subnets are declared inline in their VNet, not deployed as competing standalone updates.
+When targeting an existing VNet, include all its subnets in the blueprint and inspect what-if:
+an omitted existing subnet can otherwise be removed or cause the deployment to fail.
+
+Exports are divided by resource group. Select the matching **existing** subscription and
+resource group when deploying; tenants, management groups, subscriptions and resource groups
+are organizational context, not newly provisioned resources. Resources without an appropriate
+resource-group scope are reported rather than moved into an arbitrary group.
+The separate `.deployment-scopes.json` file records the diagram's suggested target groups;
+it is informational, not an ARM template. Download the `.instructions.txt` file as well.
+
+Resource names, locations, SKUs, tags and mapped configuration values are parameters.
+Edit the parameter file instead of editing generated resource definitions. Required values
+that cannot be derived must be supplied before deployment. Resource types and API versions
+are deliberately pinned schema identifiers, not user-configurable resource settings.
+Secrets are not extracted from arbitrary diagram attributes or custom properties.
+Do not put credentials in names, tags or other non-secret settings.
+
+Only explicit parent/child resource relationships generate deployment dependencies.
+Diagram arrows and network attachment drawings do **not** grant permissions, create private
+endpoints, configure networking or imply deployment order. Review networking, identity,
+diagnostics, authorization and application content separately.
+
+The implementation follows resource-specific schemas and uses conservative security settings;
+it is not a Microsoft certification or a guarantee of compliance with every organization's
+policies. Validate generated Bicep with `az bicep build`, then use Azure deployment
+validation and what-if with the intended scope and parameters before deployment.
+Some service tiers, regions and settings require additional Azure-side validation.
+See Microsoft's [Bicep best practices](https://learn.microsoft.com/azure/azure-resource-manager/bicep/best-practices)
+and [resource reference](https://learn.microsoft.com/azure/templates/).
+
+### Import
+
+Use **Import** to select an ARM template JSON. To supply parameter values, select the template
+and its deployment `.parameters.json` file **together** in the file picker (in either order).
+Native blueprint and embedded-diagram imports continue to work as before.
+
+ARM import is a visualization of a supported subset, not an ARM expression interpreter or
+a deployment engine. Parameter defaults and supplied values are used when supported;
+unresolved expressions and unsupported constructs are reported. Inspect the import notes and
+resource custom properties before using an imported diagram to generate infrastructure.
+
+Direct Bicep parsing is intentionally not supported. Compile Bicep to ARM JSON with the
+official Bicep CLI (`az bicep build --file main.bicep`), then import the resulting template.
+An ARM deployment parameters JSON file is required for parameter overrides; `.bicepparam`
+source files are not parsed by the browser. Compilation must be done locally; files are
+not uploaded to a compiler service.
+
+Terraform export/import is deferred. Arbitrary modules, loops, expressions, linked templates,
+deployment scripts and provider-specific features are not promised to round-trip.
+Infrastructure files contain no embedded blueprint or layout metadata. Keep a
+`.aisbp.json` backup to preserve exact layout, connections and editor settings.
 
 ## Background options
 

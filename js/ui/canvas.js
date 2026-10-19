@@ -186,7 +186,7 @@
         const a = g.rects[c.from];
         const b = g.rects[c.to];
         if (!a || !b || a.hidden || b.hidden || !a.w || !b.w) return;
-        const path = Render.connectorPath(a, b, store.project.settings.diagram.connector, c.waypoints, c.sourceAnchor, c.targetAnchor);
+        const path = Render.connectionPath(store.project, c, g);
         const handles = path.handles || [{ x: path.label.x, y: path.label.y, index: 0, insert: true }];
         handles.forEach((pt) => {
           const handle = svgEl('g', { class: 'handle route', 'data-handle': 'route', 'data-conn-id': id, 'data-point-index': pt.index, 'data-insert': pt.insert });
@@ -282,7 +282,7 @@
         const g = store.derived().geometry;
         const a = g.rects[c.from];
         const b = g.rects[c.to];
-        const path = Render.connectorPath(a, b, store.project.settings.diagram.connector, c.waypoints, c.sourceAnchor, c.targetAnchor);
+        const path = Render.connectionPath(store.project, c, g);
         gesture = {
           type: handleEl.getAttribute('data-handle'), id, index: Number(handleEl.getAttribute('data-point-index')),
           endpoint: handleEl.getAttribute('data-endpoint'),

@@ -38,9 +38,58 @@
     xml: 'application/xml'
   };
 
+  async function readImport(files) {
+    const selected = Array.from(files || []);
+    if (!selected.length || selected.length > 2) throw new Error('Choose one blueprint, or one ARM template and optionally its parameters JSON.');
+    const parsed = await Promise.all(selected.map(async (file) => {
+      if (!/\.json$/i.test(file.name) && file.type !== MIME.json) return null;
+      if (file.size > AISBP.Embedded.MAX_JSON_BYTES) throw new Error('JSON file is too large.');
+      return JSON.parse(await file.text());
+    }));
+    const templates = parsed.filter((value) => value && AISBP.Infrastructure.isTemplate(value));
+    if (templates.length === 1) {
+      const parameters = parsed.filter((value) => value !== templates[0]);
+      if (parameters.length && (!parameters[0] || !parameters[0].parameters || parameters[0].resources)) {
+        throw new Error('The second file must be an ARM deployment parameters JSON file.');
+      }
+      return AISBP.Infrastructure.importTemplate(templates[0], parameters[0]);
+    }
+    if (selected.length !== 1) throw new Error('Select exactly one ARM template with its optional parameters JSON.');
+    if (parsed[0] && parsed[0].parameters && !parsed[0].format) {
+      throw new Error('Select the ARM template together with its parameters file.');
+    }
+    return AISBP.Embedded.fromFile(selected[0]);
+  }
+
+  function infrastructureFiles(format, project, name) {
+    const result = AISBP.Infrastructure.exportProject(project, format, { baseName: name });
+    const { h, modal } = AISBP.Dom;
+    modal({
+      title: 'Export ' + (format === 'arm' ? 'ARM' : 'Bicep') + ' infrastructure',
+      body: h('div', {},
+        h('p', { text: 'Review the notes before downloading. Each resource group has separate deployment files. Deploy to the matching existing subscription and resource group; hierarchy containers are not provisioned.' }),
+        h('p', { text: 'Download every file for the desired group into the same folder. Edit the parameter file, supply required values, and validate with Azure tooling before deployment. No diagram metadata is embedded.' }),
+        h('ul', {}, result.warnings.map((note) => h('li', { text: note }))),
+        result.files.length ? h('p', {}, h('button', {
+          type: 'button', class: 'btn primary', 'data-icon': 'export', text: 'Download all as ZIP',
+          onclick: () => {
+            try {
+              download(AISBP.Zip.create(result.files), name + '-' + format + '.zip', 'application/zip');
+            } catch (e) {
+              toast('ZIP export failed: ' + e.message, 'error');
+            }
+          }
+        })) : null,
+        result.files.length ? h('div', {}, result.files.map((file) => h('p', {}, h('button', {
+          type: 'button', class: 'btn', 'data-icon': 'export', text: file.name,
+          onclick: () => download(file.content, file.name, file.mime)
+        })))) : h('p', { text: 'No supported resources to export.' }))
+    });
+  }
+
   /**
    * Run an export.
-   * @param {string} format json | svg | png | pdf | drawio | archimate
+   * @param {string} format json | arm | bicep | svg | png | pdf | drawio | archimate
    * @param {object} project
    * @param {object} [opts] { embedDiagram: boolean, background: '#RRGGBB'|'transparent' }
    */
@@ -52,6 +101,10 @@
     project = Util.clone(project);
     const name = baseName(project);
     switch (format) {
+      case 'arm':
+      case 'bicep':
+        infrastructureFiles(format, project, name);
+        break;
       case 'json':
         download(AISBP.Package.toJson(project), name + '.aisbp.json', MIME.json);
         break;
@@ -94,5 +147,5 @@
     }
   }
 
-  AISBP.Exporter = { run, iconResolver };
+  AISBP.Exporter = { run, iconResolver, readImport };
 })(typeof globalThis !== 'undefined' ? globalThis : this);

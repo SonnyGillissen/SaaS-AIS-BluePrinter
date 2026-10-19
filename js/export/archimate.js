@@ -23,6 +23,7 @@
   const Catalog = AISBP.Catalog || (typeof require === 'function' ? require('../core/catalog.js') : null);
   const Model = AISBP.Model || (typeof require === 'function' ? require('../core/model.js') : null);
   const Layout = AISBP.Layout || (typeof require === 'function' ? require('../core/layout.js') : null);
+  const Render = AISBP.Render || (typeof require === 'function' ? require('../render/svg.js') : null);
   const Embedded = AISBP.Embedded || (typeof require === 'function' ? require('./embedded.js') : null);
 
   const esc = Util.escapeXml;
@@ -146,7 +147,10 @@
       const a = g.rects[c.from];
       const b = g.rects[c.to];
       if (!relIds[c.id] || !a || !b || a.hidden || b.hidden) return;
-      const routing = Model.cleanWaypoints(c.waypoints).map((pt) => '<bendpoint x="' + Math.round(pt.x + shiftX) + '" y="' + Math.round(pt.y + shiftY) + '"/>').join('');
+      const path = Render.connectionPath(project, c, g);
+      if (!path) return;
+      const points = path.vertices || Model.cleanWaypoints(c.waypoints);
+      const routing = points.map((pt) => '<bendpoint x="' + Math.round(pt.x + shiftX) + '" y="' + Math.round(pt.y + shiftY) + '"/>').join('');
       viewContent += '<connection identifier="id-vc-' + c.id + '" relationshipRef="' + relIds[c.id] + '" xsi:type="Relationship" source="' + viewNodeId(c.from) + '" target="' + viewNodeId(c.to) + '">' + routing + '</connection>';
     });
 

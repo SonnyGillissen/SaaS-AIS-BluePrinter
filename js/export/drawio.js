@@ -110,6 +110,10 @@
     const oy = g.bounds.y - 40;
     const cells = [];
     const cellId = (id) => 'n-' + id;
+    const routingCellId = (id) => {
+      const r = g.rects[id];
+      return cellId(id) + (!r.container && !r.annotation ? '-route' : '');
+    };
     const visibleParent = (node) => {
       let p = Model.getNode(project, node.parentId);
       while (p && g.rects[p.id] && g.rects[p.id].hidden) p = Model.getNode(project, p.parentId);
@@ -146,11 +150,12 @@
         }
       } else {
         const style = (img ? 'shape=image;image=' + img + ';imageAspect=0;aspect=fixed;' : 'rounded=1;whiteSpace=wrap;fillColor=#0078d4;fontColor=#ffffff;') +
-          'html=1;verticalLabelPosition=bottom;verticalAlign=top;labelBackgroundColor=none;fontSize=12;fontColor=' + st.text + ';';
-        const ix = r.x + r.w / 2 - Layout.ICON / 2;
-        const iy = r.y + 10;
-        cells.push('<object label="' + esc(labelOf(r)) + '" id="' + cellId(r.id) + '"' + dataAttributes(project, node) + '><mxCell style="' + esc(style) + '" vertex="1" parent="' + parentCell + '">' +
-          '<mxGeometry x="' + (ix - pr.x) + '" y="' + (iy - pr.y) + '" width="' + Layout.ICON + '" height="' + Layout.ICON + '" as="geometry"/></mxCell></object>');
+          'html=1;verticalLabelPosition=bottom;verticalAlign=top;labelBackgroundColor=none;movable=0;resizable=0;rotatable=0;fontSize=12;fontColor=' + st.text + ';';
+        // Group the visible icon with its full-tile attachment surface so they move together.
+        cells.push('<object label="" id="' + routingCellId(r.id) + '"' + dataAttributes(project, node) + '><mxCell style="group;" vertex="1" parent="' + parentCell + '">' +
+          '<mxGeometry x="' + (r.x - pr.x) + '" y="' + (r.y - pr.y) + '" width="' + r.w + '" height="' + r.h + '" as="geometry"/></mxCell></object>');
+        cells.push('<object label="' + esc(labelOf(r)) + '" id="' + cellId(r.id) + '"><mxCell style="' + esc(style) + '" vertex="1" connectable="0" parent="' + routingCellId(r.id) + '">' +
+          '<mxGeometry x="' + (r.w / 2 - Layout.ICON / 2) + '" y="10" width="' + Layout.ICON + '" height="' + Layout.ICON + '" as="geometry"/></mxCell></object>');
       }
     });
 
@@ -160,7 +165,9 @@
       const kind = Model.CONNECTION_KINDS.find((k) => k.id === c.kind) || Model.CONNECTION_KINDS[0];
       const both = c.direction === 'bidirectional';
       const noArrow = !both && (c.kind === 'network' || c.kind === 'association');
-      const edgeStyle = project.settings.diagram.connector === 'straight' ? '' : project.settings.diagram.connector === 'curved' ? 'curved=1;' : 'edgeStyle=orthogonalEdgeStyle;rounded=1;';
+      const path = Render.connectionPath(project, c, g);
+      if (!path) return;
+      const edgeStyle = project.settings.diagram.connector === 'curved' ? 'curved=1;' : 'edgeStyle=none;rounded=0;';
       const attachment = (value, prefix) => {
         const anchor = Model.cleanAnchor(value);
         if (!anchor) return '';
@@ -169,15 +176,33 @@
         const y = horizontal ? anchor.side === 'bottom' ? 1 : 0 : anchor.offset;
         return prefix + 'X=' + x + ';' + prefix + 'Y=' + y + ';' + prefix + 'Dx=0;' + prefix + 'Dy=0;' + prefix + 'Perimeter=0;';
       };
-      const style = edgeStyle + attachment(c.sourceAnchor, 'exit') + attachment(c.targetAnchor, 'entry') +
-        'html=1;strokeColor=' + st.edge + ';fontColor=' + st.edgeText + ';fontSize=10;' + (kind.dashed ? 'dashed=1;' : '') +
+      const style = edgeStyle +
+        attachment(c.sourceAnchor || Render.nearestAnchor(g.rects[c.from], path.start), 'exit') +
+        attachment(c.targetAnchor || Render.nearestAnchor(g.rects[c.to], path.end), 'entry') +
+        'html=1;strokeColor=' + st.edge + ';fontColor=' + st.edgeText + ';labelBackgroundColor=' + st.edgeLabelBg + ';fontSize=10;' + (kind.dashed ? 'dashed=1;' : '') +
         (noArrow ? 'endArrow=none;' : c.kind === 'dependency' ? 'endArrow=open;endFill=0;' : 'endArrow=block;endFill=1;') +
         (both ? (c.kind === 'dependency' ? 'startArrow=open;startFill=0;' : 'startArrow=block;startFill=1;') : c.kind === 'trigger' ? 'startArrow=oval;startFill=1;' : '');
-      const label = [c.label, c.attributes && c.attributes.protocol && c.attributes.protocol !== c.label ? c.attributes.protocol : ''].filter(Boolean).join(' \u00b7 ');
-      const points = Model.cleanWaypoints(c.waypoints);
+      const label = path.labelWidth ? path.labelText : '';
+      const points = path.vertices ? path.vertices.slice(1, -1) : Model.cleanWaypoints(c.waypoints);
       const routing = points.length ? '<Array as="points">' + points.map((pt) => '<mxPoint x="' + (pt.x - ox) + '" y="' + (pt.y - oy) + '"/>').join('') + '</Array>' : '';
+      let offset = '';
+      if (path.vertices) {
+        const vertices = path.vertices;
+        const lengths = vertices.slice(1).map((p, i) => Math.abs(p.x - vertices[i].x) + Math.abs(p.y - vertices[i].y));
+        let remaining = lengths.reduce((sum, length) => sum + length, 0) / 2;
+        let midpoint = vertices[0];
+        for (let i = 0; i < lengths.length; i++) {
+          if (remaining <= lengths[i] && lengths[i]) {
+            const t = remaining / lengths[i];
+            midpoint = { x: vertices[i].x + (vertices[i + 1].x - vertices[i].x) * t, y: vertices[i].y + (vertices[i + 1].y - vertices[i].y) * t };
+            break;
+          }
+          remaining -= lengths[i];
+        }
+        offset = '<mxPoint x="' + (path.label.x - midpoint.x) + '" y="' + (path.label.y - midpoint.y) + '" as="offset"/>';
+      }
       cells.push('<object label="' + esc(html(label)) + '" id="e-' + esc(c.id) + '" connectionType="' + esc(kind.label) + '" direction="' + (both ? 'bidirectional' : 'forward') + '"' + (c.attributes && c.attributes.protocol ? ' protocol="' + esc(c.attributes.protocol) + '"' : '') + '>' +
-        '<mxCell style="' + esc(style) + '" edge="1" parent="1" source="' + cellId(c.from) + '" target="' + cellId(c.to) + '"><mxGeometry relative="1" as="geometry">' + routing + '</mxGeometry></mxCell></object>');
+        '<mxCell style="' + esc(style) + '" edge="1" parent="1" source="' + routingCellId(c.from) + '" target="' + routingCellId(c.to) + '"><mxGeometry relative="1" as="geometry">' + routing + offset + '</mxGeometry></mxCell></object>');
     });
 
     const w = Math.ceil(g.bounds.w + 80);
