@@ -400,7 +400,7 @@
     },
     'apim-api': {
       label: 'API', category: 'integration', icon: I.inputOutput, abbr: 'api', provider: 'Microsoft.ApiManagement/service/apis',
-      parents: ['api-management'], archimate: 'ApplicationInterface', rule: R.apimChild, pattern: '{name}', seed: 'api',
+      parents: ['api-management', 'apim-workspace'], archimate: 'ApplicationInterface', rule: R.apimChild, pattern: '{name}', seed: 'api',
       attributes: [
         select('apiType', 'API type', ['REST', 'SOAP', 'GraphQL', 'WebSocket', 'gRPC', 'OData', 'MCP'], { default: 'REST', show: true }),
         text('path', 'URL suffix', { show: true }),
@@ -412,13 +412,18 @@
     },
     'apim-product': {
       label: 'Product', category: 'integration', icon: I.module, abbr: 'product', provider: 'Microsoft.ApiManagement/service/products',
-      parents: ['api-management'], archimate: 'Product', rule: R.apimChild, pattern: '{name}', seed: 'product',
+      parents: ['api-management', 'apim-workspace'], archimate: 'Product', rule: R.apimChild, pattern: '{name}', seed: 'product',
       attributes: [select('state', 'State', ['published', 'notPublished'], { default: 'published' }), bool('approvalRequired', 'Approval required'), bool('subscriptionRequired', 'Subscription required', { default: true })]
     },
     'apim-backend': {
       label: 'Backend', category: 'integration', icon: I.serverFarm, abbr: 'be', provider: 'Microsoft.ApiManagement/service/backends',
-      parents: ['api-management'], archimate: 'ApplicationInterface', rule: R.apimBackend, pattern: '{name}', seed: 'backend',
+      parents: ['api-management', 'apim-workspace'], archimate: 'ApplicationInterface', rule: R.apimBackend, pattern: '{name}', seed: 'backend',
       attributes: [text('url', 'URL', { show: true }), select('protocol', 'Protocol', ['http', 'soap']), bool('circuitBreaker', 'Circuit breaker')]
+    },
+    'apim-workspace': {
+      label: 'API Management Workspace', category: 'integration', icon: I.apim, abbr: 'apimws', provider: 'Microsoft.ApiManagement/service/workspaces',
+      parents: ['api-management'], archimate: 'ApplicationComponent', rule: R.apimBackend, pattern: '{name}', seed: 'workspace',
+      attributes: [text('displayName', 'Display name', { show: true })]
     },
     'apim-gateway': {
       label: 'API Management Gateway', category: 'integration', icon: I.apim, abbr: 'gw', provider: 'Microsoft.ApiManagement/service/gateways',

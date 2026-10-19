@@ -30,6 +30,7 @@ The resource types available in the palette, generated from [`js/core/catalog.js
 | API | `api` | API Management | 1-256 characters; not allowed: *#&+:<>?; unique in the parent resource | Location, Description, API type, URL suffix, Version, Backend URL, Subscription required, Policies |
 | Product | `product` | API Management | 1-256 characters; not allowed: *#&+:<>?; unique in the parent resource | Location, Description, State, Approval required, Subscription required |
 | Backend | `be` | API Management | 1-80 characters; allowed: letters, digits_-; must start with a letter; unique in the parent resource | Location, Description, URL, Protocol, Circuit breaker |
+| API Management Workspace | `apimws` | API Management | 1-80 characters; allowed: letters, digits_-; must start with a letter; unique in the parent resource | Location, Description, Display name |
 | API Management Gateway | `gw` | API Management | 1-80 characters; allowed: letters, digits_-; must start with a letter; unique in the parent resource | Location, Description, Gateway location |
 | API Center | `apic` | Resource Group | 3-90 characters; allowed: letters, digits-; must start with a letter or digit; must end with a letter or digit; unique in the resource group | Location, Description, Plan |
 | API Connection | `con` | Resource Group | 1-80 characters; allowed: letters, digits_.()-; unique in the resource group | Location, Description, Connector, Authentication |
