@@ -43,10 +43,13 @@ Warnings identify resources by their resolved diagram names rather than internal
 | API Management service | `2024-05-01` | Tier, capacity and publisher details; APIs, policies, products, gateways and advanced networking are not generated |
 | Service Bus namespace, queue, topic, topic subscription | `2021-11-01` | Basic/Standard/Premium tier checks; no authorization rules, filters or private endpoints |
 | Storage account | `2023-05-01` | Standard StorageV2 only; no data-plane content or child services |
+| Key Vault | `2023-07-01` | Standard/Premium vault configuration only; tenant ID required; no keys, secrets, certificates, role assignments or private endpoints |
 | Virtual network, subnet, network security group | `2023-11-01` | Address spaces/prefixes and selected settings; free-text NSG rules and subnet security associations need manual configuration |
 | Log Analytics workspace | `2022-10-01` | PerGB2018 only; no capacity reservation or diagnostic settings |
 
-Other catalog resources are reported as unsupported. Properties are mapped explicitly,
+Other Azure catalog resources are reported as unsupported by infrastructure export,
+not as diagram-only objects; non-deployable diagram objects are identified separately.
+Properties are mapped explicitly,
 not copied blindly from the diagram. Missing mandatory configuration produces a required
 parameter without a supplied value rather than an invented deployment value.
 Subnets are declared inline in their VNet, not deployed as competing standalone updates.
@@ -66,6 +69,30 @@ that cannot be derived must be supplied before deployment. Resource types and AP
 are deliberately pinned schema identifiers, not user-configurable resource settings.
 Secrets are not extracted from arbitrary diagram attributes or custom properties.
 Do not put credentials in names, tags or other non-secret settings.
+
+### Key Vault
+
+Key Vault exports create a vault declaration in ARM and Bicep. **Tenant ID** is taken
+from the vault's field or its enclosing Azure Tenant container; otherwise the
+`*_tenantId` parameter must be supplied before deployment. Azure imports preserve this
+field. SKU is mapped to the vault's nested `properties.sku` (family `A`).
+
+RBAC authorization defaults to enabled; role assignments must be deployed separately.
+If access-policy authorization is selected, supply the required `*_accessPolicies`
+array explicitly. Existing policies cannot be reconstructed from the diagram.
+Review any authorization-mode change before updating an existing vault.
+
+Soft delete is enabled, retention must be 7–90 days, and purge protection defaults to
+enabled. Enabling purge protection is irreversible; an unchecked option is omitted
+rather than sending an unsupported request to disable existing protection. Existing
+vault retention cannot be changed.
+
+Missing or unsupported public-access settings default to Disabled; explicit Enabled is retained.
+Firewall rules default to deny, with no trusted-service
+bypass or generated IP/VNet rules, even when public access is explicitly enabled.
+Configure the properties parameter and any private endpoints separately, and inspect
+what-if before updating a vault with existing firewall rules. Keys, secrets, certificates
+and arbitrary custom properties are never exported.
 
 ### Logic Apps and API Management
 

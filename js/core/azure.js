@@ -504,7 +504,7 @@
     'sql-database': (r, p) => ({ sku: sqlTier(r), maxSize: p.maxSizeBytes ? Math.round(p.maxSizeBytes / 1073741824) + ' GB' : undefined, backupRedundancy: p.requestedBackupStorageRedundancy, zoneRedundant: bool(p.zoneRedundant) }),
     redis: (r, p) => ({ sku: p.sku ? p.sku.name + ' ' + p.sku.family + p.sku.capacity : undefined, publicNetworkAccess: p.publicNetworkAccess, privateEndpoint: hasPrivateEndpoint(p) }),
     'key-vault': (r, p) => ({
-      sku: p.sku && cap(p.sku.name), rbacAuthorization: bool(p.enableRbacAuthorization), softDeleteRetentionDays: p.softDeleteRetentionInDays,
+      tenantId: p.tenantId, sku: p.sku && cap(p.sku.name), rbacAuthorization: bool(p.enableRbacAuthorization), softDeleteRetentionDays: p.softDeleteRetentionInDays,
       purgeProtection: bool(p.enablePurgeProtection), publicNetworkAccess: p.publicNetworkAccess, privateEndpoint: hasPrivateEndpoint(p)
     }),
     'virtual-network': (r, p) => ({

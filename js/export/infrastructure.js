@@ -13,6 +13,7 @@
     'service-bus-topic': ['Microsoft.ServiceBus/namespaces/topics', '2021-11-01', 'service-bus-namespace'],
     'service-bus-subscription': ['Microsoft.ServiceBus/namespaces/topics/subscriptions', '2021-11-01', 'service-bus-topic'],
     'storage-account': ['Microsoft.Storage/storageAccounts', '2023-05-01'],
+    'key-vault': ['Microsoft.KeyVault/vaults', '2023-07-01'],
     'virtual-network': ['Microsoft.Network/virtualNetworks', '2023-11-01'],
     subnet: ['Microsoft.Network/virtualNetworks/subnets', '2023-11-01', 'virtual-network'],
     nsg: ['Microsoft.Network/networkSecurityGroups', '2023-11-01'],
@@ -89,7 +90,12 @@
     nodes.forEach((n) => {
       if (TYPES[n.type] && !ancestor(n, 'resource-group')) warn(n, 'Skipped: resource has no resource-group scope.');
       else if (n.type === 'logic-app-workflow') warn(n, 'Standard workflow application content must be deployed separately to its Logic App Standard host (workflow.json and connections/runtime configuration); it is not an independently deployable ARM child resource.');
-      else if (!TYPES[n.type] && !['azure-tenant', 'management-group', 'subscription', 'resource-group'].includes(n.type)) warn(n, 'Skipped: unsupported resource or diagram-only object.');
+      else if (!TYPES[n.type] && !['azure-tenant', 'management-group', 'subscription', 'resource-group'].includes(n.type)) {
+        const type = A.Catalog.get(n.type);
+        warn(n, type && type.azure && type.provider
+          ? 'Skipped: unsupported resource type in infrastructure export (' + type.provider + '). This Azure resource needs a separate deployment definition; it is not diagram-only.'
+          : 'Skipped: diagram-only object or resource without a supported ARM deployment mapping.');
+      }
     });
     groups.forEach((rg, gi) => {
       const stem = base + '-rg' + String(gi + 1).padStart(3, '0');
@@ -288,6 +294,26 @@
           if (properties.allowSharedKeyAccess) warn(n, 'Shared-key authentication remains enabled.');
           if (properties.isSftpEnabled && !properties.isHnsEnabled) { validProperties = false; warn(n, 'SFTP requires hierarchical namespace.'); }
           tls(true); network();
+        } else if (n.type === 'key-vault') {
+          const tenant = ancestor(n, 'azure-tenant');
+          const tenantId = use('tenantId') || (tenant && (tenant.attributes || {}).tenantId);
+          propertyParam('tenantId', 'string', typeof tenantId === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(tenantId) ? tenantId : undefined);
+          const tier = use('sku');
+          propertyParam('sku', 'object', ['Standard', 'Premium'].includes(tier) ? { family: 'A', name: tier.toLowerCase() } : undefined);
+          bool('rbacAuthorization', 'enableRbacAuthorization', true);
+          if (properties.enableRbacAuthorization === true) properties.accessPolicies = [];
+          else if (properties.enableRbacAuthorization === false) {
+            propertyParam('accessPolicies', 'array');
+            warn(n, 'Access-policy authorization requires an explicit accessPolicies parameter; existing policies are not recovered from the diagram. Review every policy before deployment.');
+          }
+          properties.enableSoftDelete = true;
+          integer('softDeleteRetentionDays', 'softDeleteRetentionInDays', 7, 90);
+          bool('purgeProtection', 'enablePurgeProtection', true);
+          if (properties.enablePurgeProtection === false) delete properties.enablePurgeProtection;
+          network();
+          properties.networkAcls = { bypass: 'None', defaultAction: 'Deny', ipRules: [], virtualNetworkRules: [] };
+          warn(n, 'Key Vault exports the vault only, never keys, secrets or certificates. RBAC role assignments and private endpoints are not generated. Network ACLs default to deny with no trusted-service bypass; configure access explicitly. Review authorization changes and existing firewall rules before updating a vault.');
+          warn(n, 'Soft delete is enabled. Purge protection cannot be disabled once enabled, and retention cannot be changed on an existing vault; an unchecked purge-protection setting is omitted, not a request to disable it.');
         } else if (n.type === 'virtual-network') {
           const prefixes = list('addressSpace');
           if (prefixes.length && prefixes.every(cidr)) properties.addressSpace = { addressPrefixes: prefixes };
