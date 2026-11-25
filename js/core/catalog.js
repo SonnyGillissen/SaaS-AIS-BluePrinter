@@ -135,6 +135,7 @@
     automationRunbook: { min: 1, max: 63, chars: 'A-Za-z0-9_\\-', scope: 'parent' },
     webSite: { min: 2, max: 60, chars: 'A-Za-z0-9\\-', start: 'alnum', end: 'alnum', scope: 'global' },
     serverFarm: { min: 1, max: 60, chars: 'A-Za-z0-9\\-', scope: 'resourceGroup' },
+    virtualMachine: { min: 1, max: 64, chars: 'A-Za-z0-9_.\\-', scope: 'resourceGroup' },
     standardWorkflow: { min: 1, max: 43, chars: 'A-Za-z0-9_\\-', start: 'letter', scope: 'parent' },
     functionName: { min: 1, max: 128, chars: 'A-Za-z0-9_\\-', start: 'letter', scope: 'parent' },
     generic80: { min: 1, max: 80, chars: 'A-Za-z0-9_.()\\-', scope: 'resourceGroup' },
@@ -173,6 +174,9 @@
     containerRegistry: { min: 5, max: 50, chars: 'A-Za-z0-9', scope: 'global' },
     containerAppEnv: { min: 2, max: 60, chars: 'A-Za-z0-9\\-', start: 'letter', end: 'alnum', scope: 'resourceGroup' },
     containerApp: { min: 2, max: 32, chars: 'a-z0-9\\-', lower: true, start: 'letter', end: 'alnum', noDoubleHyphen: true, scope: 'resourceGroup' },
+    containerInstance: { min: 1, max: 63, chars: 'a-z0-9\\-', lower: true, start: 'alnum', end: 'alnum', scope: 'resourceGroup' },
+    kubernetesCluster: { min: 1, max: 63, chars: 'A-Za-z0-9\\-', scope: 'resourceGroup' },
+    cosmosChild: { min: 1, max: 255, invalid: '/\\\\#?', scope: 'parent' },
     cognitive: { min: 2, max: 64, chars: 'A-Za-z0-9\\-', start: 'alnum', end: 'alnum', scope: 'resourceGroup' },
     free: { min: 1, max: 256, scope: 'none' }
   };
@@ -208,9 +212,12 @@
     functionApp: 'compute/10029-icon-service-Function-Apps.svg',
     appServicePlan: 'app-services/00046-icon-service-App-Service-Plans.svg',
     appService: 'app-services/10035-icon-service-App-Services.svg',
+    virtualMachine: 'compute/10021-icon-service-Virtual-Machine.svg',
     containerAppsEnvironment: 'other/02989-icon-service-Container-Apps-Environments.svg',
     containerApp: 'other/02884-icon-service-Worker-Container-App.svg',
     containerRegistry: 'containers/10105-icon-service-Container-Registries.svg',
+    containerInstance: 'containers/10104-icon-service-Container-Instances.svg',
+    kubernetes: 'containers/10023-icon-service-Kubernetes-Services.svg',
     storageAccount: 'storage/10086-icon-service-Storage-Accounts.svg',
     storageContainer: 'general/10839-icon-service-Storage-Container.svg',
     storageQueue: 'general/10840-icon-service-Storage-Queue.svg',
@@ -612,6 +619,21 @@
       parents: RG, archimate: 'ApplicationComponent', rule: R.webSite,
       attributes: [text('runtime', 'Runtime stack', { show: true }), text('appServicePlan', 'App Service plan'), bool('vnetIntegration', 'VNet integration'), NETWORK_ACCESS, PRIVATE_ENDPOINT, MANAGED_IDENTITY]
     },
+    'virtual-machine': {
+      label: 'Virtual Machine', category: 'compute', icon: I.virtualMachine, abbr: 'vm', provider: 'Microsoft.Compute/virtualMachines',
+      parents: RG, archimate: 'Node', rule: R.virtualMachine,
+      attributes: [text('size', 'VM size', { show: true }), text('os', 'Operating system'), text('image', 'Image'), MANAGED_IDENTITY]
+    },
+    'container-instance': {
+      label: 'Container Instance', category: 'compute', icon: I.containerInstance, abbr: 'aci', provider: 'Microsoft.ContainerInstance/containerGroups',
+      parents: RG, archimate: 'ApplicationComponent', rule: R.containerInstance, network: true,
+      attributes: [text('image', 'Image', { show: true }), select('os', 'Operating system', ['Linux', 'Windows']), select('restartPolicy', 'Restart policy', ['Always', 'OnFailure', 'Never']), select('ipType', 'IP address type', ['Public', 'Private', 'None'])]
+    },
+    'kubernetes-cluster': {
+      label: 'Kubernetes Service (AKS)', category: 'compute', icon: I.kubernetes, abbr: 'aks', provider: 'Microsoft.ContainerService/managedClusters',
+      parents: RG, archimate: 'Node', rule: R.kubernetesCluster, network: true,
+      attributes: [text('kubernetesVersion', 'Kubernetes version', { show: true }), text('vmSize', 'Node VM size'), num('nodeCount', 'Node count'), text('networkPlugin', 'Network plugin'), MANAGED_IDENTITY]
+    },
     'container-apps-environment': {
       label: 'Container Apps Environment', category: 'compute', icon: I.containerAppsEnvironment, abbr: 'cae', provider: 'Microsoft.App/managedEnvironments',
       parents: RG, archimate: 'Node', rule: R.containerAppEnv, network: true,
@@ -676,6 +698,51 @@
         select('consistency', 'Default consistency', ['Session', 'Strong', 'Bounded staleness', 'Consistent prefix', 'Eventual'], { default: 'Session' }),
         bool('multiRegionWrites', 'Multi-region writes'), NETWORK_ACCESS, PRIVATE_ENDPOINT
       ]
+    },
+    'cosmos-sql-database': {
+      label: 'Cosmos DB SQL Database', category: 'data', icon: I.cosmos, abbr: 'cosmosdb', provider: 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases',
+      parents: ['cosmos-db'], archimate: 'Artifact', rule: R.cosmosChild, pattern: '{name}',
+      attributes: [text('throughput', 'Throughput (RU/s)'), text('autoscaleMaxThroughput', 'Autoscale max throughput')]
+    },
+    'cosmos-sql-container': {
+      label: 'Cosmos DB SQL Container', category: 'data', icon: I.storageContainer, abbr: 'cosmosct', provider: 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers',
+      parents: ['cosmos-sql-database'], archimate: 'DataObject', rule: R.cosmosChild, pattern: '{name}',
+      attributes: [text('partitionKey', 'Partition key'), text('throughput', 'Throughput (RU/s)'), text('autoscaleMaxThroughput', 'Autoscale max throughput')]
+    },
+    'cosmos-mongodb-database': {
+      label: 'Cosmos DB MongoDB Database', category: 'data', icon: I.cosmos, abbr: 'cosmosdb', provider: 'Microsoft.DocumentDB/databaseAccounts/mongodbDatabases',
+      parents: ['cosmos-db'], archimate: 'Artifact', rule: R.cosmosChild, pattern: '{name}',
+      attributes: [text('throughput', 'Throughput (RU/s)'), text('autoscaleMaxThroughput', 'Autoscale max throughput')]
+    },
+    'cosmos-mongodb-collection': {
+      label: 'Cosmos DB MongoDB Collection', category: 'data', icon: I.storageContainer, abbr: 'cosmoscol', provider: 'Microsoft.DocumentDB/databaseAccounts/mongodbDatabases/collections',
+      parents: ['cosmos-mongodb-database'], archimate: 'DataObject', rule: R.cosmosChild, pattern: '{name}',
+      attributes: [text('shardKey', 'Shard key'), text('throughput', 'Throughput (RU/s)'), text('autoscaleMaxThroughput', 'Autoscale max throughput')]
+    },
+    'cosmos-cassandra-keyspace': {
+      label: 'Cosmos DB Cassandra Keyspace', category: 'data', icon: I.cosmos, abbr: 'cosmosks', provider: 'Microsoft.DocumentDB/databaseAccounts/cassandraKeyspaces',
+      parents: ['cosmos-db'], archimate: 'Artifact', rule: R.cosmosChild, pattern: '{name}',
+      attributes: [text('throughput', 'Throughput (RU/s)'), text('autoscaleMaxThroughput', 'Autoscale max throughput')]
+    },
+    'cosmos-cassandra-table': {
+      label: 'Cosmos DB Cassandra Table', category: 'data', icon: I.storageTable, abbr: 'cosmostbl', provider: 'Microsoft.DocumentDB/databaseAccounts/cassandraKeyspaces/tables',
+      parents: ['cosmos-cassandra-keyspace'], archimate: 'DataObject', rule: R.cosmosChild, pattern: '{name}',
+      attributes: [text('throughput', 'Throughput (RU/s)'), text('autoscaleMaxThroughput', 'Autoscale max throughput')]
+    },
+    'cosmos-gremlin-database': {
+      label: 'Cosmos DB Gremlin Database', category: 'data', icon: I.cosmos, abbr: 'cosmosdb', provider: 'Microsoft.DocumentDB/databaseAccounts/gremlinDatabases',
+      parents: ['cosmos-db'], archimate: 'Artifact', rule: R.cosmosChild, pattern: '{name}',
+      attributes: [text('throughput', 'Throughput (RU/s)'), text('autoscaleMaxThroughput', 'Autoscale max throughput')]
+    },
+    'cosmos-gremlin-graph': {
+      label: 'Cosmos DB Gremlin Graph', category: 'data', icon: I.storageContainer, abbr: 'cosmosgr', provider: 'Microsoft.DocumentDB/databaseAccounts/gremlinDatabases/graphs',
+      parents: ['cosmos-gremlin-database'], archimate: 'DataObject', rule: R.cosmosChild, pattern: '{name}',
+      attributes: [text('partitionKey', 'Partition key'), text('throughput', 'Throughput (RU/s)'), text('autoscaleMaxThroughput', 'Autoscale max throughput')]
+    },
+    'cosmos-table': {
+      label: 'Cosmos DB Table', category: 'data', icon: I.storageTable, abbr: 'cosmostbl', provider: 'Microsoft.DocumentDB/databaseAccounts/tables',
+      parents: ['cosmos-db'], archimate: 'DataObject', rule: R.cosmosChild, pattern: '{name}',
+      attributes: [text('throughput', 'Throughput (RU/s)'), text('autoscaleMaxThroughput', 'Autoscale max throughput')]
     },
     'sql-server': {
       label: 'SQL Server (logical)', category: 'data', icon: I.sqlServer, abbr: 'sql', provider: 'Microsoft.Sql/servers',

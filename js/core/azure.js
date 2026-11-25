@@ -202,12 +202,24 @@
     'microsoft.app/managedenvironments': 'container-apps-environment',
     'microsoft.app/containerapps': 'container-app',
     'microsoft.containerregistry/registries': 'container-registry',
+    'microsoft.compute/virtualmachines': 'virtual-machine',
+    'microsoft.containerinstance/containergroups': 'container-instance',
+    'microsoft.containerservice/managedclusters': 'kubernetes-cluster',
     'microsoft.storage/storageaccounts': 'storage-account',
     'microsoft.storage/storageaccounts/blobservices/containers': 'storage-container',
     'microsoft.storage/storageaccounts/queueservices/queues': 'storage-queue',
     'microsoft.storage/storageaccounts/tableservices/tables': 'storage-table',
     'microsoft.storage/storageaccounts/fileservices/shares': 'storage-file-share',
     'microsoft.documentdb/databaseaccounts': 'cosmos-db',
+    'microsoft.documentdb/databaseaccounts/sqldatabases': 'cosmos-sql-database',
+    'microsoft.documentdb/databaseaccounts/sqldatabases/containers': 'cosmos-sql-container',
+    'microsoft.documentdb/databaseaccounts/mongodbdatabases': 'cosmos-mongodb-database',
+    'microsoft.documentdb/databaseaccounts/mongodbdatabases/collections': 'cosmos-mongodb-collection',
+    'microsoft.documentdb/databaseaccounts/cassandrakeyspaces': 'cosmos-cassandra-keyspace',
+    'microsoft.documentdb/databaseaccounts/cassandrakeyspaces/tables': 'cosmos-cassandra-table',
+    'microsoft.documentdb/databaseaccounts/gremlindatabases': 'cosmos-gremlin-database',
+    'microsoft.documentdb/databaseaccounts/gremlindatabases/graphs': 'cosmos-gremlin-graph',
+    'microsoft.documentdb/databaseaccounts/tables': 'cosmos-table',
     'microsoft.sql/servers': 'sql-server',
     'microsoft.sql/servers/databases': 'sql-database',
     'microsoft.cache/redis': 'redis',
@@ -322,6 +334,13 @@
       { type: 'storage-queue', path: '/queueServices/default/queues', api: '2023-01-01' },
       { type: 'storage-table', path: '/tableServices/default/tables', api: '2023-01-01' },
       { type: 'storage-file-share', path: '/fileServices/default/shares', api: '2023-01-01' }
+    ],
+    'cosmos-db': [
+      { type: 'cosmos-sql-database', path: '/sqlDatabases', api: '2024-05-15', children: [{ type: 'cosmos-sql-container', path: '/containers', api: '2024-05-15' }] },
+      { type: 'cosmos-mongodb-database', path: '/mongodbDatabases', api: '2024-05-15', children: [{ type: 'cosmos-mongodb-collection', path: '/collections', api: '2024-05-15' }] },
+      { type: 'cosmos-cassandra-keyspace', path: '/cassandraKeyspaces', api: '2024-05-15', children: [{ type: 'cosmos-cassandra-table', path: '/tables', api: '2024-05-15' }] },
+      { type: 'cosmos-gremlin-database', path: '/gremlinDatabases', api: '2024-05-15', children: [{ type: 'cosmos-gremlin-graph', path: '/graphs', api: '2024-05-15' }] },
+      { type: 'cosmos-table', path: '/tables', api: '2024-05-15' }
     ],
     'private-dns-zone': [{ attach: 'vnetLinks', path: '/virtualNetworkLinks', api: '2020-06-01' }],
     'azure-openai': [{ attach: 'deployments', path: '/deployments', api: '2023-05-01' }]
@@ -484,6 +503,30 @@
         minReplicas: scale && scale.minReplicas, maxReplicas: scale && scale.maxReplicas, identity: identity(r)
       };
     },
+    'virtual-machine': (r, p) => {
+      const image = p.storageProfile && p.storageProfile.imageReference;
+      return {
+        size: p.hardwareProfile && p.hardwareProfile.vmSize,
+        os: p.storageProfile && p.storageProfile.osDisk && p.storageProfile.osDisk.osType,
+        image: image && join([image.publisher, image.offer, image.sku, image.version]),
+        identity: identity(r)
+      };
+    },
+    'container-instance': (r, p) => {
+      const container = arr(p.containers)[0];
+      return {
+        image: container && container.properties && container.properties.image,
+        os: p.osType, restartPolicy: p.restartPolicy,
+        ipType: p.ipAddress && p.ipAddress.type
+      };
+    },
+    'kubernetes-cluster': (r, p) => {
+      const pool = arr(p.agentPoolProfiles)[0];
+      return {
+        kubernetesVersion: p.kubernetesVersion, vmSize: pool && pool.vmSize, nodeCount: pool && pool.count,
+        networkPlugin: p.networkProfile && p.networkProfile.networkPlugin, identity: identity(r)
+      };
+    },
     'container-registry': (r, p) => ({ sku: r.sku && r.sku.name, adminUser: bool(p.adminUserEnabled), publicNetworkAccess: p.publicNetworkAccess, privateEndpoint: hasPrivateEndpoint(p) }),
     'storage-account': (r, p) => {
       const parts = String((r.sku && r.sku.name) || '').split('_');
@@ -499,6 +542,36 @@
       api: cosmosApi(r, p), capacityMode: arr(p.capabilities).some((c) => lower(c && c.name) === 'enableserverless') ? 'Serverless' : undefined,
       consistency: p.consistencyPolicy && CONSISTENCY[lower(p.consistencyPolicy.defaultConsistencyLevel)], multiRegionWrites: bool(p.enableMultipleWriteLocations),
       publicNetworkAccess: p.publicNetworkAccess, privateEndpoint: hasPrivateEndpoint(p)
+    }),
+    'cosmos-sql-database': (r, p) => ({
+      throughput: p.options && p.options.throughput, autoscaleMaxThroughput: p.options && p.options.autoscaleSettings && p.options.autoscaleSettings.maxThroughput
+    }),
+    'cosmos-sql-container': (r, p) => ({
+      partitionKey: p.resource && p.resource.partitionKey && join(p.resource.partitionKey.paths),
+      throughput: p.options && p.options.throughput, autoscaleMaxThroughput: p.options && p.options.autoscaleSettings && p.options.autoscaleSettings.maxThroughput
+    }),
+    'cosmos-mongodb-database': (r, p) => ({
+      throughput: p.options && p.options.throughput, autoscaleMaxThroughput: p.options && p.options.autoscaleSettings && p.options.autoscaleSettings.maxThroughput
+    }),
+    'cosmos-mongodb-collection': (r, p) => ({
+      shardKey: p.resource && p.resource.shardKey && join(Object.keys(p.resource.shardKey)),
+      throughput: p.options && p.options.throughput, autoscaleMaxThroughput: p.options && p.options.autoscaleSettings && p.options.autoscaleSettings.maxThroughput
+    }),
+    'cosmos-cassandra-keyspace': (r, p) => ({
+      throughput: p.options && p.options.throughput, autoscaleMaxThroughput: p.options && p.options.autoscaleSettings && p.options.autoscaleSettings.maxThroughput
+    }),
+    'cosmos-cassandra-table': (r, p) => ({
+      throughput: p.options && p.options.throughput, autoscaleMaxThroughput: p.options && p.options.autoscaleSettings && p.options.autoscaleSettings.maxThroughput
+    }),
+    'cosmos-gremlin-database': (r, p) => ({
+      throughput: p.options && p.options.throughput, autoscaleMaxThroughput: p.options && p.options.autoscaleSettings && p.options.autoscaleSettings.maxThroughput
+    }),
+    'cosmos-gremlin-graph': (r, p) => ({
+      partitionKey: p.resource && p.resource.partitionKey && join(p.resource.partitionKey.paths),
+      throughput: p.options && p.options.throughput, autoscaleMaxThroughput: p.options && p.options.autoscaleSettings && p.options.autoscaleSettings.maxThroughput
+    }),
+    'cosmos-table': (r, p) => ({
+      throughput: p.options && p.options.throughput, autoscaleMaxThroughput: p.options && p.options.autoscaleSettings && p.options.autoscaleSettings.maxThroughput
     }),
     'sql-server': (r, p) => ({ entraOnlyAuth: p.administrators ? bool(p.administrators.azureADOnlyAuthentication) : undefined, entraAdmin: p.administrators && p.administrators.login, minimalTlsVersion: tls(p.minimalTlsVersion), publicNetworkAccess: p.publicNetworkAccess, privateEndpoint: hasPrivateEndpoint(p) }),
     'sql-database': (r, p) => ({ sku: sqlTier(r), maxSize: p.maxSizeBytes ? Math.round(p.maxSizeBytes / 1073741824) + ' GB' : undefined, backupRedundancy: p.requestedBackupStorageRedundancy, zoneRedundant: bool(p.zoneRedundant) }),

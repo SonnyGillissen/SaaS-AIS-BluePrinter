@@ -38,6 +38,11 @@ test('Azure resource types map to catalog types (including kinds)', () => {
   assert.equal(Azure.mapType({ type: 'Microsoft.Network/expressRouteCircuits' }), 'expressroute-circuit');
   assert.equal(Azure.mapType({ type: 'Microsoft.ApiManagement/service/workspaces' }), 'apim-workspace');
   assert.equal(Azure.mapType({ type: 'Microsoft.ApiManagement/service/gateways' }), 'apim-gateway');
+  assert.equal(Azure.mapType({ type: 'Microsoft.Compute/virtualMachines' }), 'virtual-machine');
+  assert.equal(Azure.mapType({ type: 'Microsoft.ContainerInstance/containerGroups' }), 'container-instance');
+  assert.equal(Azure.mapType({ type: 'Microsoft.ContainerService/managedClusters' }), 'kubernetes-cluster');
+  assert.equal(Azure.mapType({ type: 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases' }), 'cosmos-sql-database');
+  assert.equal(Azure.mapType({ type: 'Microsoft.DocumentDB/databaseAccounts/mongodbDatabases/collections' }), 'cosmos-mongodb-collection');
   assert.equal(Azure.mapType({ type: 'Microsoft.Contoso/widgets' }), null);
   assert.ok(Azure.isSupporting({ type: 'Microsoft.Network/networkInterfaces' }));
   assert.ok(!Azure.isSkipped({ type: 'Microsoft.Network/networkInterfaces' }));
@@ -48,6 +53,72 @@ test('Azure resource types map to catalog types (including kinds)', () => {
     const walk = (specs) => specs.forEach((s) => { if (s.type) assert.ok(Catalog.get(s.type), s.type); walk(s.children || []); });
     walk(Azure.CHILD_SPECS[k]);
   });
+});
+
+test('VMs and container services import their configuration into resource groups', () => {
+  ['virtual-machine', 'container-instance', 'kubernetes-cluster'].forEach((type) => {
+    assert.ok(Catalog.canContain('resource-group', type), type);
+  });
+  const { project } = Azure.buildProject({
+    managementGroups: [],
+    subscriptions: [{ subscriptionId: SUB, displayName: 'Integration' }],
+    resourceGroups: [{ id: RG, name: 'rg-int', location: 'westeurope', subscriptionId: SUB }],
+    resources: [
+      {
+        id: RG + '/providers/Microsoft.Compute/virtualMachines/vm-int', name: 'vm-int',
+        type: 'Microsoft.Compute/virtualMachines',
+        properties: { hardwareProfile: { vmSize: 'Standard_D2s_v5' }, storageProfile: { osDisk: { osType: 'Linux' } } }
+      },
+      {
+        id: RG + '/providers/Microsoft.ContainerInstance/containerGroups/aci-int', name: 'aci-int',
+        type: 'Microsoft.ContainerInstance/containerGroups',
+        properties: { containers: [{ properties: { image: 'nginx:latest' } }], restartPolicy: 'Always', osType: 'Linux' }
+      },
+      {
+        id: RG + '/providers/Microsoft.ContainerService/managedClusters/aks-int', name: 'aks-int',
+        type: 'Microsoft.ContainerService/managedClusters',
+        properties: { kubernetesVersion: '1.30', agentPoolProfiles: [{ vmSize: 'Standard_D2s_v5', count: 3 }], networkProfile: { networkPlugin: 'azure' } }
+      }
+    ],
+    extras: {}
+  });
+  assert.equal(byName(project, 'vm-int').attributes.size, 'Standard_D2s_v5');
+  assert.equal(byName(project, 'aci-int').attributes.image, 'nginx:latest');
+  assert.equal(byName(project, 'aks-int').attributes.nodeCount, 3);
+});
+
+test('Cosmos DB API databases and their child resources retain account hierarchy', () => {
+  const accountId = RG + '/providers/Microsoft.DocumentDB/databaseAccounts/cosmos-int';
+  const databaseId = accountId + '/sqlDatabases/orders';
+  const containerId = databaseId + '/containers/items';
+  const { project } = Azure.buildProject({
+    managementGroups: [],
+    subscriptions: [{ subscriptionId: SUB, displayName: 'Integration' }],
+    resourceGroups: [{ id: RG, name: 'rg-int', location: 'westeurope', subscriptionId: SUB }],
+    resources: [
+      { id: accountId, name: 'cosmos-int', type: 'Microsoft.DocumentDB/databaseAccounts', kind: 'GlobalDocumentDB' },
+      {
+        id: databaseId, name: 'orders', type: 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases',
+        _catalogType: 'cosmos-sql-database', _parent: accountId,
+        properties: { options: { throughput: 400 } }
+      },
+      {
+        id: containerId, name: 'items', type: 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers',
+        _catalogType: 'cosmos-sql-container', _parent: databaseId,
+        properties: { resource: { partitionKey: { paths: ['/customerId'] } }, options: { autoscaleSettings: { maxThroughput: 1000 } } }
+      }
+    ],
+    extras: {}
+  });
+  const account = byName(project, 'cosmos-int');
+  const database = byName(project, 'orders');
+  const container = byName(project, 'items');
+  assert.equal(database.parentId, account.id);
+  assert.equal(database.attributes.throughput, 400);
+  assert.equal(container.parentId, database.id);
+  assert.equal(container.attributes.partitionKey, '/customerId');
+  assert.equal(container.attributes.autoscaleMaxThroughput, 1000);
+  assert.ok(Azure.CHILD_SPECS['cosmos-db'].some((spec) => spec.type === 'cosmos-sql-database' && spec.children.some((child) => child.type === 'cosmos-sql-container')));
 });
 
 test('API Management gateways are catalog children and import their location', () => {
